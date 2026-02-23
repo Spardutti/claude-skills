@@ -21,6 +21,7 @@ This will:
 | `react-use-effect` | React 19 useEffect best practices and anti-patterns |
 | `single-responsibility` | Single responsibility, file size limits, complexity rules |
 | `react-query` | TanStack React Query with query-key-factory patterns |
+| `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
 
 ## What are Claude Code Skills?
 
