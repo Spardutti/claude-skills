@@ -1,6 +1,6 @@
 ---
 name: react-use-effect
-description: Review and write React useEffect hooks following React 19 best practices. Use when creating, reviewing, or refactoring useEffect usage in components.
+description: "MUST USE when writing or editing any useEffect, useLayoutEffect, or side-effect logic in React components. Enforces React 19 best practices — most useEffects are unnecessary and should be replaced."
 ---
 
 # React useEffect Best Practices (React 19)

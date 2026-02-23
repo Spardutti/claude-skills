@@ -1,6 +1,6 @@
 ---
 name: react-query
-description: TanStack React Query with @lukemorales/query-key-factory. Enforces per-feature createQueryKeys, mergeQueryKeys, custom hooks, and named destructuring.
+description: "MUST USE when writing or editing: useQuery, useMutation, useInfiniteQuery, query hooks, mutation hooks, query keys, cache invalidation, or any data-fetching hook. Enforces TanStack React Query with @lukemorales/query-key-factory patterns."
 ---
 
 # React Query with Query Key Factory

@@ -1,6 +1,6 @@
 ---
 name: single-responsibility
-description: Enforce single responsibility, small files, low complexity, and decoupled code. Use when writing, reviewing, or refactoring any component, hook, service, or utility.
+description: "MUST USE when creating or editing any React component, hook, service, or utility file. Enforces max 200 lines/file, max 30 lines/function, max 3 nesting levels, and single-responsibility splitting rules."
 ---
 
 # Single Responsibility Principle
