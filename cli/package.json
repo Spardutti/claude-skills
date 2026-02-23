@@ -1,10 +1,10 @@
 {
   "name": "@spardutti/claude-skills",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CLI to install Claude Code skills from the claude-skills collection",
   "type": "module",
   "bin": {
-    "claude-skills": "./bin/cli.mjs"
+    "claude-skills": "bin/cli.mjs"
   },
   "engines": {
     "node": ">=18"
