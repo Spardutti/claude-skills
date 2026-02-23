@@ -11,6 +11,18 @@ Personal collection of reusable Claude Code skills.
 
 ## Usage
 
+### Quick Install (recommended)
+
+Run from any project directory to interactively select and install skills:
+
+```bash
+npx @spardutti/claude-skills
+```
+
+This fetches the latest skills from GitHub, lets you pick which ones to install, and copies them into your project's `.claude/skills/` directory.
+
+### Manual Install
+
 Copy a skill directory into your project's `.claude/skills/` folder:
 
 ```bash

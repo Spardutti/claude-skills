@@ -1,0 +1,27 @@
+{
+  "name": "@spardutti/claude-skills",
+  "version": "1.0.0",
+  "description": "CLI to install Claude Code skills from the claude-skills collection",
+  "type": "module",
+  "bin": {
+    "claude-skills": "./bin/cli.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "skills",
+    "cli"
+  ],
+  "author": "spardutti",
+  "license": "MIT",
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0"
+  }
+}
