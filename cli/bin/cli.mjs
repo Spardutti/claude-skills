@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
+import { confirm } from "@inquirer/prompts";
 import { fetchSkills } from "../lib/github.mjs";
 import { promptSkillSelection } from "../lib/prompt.mjs";
 import { installSkills } from "../lib/install.mjs";
+import { setupHook } from "../lib/setup-hook.mjs";
+import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 
 async function main() {
   console.log("\n  Claude Skills Installer\n");
@@ -24,6 +27,19 @@ async function main() {
 
   console.log();
   await installSkills(selected);
+
+  console.log();
+  const shouldSetup = await confirm({
+    message: "Set up skill evaluation hook + CLAUDE.md rule? (Recommended)",
+    default: true,
+  });
+
+  if (shouldSetup) {
+    console.log();
+    await setupHook();
+    await setupClaudeMd();
+  }
+
   console.log(`\n  Done! ${selected.length} skill(s) installed.\n`);
 }
 

@@ -11,28 +11,77 @@ Personal collection of reusable Claude Code skills.
 | `react-query` | TanStack React Query with @lukemorales/query-key-factory patterns |
 | `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
 
-## Usage
+## Quick Start
 
-### Quick Install (recommended)
-
-Run from any project directory to interactively select and install skills:
+Run from any project directory:
 
 ```bash
 npx @spardutti/claude-skills
 ```
 
-This fetches the latest skills from GitHub, lets you pick which ones to install, and copies them into your project's `.claude/skills/` directory.
+The CLI will:
 
-### Manual Install
+1. Fetch the latest skills from GitHub
+2. Let you pick which ones to install
+3. Copy them into your project's `.claude/skills/` directory
+4. **Optionally set up automatic skill evaluation** (recommended — see below)
+
+## Automatic Skill Evaluation
+
+After installing skills, the CLI asks if you want to set up automatic skill evaluation. If you say yes, it will:
+
+- **Create a hook** at `.claude/hooks/skill-forced-eval-hook.sh` that runs on every prompt
+- **Update your `CLAUDE.md`** with a `skill_evaluation` rule
+
+This forces Claude to explicitly evaluate every installed skill before writing code — listing each skill as ACTIVATE or SKIP with a reason, then calling the relevant ones. Without this, Claude may silently ignore your skills.
+
+### What gets created
+
+**`.claude/settings.json`** — Registers the hook:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/.claude/hooks/skill-forced-eval-hook.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**`CLAUDE.md`** — Appends the evaluation rule:
+
+```yaml
+skill_evaluation:
+  mandatory: true
+  rule: |
+    BEFORE writing ANY code, you MUST:
+    1. List EVERY skill from the system-reminder's available skills section
+    2. For each skill, write: [skill-name] → ACTIVATE / SKIP — [one-line reason]
+    3. Call Skill(name) for every skill marked ACTIVATE
+    4. Only THEN proceed to implementation
+    If you skip this evaluation, your response is INCOMPLETE and WRONG.
+```
+
+### GitHub Authentication
+
+The CLI uses the GitHub API to fetch skills. To avoid rate limits:
+
+- If you have the [GitHub CLI](https://cli.github.com) installed and authenticated (`gh auth login`), the token is picked up automatically
+- Or set `GITHUB_TOKEN` / `GH_TOKEN` environment variable
+- Without auth, GitHub allows 60 requests/hour (the CLI uses ~6 per run)
+
+## Manual Install
 
 Copy a skill directory into your project's `.claude/skills/` folder:
 
 ```bash
 cp -r skills/<skill-name> /path/to/project/.claude/skills/
-```
-
-Or symlink for automatic updates:
-
-```bash
-ln -s /path/to/claude-skills/skills/<skill-name> /path/to/project/.claude/skills/<skill-name>
 ```

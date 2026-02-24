@@ -1,16 +1,45 @@
+import { execSync } from "node:child_process";
+
 const REPO_OWNER = "Spardutti";
 const REPO_NAME = "claude-skills";
 const CONTENTS_API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/skills`;
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/skills`;
 
+function getAuthHeaders() {
+  const headers = { "User-Agent": "claude-skills-cli" };
+
+  // 1. Explicit env var
+  const envToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (envToken) {
+    headers.Authorization = `Bearer ${envToken}`;
+    return headers;
+  }
+
+  // 2. Try gh CLI token
+  try {
+    const token = execSync("gh auth token", {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // gh not installed or not authenticated — continue unauthenticated
+  }
+
+  return headers;
+}
+
 export async function fetchSkills() {
-  const res = await fetch(CONTENTS_API, {
-    headers: { "User-Agent": "claude-skills-cli" },
-  });
+  const headers = getAuthHeaders();
+
+  const res = await fetch(CONTENTS_API, { headers });
 
   if (!res.ok) {
-    if (res.status === 403) {
-      throw new Error("GitHub API rate limit exceeded. Try again later.");
+    if (res.status === 403 || res.status === 429) {
+      throw new Error("GitHub API rate limit exceeded. Try again later or install gh CLI (https://cli.github.com).");
     }
     throw new Error(`Failed to list skills: ${res.status} ${res.statusText}`);
   }
@@ -22,9 +51,7 @@ export async function fetchSkills() {
     dirs.map(async (dir) => {
       try {
         const url = `${RAW_BASE}/${dir.name}/SKILL.md`;
-        const r = await fetch(url, {
-          headers: { "User-Agent": "claude-skills-cli" },
-        });
+        const r = await fetch(url, { headers });
 
         if (!r.ok) {
           console.warn(`  Warning: No SKILL.md found in ${dir.name}, skipping`);
