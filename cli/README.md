@@ -32,6 +32,7 @@ Together, these force Claude to explicitly evaluate and activate relevant skills
 | `single-responsibility` | Single responsibility, file size limits, complexity rules |
 | `react-query` | TanStack React Query with query-key-factory patterns |
 | `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
+| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
 
 ## GitHub Authentication
 

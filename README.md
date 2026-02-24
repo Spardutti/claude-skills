@@ -10,6 +10,8 @@ Personal collection of reusable Claude Code skills.
 | `single-responsibility` | Single responsibility, file size limits, complexity rules |
 | `react-query` | TanStack React Query with @lukemorales/query-key-factory patterns |
 | `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
+| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
+| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
 
 ## Quick Start
 
