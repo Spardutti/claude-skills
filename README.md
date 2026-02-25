@@ -11,7 +11,10 @@ Personal collection of reusable Claude Code skills.
 | `react-query` | TanStack React Query with @lukemorales/query-key-factory patterns |
 | `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
 | `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
-| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
+| `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
+| `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
+| `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
+| `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
 
 ## Quick Start
 
