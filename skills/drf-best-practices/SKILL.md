@@ -1,5 +1,6 @@
 ---
 name: drf-best-practices
+category: Backend
 description: "MUST USE when creating or editing Django REST Framework views, serializers, viewsets, or API configuration. Enforces thin serializers, service layer, queryset optimization, and object-level permissions."
 ---
 

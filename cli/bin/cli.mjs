@@ -1,16 +1,23 @@
 #!/usr/bin/env node
 
 import { confirm } from "@inquirer/prompts";
+import chalk from "chalk";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { fetchSkills } from "../lib/github.mjs";
 import { promptSkillSelection } from "../lib/prompt.mjs";
 import { installSkills } from "../lib/install.mjs";
 import { setupHook } from "../lib/setup-hook.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 
-async function main() {
-  console.log("\n  Claude Skills Installer\n");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
-  console.log("  Fetching available skills...\n");
+async function main() {
+  console.log(`\n  ${chalk.bold.cyan("Claude Skills Installer")} ${chalk.dim(`v${pkg.version}`)}\n`);
+
+  console.log(chalk.dim("  Fetching available skills...\n"));
   const skills = await fetchSkills();
 
   if (skills.length === 0) {
@@ -40,7 +47,7 @@ async function main() {
     await setupClaudeMd();
   }
 
-  console.log(`\n  Done! ${selected.length} skill(s) installed.\n`);
+  console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`${selected.length} skill(s) installed successfully.`)}\n`);
 }
 
 main().catch((err) => {
@@ -48,6 +55,6 @@ main().catch((err) => {
     console.log("\n  Cancelled.\n");
     process.exit(0);
   }
-  console.error(`\n  Error: ${err.message}\n`);
+  console.error(`\n  ${chalk.red("Error:")} ${err.message}\n`);
   process.exit(1);
 });

@@ -1,5 +1,6 @@
 ---
 name: typescript-best-practices
+category: TypeScript
 description: "MUST USE when writing or editing TypeScript types, interfaces, generics, type guards, error handling patterns, or tsconfig configuration. Enforces TypeScript 5.x strict-mode best practices and type safety patterns."
 ---
 

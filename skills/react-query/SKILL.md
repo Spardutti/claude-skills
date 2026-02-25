@@ -1,5 +1,6 @@
 ---
 name: react-query
+category: Frontend
 description: "MUST USE when writing or editing: useQuery, useMutation, useInfiniteQuery, query hooks, mutation hooks, query keys, cache invalidation, or any data-fetching hook. Enforces TanStack React Query with @lukemorales/query-key-factory patterns."
 ---
 

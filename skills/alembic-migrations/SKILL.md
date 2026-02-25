@@ -1,5 +1,6 @@
 ---
 name: alembic-migrations
+category: Backend
 description: "MUST USE when creating, editing, or reviewing Alembic migration scripts, env.py configuration, or SQLAlchemy model changes that require migrations. Enforces naming conventions, autogenerate review, data migration safety, downgrade correctness, and production deployment patterns."
 ---
 

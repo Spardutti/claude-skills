@@ -1,5 +1,6 @@
 ---
 name: tanstack-router-best-practices
+category: Frontend
 description: "MUST USE when writing or editing TanStack Router routes, navigation, loaders, search params, beforeLoad guards, or route configuration. Enforces type-safe file-based routing patterns with TanStack Query integration."
 ---
 

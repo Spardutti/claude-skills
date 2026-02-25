@@ -1,5 +1,6 @@
 ---
 name: fastapi-best-practices
+category: Backend
 description: "MUST USE when creating or editing FastAPI routes, dependencies, Pydantic schemas, middleware, or API configuration. Enforces async correctness, dependency injection, service layer, Pydantic validation, and structured error handling."
 ---
 

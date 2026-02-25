@@ -1,5 +1,6 @@
 ---
 name: react-best-practices
+category: Frontend
 description: "MUST USE when writing or editing React components, hooks, state management, or component architecture. Enforces React 19 best practices — component design, state patterns, performance, and TypeScript integration."
 ---
 

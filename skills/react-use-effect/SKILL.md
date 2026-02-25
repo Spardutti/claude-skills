@@ -1,5 +1,6 @@
 ---
 name: react-use-effect
+category: Frontend
 description: "MUST USE when writing or editing any useEffect, useLayoutEffect, or side-effect logic in React components. Enforces React 19 best practices — most useEffects are unnecessary and should be replaced."
 ---
 

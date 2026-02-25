@@ -59,9 +59,9 @@ export async function fetchSkills() {
         }
 
         const content = await r.text();
-        const { name, description } = parseFrontmatter(content, dir.name);
+        const { name, description, category } = parseFrontmatter(content, dir.name);
 
-        return { dirName: dir.name, name, description, content };
+        return { dirName: dir.name, name, description, category, content };
       } catch {
         console.warn(`  Warning: Failed to fetch ${dir.name}, skipping`);
         return null;
@@ -75,7 +75,7 @@ export async function fetchSkills() {
 function parseFrontmatter(content, fallbackName) {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) {
-    return { name: fallbackName, description: "" };
+    return { name: fallbackName, description: "", category: "General" };
   }
 
   const block = match[1];
@@ -83,6 +83,8 @@ function parseFrontmatter(content, fallbackName) {
     block.match(/^name:\s*(.+)$/m)?.[1]?.trim() || fallbackName;
   const description =
     block.match(/^description:\s*(.+)$/m)?.[1]?.trim() || "";
+  const category =
+    block.match(/^category:\s*(.+)$/m)?.[1]?.trim() || "General";
 
-  return { name, description };
+  return { name, description, category };
 }

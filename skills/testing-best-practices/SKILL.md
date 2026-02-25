@@ -1,5 +1,6 @@
 ---
 name: testing-best-practices
+category: Quality
 description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage."
 ---
 

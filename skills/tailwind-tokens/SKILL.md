@@ -1,5 +1,6 @@
 ---
 name: tailwind-tokens
+category: Frontend
 description: "MUST USE when writing or editing any JSX/TSX with Tailwind CSS classes, className attributes, or styling. Enforces design tokens — every visual property (color, spacing, radius, etc.) must come from the project theme. No raw Tailwind palette colors, no arbitrary values."
 ---
 
