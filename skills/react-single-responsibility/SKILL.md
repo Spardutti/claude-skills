@@ -1,6 +1,6 @@
 ---
-name: single-responsibility
-category: Quality
+name: react-single-responsibility
+category: React
 description: "MUST USE when creating or editing any React component, hook, service, or utility file. Enforces max 200 lines/file, max 30 lines/function, max 3 nesting levels, and single-responsibility splitting rules."
 ---
 

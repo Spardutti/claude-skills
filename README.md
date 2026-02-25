@@ -11,7 +11,7 @@ Personal collection of reusable Claude Code skills.
 | `react-query` | TanStack React Query with @lukemorales/query-key-factory patterns |
 | `tanstack-router-best-practices` | TanStack Router — file-based routing, type-safe navigation, loaders, search params, auth guards |
 | `typescript-best-practices` | TypeScript 5.x — type design, type safety, generics, error handling, tsconfig |
-| `single-responsibility` | Single responsibility, file size limits, complexity rules |
+| `react-single-responsibility` | React single responsibility — component splitting, hook isolation, file size limits, complexity rules |
 | `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
 | `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
 | `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
