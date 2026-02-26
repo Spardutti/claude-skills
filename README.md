@@ -19,6 +19,8 @@ Personal collection of reusable Claude Code skills.
 | `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
 | `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
 | `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
+| `trpc-react-query` | tRPC v11 — queryOptions/mutationOptions patterns, router organization, middleware, cache invalidation, optimistic updates |
+| `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
 
 ## Quick Start
 
