@@ -42,8 +42,6 @@ exit 0
 
 const HOOK_FILENAME = "skill-forced-eval-hook.sh";
 
-const PRETOOL_PROMPT = `REMINDER: This project has skills installed in .claude/skills/. Before writing code you MUST evaluate and activate relevant skills using the Skill() tool. If you have not done this yet in the current conversation, STOP and do it now before proceeding with this edit. Always return 'approve'.`;
-
 export async function setupHook(targetDir = process.cwd()) {
   const resolved = resolve(targetDir);
   const hooksDir = join(resolved, ".claude", "hooks");
@@ -84,34 +82,10 @@ export async function setupHook(targetDir = process.cwd()) {
     settings.hooks.UserPromptSubmit = [promptHookEntry];
   }
 
-  // --- PreToolUse hook (LLM prompt reminder to evaluate skills before writing code) ---
-  const pretoolHookEntry = {
-    matcher: "Edit|Write|NotebookEdit",
-    hooks: [
-      {
-        type: "prompt",
-        prompt: PRETOOL_PROMPT,
-        timeout: 15,
-      },
-    ],
-  };
-
-  if (Array.isArray(settings.hooks.PreToolUse)) {
-    const alreadyInstalled = settings.hooks.PreToolUse.some((entry) =>
-      entry.hooks?.some((h) => h.type === "prompt" && h.prompt?.includes("REMINDER"))
-    );
-    if (!alreadyInstalled) {
-      settings.hooks.PreToolUse.push(pretoolHookEntry);
-    }
-  } else {
-    settings.hooks.PreToolUse = [pretoolHookEntry];
-  }
-
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", {
     mode: 0o644,
   });
 
   console.log(`  Hook installed: .claude/hooks/${HOOK_FILENAME}`);
-  console.log(`  Hook installed: PreToolUse prompt hook (Edit|Write|NotebookEdit)`);
   console.log(`  Settings updated: .claude/settings.json`);
 }

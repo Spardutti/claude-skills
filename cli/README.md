@@ -33,13 +33,16 @@ Together, these force Claude to explicitly evaluate and activate relevant skills
 | `react-query` | TanStack React Query with query-key-factory patterns |
 | `tanstack-router-best-practices` | TanStack Router — file-based routing, type-safe navigation, loaders, search params, auth guards |
 | `typescript-best-practices` | TypeScript 5.x — type design, type safety, generics, error handling, tsconfig |
-| `single-responsibility` | Single responsibility, file size limits, complexity rules |
+| `react-single-responsibility` | React single responsibility — component splitting, hook isolation, file size limits, complexity rules |
 | `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
 | `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
 | `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
 | `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
 | `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
 | `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
+| `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
+| `trpc-react-query` | tRPC v11 — queryOptions/mutationOptions patterns, router organization, middleware, cache invalidation, optimistic updates |
+| `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
 
 ## GitHub Authentication
 
