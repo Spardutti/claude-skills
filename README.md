@@ -21,6 +21,7 @@ Personal collection of reusable Claude Code skills.
 | `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
 | `trpc-react-query` | tRPC v11 — queryOptions/mutationOptions patterns, router organization, middleware, cache invalidation, optimistic updates |
 | `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
+| `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
 
 ## Quick Start
 
