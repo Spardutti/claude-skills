@@ -6,7 +6,10 @@ const HOOK_SCRIPT = `#!/bin/bash
 
 cat > /dev/null
 
-DIR="\${CLAUDE_PROJECT_DIR:-.}"
+# Derive project root from the hook's own location
+# .claude/hooks/script.sh → go up two levels → project root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Build skill list from project skills
 SKILL_LIST=""
@@ -67,8 +70,9 @@ export async function setupHook(targetDir = process.cwd()) {
   }
 
   // --- UserPromptSubmit hook (forced eval via command) ---
+  const relativeHookPath = `.claude/hooks/${HOOK_FILENAME}`;
   const promptHookEntry = {
-    hooks: [{ type: "command", command: hookPath }],
+    hooks: [{ type: "command", command: relativeHookPath }],
   };
 
   if (Array.isArray(settings.hooks.UserPromptSubmit)) {
