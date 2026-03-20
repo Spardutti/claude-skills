@@ -23,6 +23,16 @@ Personal collection of reusable Claude Code skills.
 | `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
 | `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
 
+## Commands
+
+Portable slash commands for common git workflows. Installed to `.claude/commands/` in your project.
+
+| Command | Description |
+|---------|-------------|
+| `/commit` | Smart commit — branch safety, atomic staging, conventional commits |
+| `/pr` | Create PR — auto-detect base branch, structured summary and test plan |
+| `/release` | Release flow — dev→main PR with semver, changelog, tag, and GitHub release |
+
 ## Quick Start
 
 Run from any project directory:
@@ -33,9 +43,9 @@ npx @spardutti/claude-skills
 
 The CLI will:
 
-1. Fetch the latest skills from GitHub
-2. Let you pick which ones to install
-3. Copy them into your project's `.claude/skills/` directory
+1. Fetch the latest skills and commands from GitHub
+2. Let you pick which skills to install → `.claude/skills/`
+3. Let you pick which commands to install → `.claude/commands/`
 4. **Optionally set up automatic skill evaluation** (recommended — see below)
 
 ## Automatic Skill Evaluation
@@ -59,7 +69,7 @@ This forces Claude to explicitly evaluate every installed skill before writing c
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/.claude/hooks/skill-forced-eval-hook.sh"
+            "command": ".claude/hooks/skill-forced-eval-hook.sh"
           }
         ]
       }
