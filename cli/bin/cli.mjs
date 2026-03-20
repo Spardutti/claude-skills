@@ -5,9 +5,9 @@ import chalk from "chalk";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { fetchSkills } from "../lib/github.mjs";
-import { promptSkillSelection } from "../lib/prompt.mjs";
-import { installSkills } from "../lib/install.mjs";
+import { fetchSkills, fetchCommands } from "../lib/github.mjs";
+import { promptSkillSelection, promptCommandSelection } from "../lib/prompt.mjs";
+import { installSkills, installCommands } from "../lib/install.mjs";
 import { setupHook } from "../lib/setup-hook.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 
@@ -17,37 +17,56 @@ const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-
 async function main() {
   console.log(`\n  ${chalk.bold.cyan("Claude Skills Installer")} ${chalk.dim(`v${pkg.version}`)}\n`);
 
-  console.log(chalk.dim("  Fetching available skills...\n"));
-  const skills = await fetchSkills();
+  console.log(chalk.dim("  Fetching available skills and commands...\n"));
+  const [skills, commands] = await Promise.all([fetchSkills(), fetchCommands()]);
 
+  // --- Skills ---
+  let selectedSkills = [];
   if (skills.length === 0) {
     console.log("  No skills found.");
-    process.exit(0);
+  } else {
+    selectedSkills = await promptSkillSelection(skills);
+    if (selectedSkills.length > 0) {
+      console.log();
+      await installSkills(selectedSkills);
+    }
   }
 
-  const selected = await promptSkillSelection(skills);
-
-  if (selected.length === 0) {
-    console.log("\n  No skills selected.");
-    process.exit(0);
-  }
-
-  console.log();
-  await installSkills(selected);
-
-  console.log();
-  const shouldSetup = await confirm({
-    message: "Set up skill evaluation hook + CLAUDE.md rule? (Recommended)",
-    default: true,
-  });
-
-  if (shouldSetup) {
+  // --- Commands ---
+  let selectedCommands = [];
+  if (commands.length > 0) {
     console.log();
-    await setupHook();
-    await setupClaudeMd();
+    selectedCommands = await promptCommandSelection(commands);
+    if (selectedCommands.length > 0) {
+      console.log();
+      await installCommands(selectedCommands);
+    }
   }
 
-  console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`${selected.length} skill(s) installed successfully.`)}\n`);
+  if (selectedSkills.length === 0 && selectedCommands.length === 0) {
+    console.log("\n  Nothing selected.");
+    process.exit(0);
+  }
+
+  // --- Hook setup (only if skills were installed) ---
+  if (selectedSkills.length > 0) {
+    console.log();
+    const shouldSetup = await confirm({
+      message: "Set up skill evaluation hook + CLAUDE.md rule? (Recommended)",
+      default: true,
+    });
+
+    if (shouldSetup) {
+      console.log();
+      await setupHook();
+      await setupClaudeMd();
+    }
+  }
+
+  const parts = [];
+  if (selectedSkills.length > 0) parts.push(`${selectedSkills.length} skill(s)`);
+  if (selectedCommands.length > 0) parts.push(`${selectedCommands.length} command(s)`);
+  console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`${parts.join(" and ")} installed successfully.`)}\n`);
 }
 
 main().catch((err) => {

@@ -3,7 +3,9 @@ import { execSync } from "node:child_process";
 const REPO_OWNER = "Spardutti";
 const REPO_NAME = "claude-skills";
 const CONTENTS_API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/skills`;
+const COMMANDS_API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/commands`;
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/skills`;
+const RAW_COMMANDS_BASE = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/commands`;
 
 function getAuthHeaders() {
   const headers = { "User-Agent": "claude-skills-cli" };
@@ -64,6 +66,49 @@ export async function fetchSkills() {
         return { dirName: dir.name, name, description, category, content };
       } catch {
         console.warn(`  Warning: Failed to fetch ${dir.name}, skipping`);
+        return null;
+      }
+    })
+  );
+
+  return results.filter(Boolean);
+}
+
+export async function fetchCommands() {
+  const headers = getAuthHeaders();
+
+  const res = await fetch(COMMANDS_API, { headers });
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      return [];
+    }
+    if (res.status === 403 || res.status === 429) {
+      throw new Error("GitHub API rate limit exceeded. Try again later or install gh CLI (https://cli.github.com).");
+    }
+    throw new Error(`Failed to list commands: ${res.status} ${res.statusText}`);
+  }
+
+  const entries = await res.json();
+  const files = entries.filter((e) => e.type === "file" && e.name.endsWith(".md"));
+
+  const results = await Promise.all(
+    files.map(async (file) => {
+      try {
+        const url = `${RAW_COMMANDS_BASE}/${file.name}`;
+        const r = await fetch(url, { headers });
+
+        if (!r.ok) {
+          console.warn(`  Warning: Failed to fetch command ${file.name}, skipping`);
+          return null;
+        }
+
+        const content = await r.text();
+        const { name, description, category } = parseFrontmatter(content, file.name.replace(/\.md$/, ""));
+
+        return { fileName: file.name, name, description, category, content };
+      } catch {
+        console.warn(`  Warning: Failed to fetch ${file.name}, skipping`);
         return null;
       }
     })

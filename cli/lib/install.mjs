@@ -18,3 +18,13 @@ export async function installSkills(skills, targetDir = process.cwd()) {
     console.log(`  ${chalk.green("✔")} ${chalk.bold(humanName(skill))} ${chalk.dim(`→ .claude/skills/${skill.dirName}/`)}`);
   }
 }
+
+export async function installCommands(commands, targetDir = process.cwd()) {
+  const baseDir = join(targetDir, ".claude", "commands");
+  await mkdir(baseDir, { recursive: true });
+
+  for (const cmd of commands) {
+    await writeFile(join(baseDir, cmd.fileName), cmd.content);
+    console.log(`  ${chalk.green("✔")} ${chalk.bold(humanName(cmd))} ${chalk.dim(`→ .claude/commands/${cmd.fileName}`)}`);
+  }
+}
