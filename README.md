@@ -23,6 +23,10 @@ Personal collection of reusable Claude Code skills.
 | `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
 | `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
 | `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, relational queries, migrations, drizzle-kit workflow, type inference |
+| `zustand` | Zustand — store design, selectors, persist/immer middleware, slices pattern, devtools, transient updates |
+| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
+| `dnd-kit` | @dnd-kit — sortable lists, sensors, collision detection, drag overlays, multi-container (kanban), accessibility |
+| `framer-motion` | Motion (Framer Motion) — AnimatePresence, layout animations, variants, gestures, useAnimate, performance |
 
 ## Commands
 
