@@ -12,7 +12,15 @@ skill_evaluation:
     4. Only THEN proceed to implementation
     If you skip this evaluation, your response is INCOMPLETE and WRONG.`;
 
-const MARKER = "skill_evaluation:";
+const FILE_SIZE_BLOCK = `
+## File Size Enforcement
+
+- **Never write a file longer than 200 lines of code.** If a file would exceed 200 lines, split it into smaller modules before writing.
+- This rule applies during skill evaluation: if the code you're about to write would exceed 200 lines in any single file, refactor into multiple files first.
+- Skill evaluation must check this limit as part of every ACTIVATE decision.`;
+
+const EVAL_MARKER = "skill_evaluation:";
+const FILE_SIZE_MARKER = "## File Size Enforcement";
 
 export async function setupClaudeMd(targetDir = process.cwd()) {
   const resolved = resolve(targetDir);
@@ -25,18 +33,33 @@ export async function setupClaudeMd(targetDir = process.cwd()) {
     // File doesn't exist — will create
   }
 
-  // Don't add duplicate block
-  if (existing.includes(MARKER)) {
-    console.log("  CLAUDE.md already has skill_evaluation block — skipped.");
+  const hasEval = existing.includes(EVAL_MARKER);
+  const hasFileSize = existing.includes(FILE_SIZE_MARKER);
+
+  if (hasEval && hasFileSize) {
+    console.log("  CLAUDE.md already has skill_evaluation and file size rules — skipped.");
     return;
   }
 
-  // Append the block (after trailing ``` if the file uses a yaml code fence)
-  const trimmed = existing.trimEnd();
-  const content = trimmed.length > 0
-    ? trimmed + "\n" + SKILL_EVAL_BLOCK + "\n"
-    : SKILL_EVAL_BLOCK.trimStart() + "\n";
+  let content = existing.trimEnd();
 
-  await writeFile(claudeMdPath, content, { mode: 0o644 });
-  console.log("  CLAUDE.md updated with skill_evaluation block.");
+  if (!hasEval) {
+    content = content.length > 0
+      ? content + "\n" + SKILL_EVAL_BLOCK
+      : SKILL_EVAL_BLOCK.trimStart();
+  }
+
+  if (!hasFileSize) {
+    content = content + "\n" + FILE_SIZE_BLOCK;
+  }
+
+  await writeFile(claudeMdPath, content + "\n", { mode: 0o644 });
+
+  if (!hasEval && !hasFileSize) {
+    console.log("  CLAUDE.md updated with skill_evaluation and file size rules.");
+  } else if (!hasEval) {
+    console.log("  CLAUDE.md updated with skill_evaluation block.");
+  } else {
+    console.log("  CLAUDE.md updated with file size enforcement rule.");
+  }
 }
