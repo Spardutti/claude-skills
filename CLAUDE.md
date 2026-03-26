@@ -30,3 +30,9 @@ CLAUDE.md           # This file
 ```
 
 When adding a new skill, also add it to the README.md skills table.
+
+## File Size Enforcement
+
+- **Never write a file longer than 200 lines of code.** If a file would exceed 200 lines, split it into smaller modules before writing.
+- This rule applies during skill evaluation: if the code you're about to write would exceed 200 lines in any single file, refactor into multiple files first.
+- Skill evaluation must check this limit as part of every ACTIVATE decision.
