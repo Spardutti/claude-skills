@@ -1,7 +1,7 @@
 import { checkbox, Separator } from "@inquirer/prompts";
 import chalk from "chalk";
 
-const CATEGORY_ORDER = ["Frontend", "Desktop", "TypeScript", "Backend", "Quality", "General"];
+const CATEGORY_ORDER = ["Frontend", "Desktop", "TypeScript", "Backend", "Architecture", "Quality", "General"];
 const COMMAND_CATEGORY_ORDER = ["Workflow", "General"];
 
 function humanName(skill) {
