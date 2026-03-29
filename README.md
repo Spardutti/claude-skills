@@ -38,6 +38,7 @@ Portable slash commands for common git workflows. Installed to `.claude/commands
 | `/commit` | Smart commit — branch safety, atomic staging, conventional commits |
 | `/pr` | Create PR — auto-detect base branch, structured summary and test plan |
 | `/release` | Release flow — dev→main PR with semver, changelog, tag, and GitHub release |
+| `/refactor` | Find code files over 200 lines and refactor them into smaller modules |
 
 ## Quick Start
 
