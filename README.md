@@ -4,30 +4,66 @@ Personal collection of reusable Claude Code skills.
 
 ## Skills
 
+### Frontend
+
 | Skill | Description |
 |-------|-------------|
 | `react-best-practices` | React 19 — component design, state management, performance, React 19 features, TypeScript integration |
 | `react-use-effect` | React 19 useEffect best practices and anti-patterns |
 | `react-query` | TanStack React Query with @lukemorales/query-key-factory patterns |
-| `tanstack-router-best-practices` | TanStack Router — file-based routing, type-safe navigation, loaders, search params, auth guards |
-| `typescript-best-practices` | TypeScript 5.x — type design, type safety, generics, error handling, tsconfig |
 | `react-single-responsibility` | React single responsibility — component splitting, hook isolation, file size limits, complexity rules |
-| `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
-| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
-| `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
-| `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
-| `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
-| `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
-| `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
+| `tanstack-router-best-practices` | TanStack Router — file-based routing, type-safe navigation, loaders, search params, auth guards |
 | `trpc-react-query` | tRPC v11 — queryOptions/mutationOptions patterns, router organization, middleware, cache invalidation, optimistic updates |
-| `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
-| `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
-| `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, relational queries, migrations, drizzle-kit workflow, type inference |
+| `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
 | `zustand` | Zustand — store design, selectors, persist/immer middleware, slices pattern, devtools, transient updates |
-| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
 | `dnd-kit` | @dnd-kit — sortable lists, sensors, collision detection, drag overlays, multi-container (kanban), accessibility |
 | `framer-motion` | Motion (Framer Motion) — AnimatePresence, layout animations, variants, gestures, useAnimate, performance |
+
+### Desktop
+
+| Skill | Description |
+|-------|-------------|
+| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
+
+### TypeScript
+
+| Skill | Description |
+|-------|-------------|
+| `typescript-best-practices` | TypeScript 5.x — type design, type safety, generics, error handling, tsconfig |
+
+### Backend
+
+| Skill | Description |
+|-------|-------------|
+| `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
+| `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
+| `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
+| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
+| `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, relational queries, migrations, drizzle-kit workflow, type inference |
+| `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
+| `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
+
+### Database
+
+| Skill | Description |
+|-------|-------------|
+| `sql-joins` | SQL joins — LEFT JOIN traps, fan-out, NOT IN NULL bug, EXISTS vs IN, FK design, junction tables, CASCADE pitfalls |
+| `sql-indexing` | SQL indexing — composite order, covering/partial/expression indexes, SARGability, EXPLAIN interpretation, keyset pagination |
+| `sql-schema-design` | SQL schema — normalization, data types (TIMESTAMPTZ, NUMERIC), constraints, anti-patterns, safe migrations |
+| `sql-orm-patterns` | SQL ORM — N+1 fixes for Prisma/Django/SQLAlchemy/ActiveRecord/TypeORM, transactions, isolation levels, locking |
+
+### Architecture
+
+| Skill | Description |
+|-------|-------------|
 | `single-responsibility` | Single Responsibility Principle — language-agnostic SRP, file size limits, CQS, separation of concerns, smell tests |
+
+### Quality
+
+| Skill | Description |
+|-------|-------------|
+| `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
+| `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
 
 ## Commands
 
