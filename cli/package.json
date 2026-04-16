@@ -1,10 +1,14 @@
 {
   "name": "@spardutti/claude-skills",
-  "version": "1.19.1",
+  "version": "1.19.2",
   "description": "CLI to install Claude Code skills from the claude-skills collection",
   "type": "module",
   "bin": {
     "claude-skills": "bin/cli.mjs"
+  },
+  "scripts": {
+    "prepack": "cp ../README.md README.md",
+    "postpack": "git checkout -- README.md"
   },
   "engines": {
     "node": ">=18"
