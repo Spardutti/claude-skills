@@ -1,18 +1,21 @@
 ---
 name: deep-review
-category: Quality
-description: "Multi-agent deep code review on the current branch. Spawns 5 parallel subagents to catch cross-system bugs that unit tests miss: guard bypasses, lost state across async boundaries, wrong-table queries, dead references, and protocol violations."
+description: "Multi-agent deep code review — spawns 5 parallel agents to catch guard bypasses, lost async state, wrong-table queries, dead references, and protocol violations"
+category: Workflow
+allowed-tools: Bash(git *), Read, Grep, Glob, Agent
+argument-hint: "[base-branch] defaults to develop or main"
 ---
 
 # Deep Review — Multi-Agent Code Review
 
-Invoke with `/deep-review`. Catches bugs that unit tests miss — cross-system state issues, lost flags, wrong table queries, bypassed guards, stale references to deleted code.
+You are a code review orchestrator. Catch bugs that unit tests miss — cross-system state issues, lost flags, wrong table queries, bypassed guards, stale references to deleted code.
 
 ## Step 1 — Gather the Diff
 
 ```bash
-# detect base branch
-BASE=$(git merge-base HEAD develop 2>/dev/null || git merge-base HEAD main 2>/dev/null || echo "main")
+BASE=$ARGUMENTS  # if empty, auto-detect below
+# auto-detect base branch
+git merge-base HEAD develop 2>/dev/null || git merge-base HEAD main 2>/dev/null
 git diff $BASE...HEAD --name-only          # changed files list
 git diff $BASE...HEAD                       # full diff
 ```
@@ -21,7 +24,7 @@ Read every changed/created file in full. The diff alone is not enough — agents
 
 ## Step 2 — Spawn 5 Parallel Subagents
 
-Launch all 5 agents in a **single message** so they run concurrently. Each agent receives: the full diff, the list of changed files, and instructions to read any additional files it needs.
+Launch all 5 agents in a **single message** using the Agent tool so they run concurrently. Each agent receives: the full diff, the list of changed files, and instructions to read any additional files it needs.
 
 ### Agent 1 — Guard Bypass Audit
 
@@ -70,18 +73,18 @@ Prompt the agent:
 - Identify every .count(), .filter(), .exists(), .aggregate() in changed code
 - For each query, check: does it target the right model for the context?
 - Look for parallel model pairs (DataImportSubTask/EnrichmentSubTask,
-  UserNotification/SystemNotification, DraftOrder/Order) — flag queries
-  that only check one when the logic applies to both
+  UserNotification/SystemNotification, DraftOrder/Order) — flag queries that
+  only check one when the logic applies to both
 - Check slot/capacity calculations: are all contributing tables included?
 ```
 
 **Example bug it catches:** "`compute_dispatch_slots` queries `DataImportSubTask` but enrichment subtasks live in `EnrichmentSubTask`, so enrichment concurrency is never enforced."
 
-**Do NOT flag:** Queries that are intentionally scoped to one model (e.g., a view that only shows import tasks). Queries behind an `if` branch that already discriminates by type.
+**Do NOT flag:** Queries intentionally scoped to one model (e.g., a view that only shows import tasks). Queries behind an `if` branch that already discriminates by type.
 
 ### Agent 4 — Dead Reference Audit
 
-**Goal:** After any deletion or rename, search for every import, string reference, `patch()` target, and Celery task name that still points at the old name. Only flag executable code — not comments or docstrings.
+**Goal:** After any deletion or rename, search for every import, string reference, `patch()` target, and Celery task name that still points at the old name. Only flag executable code.
 
 ```
 Prompt the agent:
@@ -105,7 +108,8 @@ Prompt the agent:
 Prompt the agent:
 - Identify every Protocol, ABC, or TypedDict in changed code
 - For each, find all concrete implementations (classes that inherit or register)
-- Verify method signatures match: name, parameter count, parameter types, return type
+- Verify method signatures match: name, parameter count, parameter types,
+  return type
 - Check consumption sites: where the protocol type is used, verify all called
   methods exist on every implementation
 - Check test mocks: MagicMock/patch setups must configure every method the
@@ -120,11 +124,11 @@ Prompt the agent:
 
 Each agent classifies findings as:
 
-| Level | Meaning | Examples |
-|-------|---------|---------|
-| **CRITICAL** | Will cause data corruption, silent failures, or bypassed security in production | Guard bypass on auth check, lost flag causing duplicate writes, wrong-table query miscounting capacity |
-| **WARNING** | Edge case that could cause issues under specific conditions | State lost only on retry after timeout, dead reference in rarely-used admin command |
-| **INFO** | Cosmetic or low-impact observation | Unused import from renamed module, mock missing a method only used in skipped test |
+| Level | Meaning |
+|-------|---------|
+| **CRITICAL** | Data corruption, silent failures, or bypassed security in production |
+| **WARNING** | Edge case that could cause issues under specific conditions |
+| **INFO** | Cosmetic or low-impact observation |
 
 ## Step 4 — Aggregate and Report
 
