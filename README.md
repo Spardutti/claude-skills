@@ -64,6 +64,7 @@ Personal collection of reusable Claude Code skills.
 |-------|-------------|
 | `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
 | `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
+| `deep-review` | Multi-agent deep code review — 5 parallel agents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
 
 ## Commands
 
