@@ -5,9 +5,9 @@ import chalk from "chalk";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { fetchSkills, fetchCommands } from "../lib/github.mjs";
+import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
 import { promptSkillSelection, promptCommandSelection } from "../lib/prompt.mjs";
-import { installSkills, installCommands } from "../lib/install.mjs";
+import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
 import { setupHook } from "../lib/setup-hook.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 
@@ -17,8 +17,8 @@ const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-
 async function main() {
   console.log(`\n  ${chalk.bold.cyan("Claude Skills Installer")} ${chalk.dim(`v${pkg.version}`)}\n`);
 
-  console.log(chalk.dim("  Fetching available skills and commands...\n"));
-  const [skills, commands] = await Promise.all([fetchSkills(), fetchCommands()]);
+  console.log(chalk.dim("  Fetching available skills, commands, and agents...\n"));
+  const [skills, commands, agents] = await Promise.all([fetchSkills(), fetchCommands(), fetchAgents()]);
 
   // --- Skills ---
   let selectedSkills = [];
@@ -34,12 +34,21 @@ async function main() {
 
   // --- Commands ---
   let selectedCommands = [];
+  let installedAgentCount = 0;
   if (commands.length > 0) {
     console.log();
     selectedCommands = await promptCommandSelection(commands);
     if (selectedCommands.length > 0) {
       console.log();
       await installCommands(selectedCommands);
+
+      const { installed, missing } = await installRequiredAgents(selectedCommands, agents);
+      installedAgentCount = installed.length;
+      if (missing.length > 0) {
+        console.log(
+          `  ${chalk.yellow("!")} Missing agents referenced by commands: ${missing.join(", ")}`
+        );
+      }
     }
   }
 
@@ -66,7 +75,8 @@ async function main() {
   const parts = [];
   if (selectedSkills.length > 0) parts.push(`${selectedSkills.length} skill(s)`);
   if (selectedCommands.length > 0) parts.push(`${selectedCommands.length} command(s)`);
-  console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`${parts.join(" and ")} installed successfully.`)}\n`);
+  if (installedAgentCount > 0) parts.push(`${installedAgentCount} agent(s)`);
+  console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`${parts.join(", ")} installed successfully.`)}\n`);
 }
 
 main().catch((err) => {

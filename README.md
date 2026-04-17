@@ -1,6 +1,6 @@
 # Claude Skills
 
-Personal collection of reusable Claude Code skills.
+Personal collection of reusable Claude Code **skills**, **slash commands**, and **subagents**. Install them into any project with one command — pick what you want from an interactive menu, and any subagents declared by the commands you pick get installed automatically.
 
 ## Skills
 
@@ -74,8 +74,8 @@ Portable slash commands for common git workflows. Installed to `.claude/commands
 | `/commit` | Smart commit — branch safety, atomic staging, conventional commits |
 | `/pr` | Create PR — auto-detect base branch, structured summary and test plan |
 | `/release` | Release flow — dev→main PR with semver, changelog, tag, and GitHub release |
-| `/refactor` | Find code files over 200 lines and refactor them into smaller modules |
-| `/deep-review` | Multi-agent deep code review — 5 parallel agents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
+| `/refactor` | Detect size/complexity/duplication/coupling issues via 4 parallel Haiku subagents, then refactor |
+| `/deep-review` | Multi-agent deep code review — 5 parallel Sonnet subagents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
 
 ## Quick Start
 
@@ -87,10 +87,11 @@ npx @spardutti/claude-skills
 
 The CLI will:
 
-1. Fetch the latest skills and commands from GitHub
+1. Fetch the latest skills, commands, and agents from GitHub
 2. Let you pick which skills to install → `.claude/skills/`
 3. Let you pick which commands to install → `.claude/commands/`
-4. **Optionally set up automatic skill evaluation** (recommended — see below)
+4. Auto-install any subagents declared by the selected commands → `.claude/agents/`
+5. **Optionally set up automatic skill evaluation** (recommended — see below)
 
 ## Automatic Skill Evaluation
 
@@ -136,18 +137,26 @@ skill_evaluation:
     If you skip this evaluation, your response is INCOMPLETE and WRONG.
 ```
 
-### GitHub Authentication
-
-The CLI uses the GitHub API to fetch skills. To avoid rate limits:
-
-- If you have the [GitHub CLI](https://cli.github.com) installed and authenticated (`gh auth login`), the token is picked up automatically
-- Or set `GITHUB_TOKEN` / `GH_TOKEN` environment variable
-- Without auth, GitHub allows 60 requests/hour (the CLI uses ~6 per run)
-
 ## Manual Install
 
-Copy a skill directory into your project's `.claude/skills/` folder:
+If you don't want to use the CLI, copy files directly into your project:
 
 ```bash
+# Skills
 cp -r skills/<skill-name> /path/to/project/.claude/skills/
+
+# Commands
+cp commands/<command-name>.md /path/to/project/.claude/commands/
+
+# Subagents (required by some commands — see the command's `requires-agents` frontmatter)
+cp agents/<agent-name>.md /path/to/project/.claude/agents/
+```
+
+## Repository Layout
+
+```
+skills/           Reference playbooks loaded by Claude during coding tasks
+commands/         Slash commands installed to .claude/commands/
+agents/           Subagent definitions — commands declare which ones they need
+cli/              The npm installer (npx @spardutti/claude-skills)
 ```

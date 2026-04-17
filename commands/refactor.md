@@ -2,7 +2,8 @@
 name: refactor
 description: "Find code files with size, complexity, duplication, or coupling issues and refactor them"
 category: Workflow
-allowed-tools: Glob, Bash(wc *), Read, Edit, Write, Grep
+allowed-tools: Task, Glob, Bash(wc *), Read, Edit, Write, Grep
+requires-agents: [refactor-size, refactor-complexity, refactor-duplication, refactor-coupling]
 argument-hint: "[file-path] or leave empty to scan entire project"
 ---
 
@@ -19,28 +20,78 @@ You are a code refactoring assistant. Find files with **size**, **complexity**, 
 | **Duplication** | Near-identical code blocks (10+ lines) across 2+ files      |
 | **Coupling**   | File imports from 8+ modules, or circular dependency exists  |
 
-## Step 1 — Detect Issues
+## Step 1 — Detect Issues (parallel subagents)
 
 If the user passed a file path in `$ARGUMENTS`, skip the scan and go directly to Step 3 for that file.
 
-Otherwise, scan the project. Use **Glob** to find source files:
+Otherwise, spawn **all four detection subagents in parallel** using the Task tool in a single message:
+
+- `refactor-size` — flags files over 200 lines
+- `refactor-complexity` — flags deep nesting, 5+ params, 4+ branches
+- `refactor-duplication` — flags 10+ line copy-paste across files
+- `refactor-coupling` — flags 8+ imports and circular deps
+
+Each returns a JSON array. Parallel fan-out keeps detection cheap (agents run on Haiku) and keeps file-read output out of the main context.
+
+## Step 2 — Synthesize Findings
+
+Merge the four JSON arrays into one sorted table (worst issues first):
 
 ```
-**/*.ts  **/*.tsx  **/*.js  **/*.jsx
-**/*.py  **/*.go   **/*.rs  **/*.java
-**/*.rb  **/*.php  **/*.vue **/*.svelte
+Code issues found:
+
+  File                              Issue         Detail
+  src/services/api.ts               Size          342 lines (142 over)
+  src/utils/helpers.py              Duplication   3 copies of parseDate() across files
+  src/components/Dashboard.tsx      Complexity    renderStats() has 5 nesting levels
+  src/controllers/order.ts          Coupling      imports from 12 modules
+
+  Total: 4 files need refactoring
 ```
 
-**Exclude**: `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files.
+If every agent returned `[]`:
 
-### Size check
-Count lines with `wc -l` on matched files. Flag files > 200 lines.
+```
+All files look clean. No refactoring needed.
+```
 
-### Complexity check
-Read files and look for:
-- **Deep nesting**: 3+ levels of `if/for/while/match/switch` inside a function
-- **Too many params**: functions with 5+ parameters
-- **Excessive branching**: functions with 4+ `if/else if/elif/case` branches
+Stop here if nothing found.
+
+## Step 3 — Plan the Refactor
+
+**1–3 files**: propose fixing **all** in one pass.
+**4+ files**: propose fixing **one at a time**, starting with the worst.
+
+Read each file fully, then show a plan based on the issue type:
+
+### Size → Split by responsibility
+
+**BAD** — one file doing too much (342 lines):
+```ts
+// src/services/api.ts — auth, users, orders, payments all in one file
+export function login() { /* ... */ }
+export function signup() { /* ... */ }
+export function getUser() { /* ... */ }
+export function updateUser() { /* ... */ }
+export function createOrder() { /* ... */ }
+// ...hundreds more lines
+```
+
+**GOOD** — split by responsibility, each file under 200 lines:
+```ts
+// src/services/api.ts (~45 lines) — shared client setup only
+export { client } from "./client";
+
+// src/services/auth-api.ts (80 lines)
+export function login() { /* ... */ }
+export function signup() { /* ... */ }
+
+// src/services/user-api.ts (90 lines)
+export function getUser() { /* ... */ }
+export function updateUser() { /* ... */ }
+```
+
+### Complexity → Extract and simplify
 
 **BAD** — deeply nested, hard to follow:
 ```ts
@@ -75,10 +126,7 @@ function processOrderLines(lines) {
 }
 ```
 
-### Duplication check
-Use **Grep** to find repeated patterns. Look for:
-- Functions/methods with near-identical bodies across files (10+ matching lines)
-- Copy-pasted blocks with only variable name differences
+### Duplication → Extract shared module
 
 **BAD** — same logic in two files with different variable names:
 ```ts
@@ -110,10 +158,7 @@ export function formatPerson(p) {
 import { formatPerson } from "../utils/format-person";
 ```
 
-### Coupling check
-Read import/require statements and flag:
-- Files importing from **8+ different modules**
-- **Circular dependencies**: A imports B and B imports A (use Grep to trace both directions)
+### Coupling → Break the cycle
 
 **BAD** — circular dependency:
 ```ts
@@ -139,68 +184,6 @@ export function getUser(id) { /* ... */ }
 import { getUser } from "./user";
 import { createOrder } from "./order";
 export function createUserOrder(userId) { /* ... */ }
-```
-
-## Step 2 — Report Findings
-
-Present a sorted table (worst issues first):
-
-```
-Code issues found:
-
-  File                              Issue         Detail
-  src/services/api.ts               Size          342 lines (142 over)
-  src/utils/helpers.py              Duplication   3 copies of parseDate() across files
-  src/components/Dashboard.tsx      Complexity    renderStats() has 5 nesting levels
-  src/controllers/order.ts          Coupling      imports from 12 modules
-
-  Total: 4 files need refactoring
-```
-
-If no issues found:
-
-```
-All files look clean. No refactoring needed.
-```
-
-Stop here if nothing found.
-
-## Step 3 — Plan the Refactor
-
-**1–3 files**: propose fixing **all** in one pass.
-**4+ files**: propose fixing **one at a time**, starting with the worst.
-
-Read each file fully, then show a plan based on the issue type:
-
-### Size → Split by responsibility
-```
-src/services/api.ts (342 lines):
-  → Extract auth endpoints → src/services/auth-api.ts
-  → Extract user endpoints → src/services/user-api.ts
-  → Keep shared client setup → src/services/api.ts (~45 lines)
-```
-
-### Complexity → Extract and simplify
-```
-src/components/Dashboard.tsx — renderStats() has 5 nesting levels:
-  → Extract validation logic → validateStats()
-  → Extract formatting → formatStatDisplay()
-  → Use early returns to flatten nesting
-```
-
-### Duplication → Extract shared module
-```
-parseDate() duplicated in 3 files:
-  → Create src/utils/date-helpers.ts with shared parseDate()
-  → Update imports in all 3 consuming files
-```
-
-### Coupling → Introduce facade or split
-```
-src/controllers/order.ts imports 12 modules:
-  → Group related imports behind src/services/order-service.ts facade
-  → Move validation logic to src/validators/order-validator.ts
-  → Reduce direct imports to 4-5
 ```
 
 **Ask the user to confirm before proceeding.**
@@ -252,6 +235,7 @@ Refactoring complete:
 
 ## Rules
 
+- ALWAYS spawn the four detection agents in parallel (single message, four Task calls)
 - ALWAYS read the full file before proposing any refactor
 - ALWAYS update every import referencing moved exports — use Grep to find them all
 - ALWAYS keep resulting files under 200 lines

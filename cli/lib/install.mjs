@@ -2,10 +2,19 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
 
-function humanName(skill) {
-  return skill.name
+function humanName(item) {
+  return item.name
     .replace(/-/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+async function installFlat(items, subdir, targetDir) {
+  const baseDir = join(targetDir, ".claude", subdir);
+  await mkdir(baseDir, { recursive: true });
+  for (const item of items) {
+    await writeFile(join(baseDir, item.fileName), item.content);
+    console.log(`  ${chalk.green("✔")} ${chalk.bold(humanName(item))} ${chalk.dim(`→ .claude/${subdir}/${item.fileName}`)}`);
+  }
 }
 
 export async function installSkills(skills, targetDir = process.cwd()) {
@@ -19,12 +28,28 @@ export async function installSkills(skills, targetDir = process.cwd()) {
   }
 }
 
-export async function installCommands(commands, targetDir = process.cwd()) {
-  const baseDir = join(targetDir, ".claude", "commands");
-  await mkdir(baseDir, { recursive: true });
+export function installCommands(commands, targetDir = process.cwd()) {
+  return installFlat(commands, "commands", targetDir);
+}
 
-  for (const cmd of commands) {
-    await writeFile(join(baseDir, cmd.fileName), cmd.content);
-    console.log(`  ${chalk.green("✔")} ${chalk.bold(humanName(cmd))} ${chalk.dim(`→ .claude/commands/${cmd.fileName}`)}`);
+export function installAgents(agents, targetDir = process.cwd()) {
+  return installFlat(agents, "agents", targetDir);
+}
+
+export async function installRequiredAgents(selectedCommands, availableAgents, targetDir = process.cwd()) {
+  const requiredNames = new Set(
+    selectedCommands.flatMap((c) => c.requiresAgents ?? [])
+  );
+  if (requiredNames.size === 0) return { installed: [], missing: [] };
+
+  const installed = availableAgents.filter((a) => requiredNames.has(a.name));
+  const missing = [...requiredNames].filter(
+    (n) => !availableAgents.some((a) => a.name === n)
+  );
+
+  if (installed.length > 0) {
+    console.log();
+    await installAgents(installed, targetDir);
   }
+  return { installed, missing };
 }
