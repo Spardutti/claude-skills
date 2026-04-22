@@ -38,6 +38,8 @@ Personal collection of reusable Claude Code **skills**, **slash commands**, and 
 | `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
 | `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
 | `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
+| `pydantic-best-practices` | Pydantic v2 — model_config, field/model validators, Annotated types, discriminated unions, computed_field, strict mode, TypeAdapter |
+| `celery-best-practices` | Celery — idempotency, acks_late, autoretry with backoff/jitter, canvas (chain/group/chord), routing, priorities, beat, time limits |
 | `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
 | `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, relational queries, migrations, drizzle-kit workflow, type inference |
 | `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
