@@ -59,6 +59,7 @@ Personal collection of reusable Claude Code **skills**, **slash commands**, and 
 | Skill | Description |
 |-------|-------------|
 | `single-responsibility` | Single Responsibility Principle — language-agnostic SRP, file size limits, CQS, separation of concerns, smell tests |
+| `avoid-hasty-abstractions` | AHA / Rule of Three — prefer duplication over the wrong abstraction, boolean-parameter creep, undoing bad extractions |
 
 ### Quality
 
