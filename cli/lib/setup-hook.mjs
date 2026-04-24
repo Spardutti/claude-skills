@@ -70,9 +70,9 @@ export async function setupHook(targetDir = process.cwd()) {
   }
 
   // --- UserPromptSubmit hook (forced eval via command) ---
-  const relativeHookPath = `.claude/hooks/${HOOK_FILENAME}`;
+  const hookCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${HOOK_FILENAME}`;
   const promptHookEntry = {
-    hooks: [{ type: "command", command: relativeHookPath }],
+    hooks: [{ type: "command", command: hookCommand }],
   };
 
   if (Array.isArray(settings.hooks.UserPromptSubmit)) {
