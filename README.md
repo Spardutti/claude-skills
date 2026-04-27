@@ -79,6 +79,7 @@ Portable slash commands for common git workflows. Installed to `.claude/commands
 | `/release` | Release flow — dev→main PR with semver, changelog, tag, and GitHub release |
 | `/refactor` | Detect size/complexity/duplication/coupling issues via 4 parallel Haiku subagents, then refactor |
 | `/deep-review` | Multi-agent deep code review — 5 parallel Sonnet subagents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
+| `/plan-feature` | Integration-first feature planning — 3 parallel Haiku subagents scan for reusable code, established patterns, and touch points before producing a short integration plan |
 
 ## Quick Start
 
