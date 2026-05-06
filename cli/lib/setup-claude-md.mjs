@@ -8,9 +8,10 @@ BEFORE writing ANY code, you MUST:
 1. List EVERY skill available: check \`.claude/skills/\` (project) and \`~/.claude/skills/\` (global). The system-reminder's available-skills section is a hint, not the source of truth — if it's missing or empty, still check the directories.
 2. For each skill, write: [skill-name] → ACTIVATE / SKIP — [one-line reason]
 3. Call Skill(name) for every skill marked ACTIVATE
-4. Only THEN proceed to implementation
+4. Emit the literal token \`[skills-checked]\` on its own line
+5. Only THEN proceed to implementation
 
-If you skip this evaluation, your response is INCOMPLETE and WRONG.`;
+A PreToolUse gate hook blocks Write/Edit/MultiEdit until the \`[skills-checked]\` token appears in your response since the most recent user prompt. The gate fires once per turn — the first blocked edit is the signal to evaluate skills, then retry. If you skip the evaluation, your response is INCOMPLETE and WRONG.`;
 
 const FILE_SIZE_BODY = `## File Size Enforcement
 

@@ -101,24 +101,29 @@ The CLI will:
 
 After installing skills, the CLI asks if you want to set up automatic skill evaluation. If you say yes, it will:
 
-- **Create a hook** at `.claude/hooks/skill-forced-eval-hook.sh` that runs on every prompt
-- **Update your `CLAUDE.md`** with a `skill_evaluation` rule
+- **Create a PreToolUse gate hook** at `.claude/hooks/skill-gate.sh`
+- **Update your `CLAUDE.md`** with the skill-evaluation rule
 
-This forces Claude to explicitly evaluate every installed skill before writing code — listing each skill as ACTIVATE or SKIP with a reason, then calling the relevant ones. Without this, Claude may silently ignore your skills.
+The gate hard-blocks `Write`, `Edit`, and `MultiEdit` tool calls until Claude has evaluated the available skills and emitted the literal token `[skills-checked]` in its response. Once emitted, every subsequent edit in that turn passes through. The next user prompt resets the gate.
+
+Unlike a soft reminder injected into context (which Claude can ignore), the gate denies the tool call outright — so the only path forward is to actually evaluate skills.
+
+The gate auto-passes when the project has no skills installed, so it's safe to leave on globally.
 
 ### What gets created
 
-**`.claude/settings.json`** — Registers the hook:
+**`.claude/settings.json`** — Registers the gate on file-writing tools:
 
 ```json
 {
   "hooks": {
-    "UserPromptSubmit": [
+    "PreToolUse": [
       {
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/skill-forced-eval-hook.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh"
           }
         ]
       }
@@ -127,19 +132,7 @@ This forces Claude to explicitly evaluate every installed skill before writing c
 }
 ```
 
-**`CLAUDE.md`** — Appends the evaluation rule:
-
-```yaml
-skill_evaluation:
-  mandatory: true
-  rule: |
-    BEFORE writing ANY code, you MUST:
-    1. List EVERY skill from the system-reminder's available skills section
-    2. For each skill, write: [skill-name] → ACTIVATE / SKIP — [one-line reason]
-    3. Call Skill(name) for every skill marked ACTIVATE
-    4. Only THEN proceed to implementation
-    If you skip this evaluation, your response is INCOMPLETE and WRONG.
-```
+**`CLAUDE.md`** — Appends the evaluation rule, including the `[skills-checked]` sentinel that the gate looks for.
 
 ## Manual Install
 
