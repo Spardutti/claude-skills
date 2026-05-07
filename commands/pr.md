@@ -2,6 +2,7 @@
 name: pr
 description: "Create a pull request with summary, test plan, and proper base branch"
 category: Workflow
+disable-model-invocation: true
 ---
 
 # Create Pull Request

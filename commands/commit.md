@@ -2,6 +2,7 @@
 name: commit
 description: "Smart commit workflow — conventional commits, atomic staging, branch safety"
 category: Workflow
+disable-model-invocation: true
 ---
 
 # Smart Commit

@@ -2,6 +2,7 @@
 name: release
 description: "Create a release PR from dev to main with tag, changelog, and GitHub release"
 category: Workflow
+disable-model-invocation: true
 ---
 
 # Create Release

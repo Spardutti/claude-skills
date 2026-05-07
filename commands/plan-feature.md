@@ -2,6 +2,7 @@
 name: plan-feature
 description: "Plan a feature so it integrates with existing code instead of duplicating it — 3 parallel Haiku subagents scan for reusable code, established patterns, and touch points, then ask grounded clarifying questions before producing an integration plan"
 category: Workflow
+disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Task, Write
 requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
 argument-hint: "<short feature description>"

@@ -2,6 +2,7 @@
 name: deep-review
 description: "Multi-agent deep code review — spawns 5 parallel agents to catch guard bypasses, lost async state, wrong-table queries, dead references, and protocol violations"
 category: Workflow
+disable-model-invocation: true
 allowed-tools: Bash(git *), Read, Grep, Glob, Task
 requires-agents: [deep-review-guard-bypass, deep-review-state-persistence, deep-review-cross-table, deep-review-dead-reference, deep-review-protocol-conformance]
 argument-hint: "[base-branch] defaults to develop or main"

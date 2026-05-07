@@ -2,6 +2,7 @@
 name: refactor
 description: "Find code files with size, complexity, duplication, or coupling issues and refactor them"
 category: Workflow
+disable-model-invocation: true
 allowed-tools: Task, Glob, Bash(wc *), Read, Edit, Write, Grep
 requires-agents: [refactor-size, refactor-complexity, refactor-duplication, refactor-coupling]
 argument-hint: "[file-path] or leave empty to scan entire project"
