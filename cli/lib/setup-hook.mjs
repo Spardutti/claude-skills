@@ -11,8 +11,12 @@ import { join, resolve } from "node:path";
 //   - transcript_path missing or unreadable
 //   - no user prompt found in transcript
 //
-// tool_result lines (which include the gate's own deny message) are
-// filtered out of the sentinel scan to prevent self-satisfaction.
+// LAST_PROMPT is detected by matching user-role lines whose content is
+// a JSON string ("role":"user","content":"..."), which excludes
+// tool_results, skill loads, task notifications, and slash-command
+// payloads (all of which use array content). The sentinel scan also
+// excludes tool_result lines so the gate's own deny message — which
+// embeds the literal sentinel — cannot self-satisfy.
 const GATE_SCRIPT = `#!/bin/bash
 # PreToolUse gate: forces skill evaluation before file-writing tools run.
 
@@ -30,12 +34,12 @@ if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
   exit 0
 fi
 
-LAST_PROMPT=$(grep -n '"type":"user"' "$TRANSCRIPT" 2>/dev/null | grep -v 'tool_use_id' | tail -1 | cut -d: -f1)
+LAST_PROMPT=$(grep -nE '"role":"user","content":"' "$TRANSCRIPT" 2>/dev/null | tail -1 | cut -d: -f1)
 if [ -z "$LAST_PROMPT" ]; then
   exit 0
 fi
 
-if tail -n +"$LAST_PROMPT" "$TRANSCRIPT" | grep -v 'tool_use_id' | grep -qF '[skills-checked]'; then
+if tail -n +"$LAST_PROMPT" "$TRANSCRIPT" | grep -v '"type":"tool_result"' | grep -qF '[skills-checked]'; then
   exit 0
 fi
 
