@@ -2,14 +2,15 @@ import { mkdir, writeFile, readFile, chmod } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 // PreToolUse gate on Write|Edit|MultiEdit. Blocks the tool call unless
-// a per-prompt marker file exists at $PROJECT_DIR/.claude/.skill-gate-<UUID>,
+// a per-prompt marker file exists at /tmp/claude-skill-gate-<UUID>,
 // where <UUID> is the uuid of the most recent typed user prompt. The
 // assistant creates the marker via Bash; Bash output is flushed
 // synchronously, so the marker is race-free against the message-buffering
 // behavior that broke the earlier text-sentinel approach (Claude Code
 // writes assistant content blocks to JSONL only after the turn completes,
 // so [skills-checked] text emitted in the same message as a tool_use is
-// invisible to PreToolUse).
+// invisible to PreToolUse). /tmp keeps the marker out of the project
+// directory so it can't leak into commits.
 //
 // LAST_PROMPT_UUID is detected by matching user-role lines whose content
 // is a JSON string ("role":"user","content":"..."), which excludes
@@ -43,15 +44,14 @@ if [ -z "$LAST_PROMPT_UUID" ]; then
   exit 0
 fi
 
-MARKER_DIR="$PROJECT_DIR/.claude"
-MARKER="$MARKER_DIR/.skill-gate-$LAST_PROMPT_UUID"
+MARKER="/tmp/claude-skill-gate-$LAST_PROMPT_UUID"
 if [ -f "$MARKER" ]; then
-  find "$MARKER_DIR" -maxdepth 1 -name '.skill-gate-*' ! -name ".skill-gate-$LAST_PROMPT_UUID" -delete 2>/dev/null
+  find /tmp -maxdepth 1 -name 'claude-skill-gate-*' ! -name "claude-skill-gate-$LAST_PROMPT_UUID" -delete 2>/dev/null
   exit 0
 fi
 
 cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries. (3) Run this exact Bash command to record approval: mkdir -p .claude && touch .claude/.skill-gate-$LAST_PROMPT_UUID  (4) Then retry the file edit. The marker is unique to this user prompt and is auto-cleaned on the next prompt."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries. (3) Run this exact Bash command to record approval: touch /tmp/claude-skill-gate-$LAST_PROMPT_UUID  (4) Then retry the file edit. The marker is unique to this user prompt and is auto-cleaned on the next prompt."}}
 EOF
 exit 0
 `;
