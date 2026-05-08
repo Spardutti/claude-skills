@@ -101,18 +101,22 @@ The CLI will:
 
 After installing skills, the CLI asks if you want to set up automatic skill evaluation. If you say yes, it will:
 
-- **Create a PreToolUse gate hook** at `.claude/hooks/skill-gate.sh`
+- **Install two hooks** in `.claude/hooks/`:
+  - `skill-gate.sh` — PreToolUse gate on `Write|Edit|MultiEdit`
+  - `skill-gate-automark.sh` — PostToolUse on `Skill` that auto-clears the gate
 - **Update your `CLAUDE.md`** with the skill-evaluation rule
 
-The gate hard-blocks `Write`, `Edit`, and `MultiEdit` tool calls until Claude has evaluated the available skills and emitted the literal token `[skills-checked]` in its response. Once emitted, every subsequent edit in that turn passes through. The next user prompt resets the gate.
+The gate hard-blocks `Write`, `Edit`, and `MultiEdit` until a per-session marker file exists at `/tmp/claude-skill-gate-<SESSION_ID>`. The marker is created automatically the first time Claude invokes any `Skill()` in the session — so the normal flow is: Claude lists skills as ACTIVATE/SKIP, calls `Skill()` for the ACTIVATE ones, and the gate clears for the rest of the session. If every skill is SKIP, Claude clears the gate by running `touch /tmp/claude-skill-gate-<SESSION_ID>`.
+
+The marker is **per-session, not per-turn** — short follow-ups like "yes" don't re-lock the gate after evaluation has already happened.
 
 Unlike a soft reminder injected into context (which Claude can ignore), the gate denies the tool call outright — so the only path forward is to actually evaluate skills.
 
-The gate auto-passes when the project has no skills installed, so it's safe to leave on globally.
+The gate auto-passes when the project has no `.claude/skills/*/SKILL.md` files, so it's safe to leave on globally.
 
 ### What gets created
 
-**`.claude/settings.json`** — Registers the gate on file-writing tools:
+**`.claude/settings.json`** — Registers both hooks:
 
 ```json
 {
@@ -127,12 +131,23 @@ The gate auto-passes when the project has no skills installed, so it's safe to l
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh"
+          }
+        ]
+      }
     ]
   }
 }
 ```
 
-**`CLAUDE.md`** — Appends the evaluation rule, including the `[skills-checked]` sentinel that the gate looks for.
+**`CLAUDE.md`** — Appends the skill-evaluation rule that tells Claude to enumerate skills as ACTIVATE/SKIP and call `Skill()` for ACTIVATE entries before writing code.
 
 ## Manual Install
 
