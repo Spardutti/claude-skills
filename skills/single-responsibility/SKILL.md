@@ -280,3 +280,14 @@ Don't over-apply SRP. Keep together when:
 - Never create a class/module that serves two different stakeholders.
 - Always extract when a test needs 4+ mocks — the unit has too many dependencies.
 - Never split just because you can — only split when there's a real second responsibility.
+
+## Anti-Rationalizations
+
+| Excuse | Rebuttal |
+|--------|----------|
+| "It's only 250 lines, that's fine" | The rule is 200. The next change makes it 280. Split now while the seams are still obvious. |
+| "Splitting would just create indirection" | If the parts have different reasons to change, the indirection is the point. |
+| "These two things always change together" | Then keep them — but verify with `git log`, not vibes. "Always" usually means "twice so far". |
+| "I'll refactor this later, after the feature ships" | Post-ship refactors don't get prioritized. Split as part of this PR or it stays forever. |
+| "The function is long but it reads top-to-bottom" | Mixed levels of abstraction also read top-to-bottom. Extract by abstraction level, not by length. |
+| "The test needs 6 mocks but the code is fine" | 4+ mocks means the unit has too many dependencies. The test is telling you to split. |

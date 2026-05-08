@@ -274,3 +274,14 @@ You have a wrong abstraction if:
 - Never name an abstraction `process`, `handle`, `manage`, or `doStuff` — if that's the best name, it's not an abstraction.
 - Never build a base class whose subclasses need to override its orchestration methods.
 - Always prefer coincidental duplication to coincidental coupling.
+
+## Anti-Rationalizations
+
+| Excuse | Rebuttal |
+|--------|----------|
+| "I see this pattern twice, let me extract it now" | Two is coincidence. Wait for three and check the shape actually matches. |
+| "I'll just add a boolean flag to handle the new case" | Boolean flags are how a wrong abstraction grows. Split into two purpose-named functions instead. |
+| "The duplication is ugly, I should DRY it up" | Wrong abstraction costs more than duplication. Verify both callers change for the same reason first. |
+| "I can fix the abstraction by adding another parameter" | That's how it got wrong. Inline back to duplication, then re-abstract from scratch if a real shape emerges. |
+| "I'll generalize now to save time later" | You'll pay now AND later — once for building it, again for unwinding it when the needs diverge. |
+| "The base class with template methods is cleaner" | Until subclasses need to override orchestration. Prefer composition; inheritance locks in the wrong assumptions. |

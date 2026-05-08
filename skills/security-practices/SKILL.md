@@ -225,3 +225,15 @@ response.set_cookie(key="session", value=token,
 10. **Never leak internal errors** — log details, return generic messages
 11. **Explicit CORS origins** — never `"*"` with credentials
 12. **Secure cookie flags** — `httponly`, `secure`, `samesite`
+
+## Anti-Rationalizations
+
+| Excuse | Rebuttal |
+|--------|----------|
+| "It's an internal tool, doesn't need validation" | Internal tools get exposed — VPN drops, SSRF, accidental public deploy. Validate at every boundary. |
+| "The frontend already validates this" | Client validation is UX, not security. Anyone can hit the API directly with curl. |
+| "We'll add auth before launch" | Auth bolted on late misses object-level checks (IDOR). Build it in from the first endpoint. |
+| "String interpolation is fine, the input is trusted" | "Trusted" is a vibe, not a guarantee. Parameterize every query, every time — no exceptions. |
+| "Logging the full error helps debugging" | And leaks stack traces, paths, and secrets to attackers. Log details server-side, return generic messages. |
+| "We need CORS `*` for the public API" | Then it can't use credentials. `allow_origins=["*"]` + `allow_credentials=True` is a critical bug. |
+| "MD5 is fine, we just need a quick hash" | Not for passwords, not for tokens, not for anything security-adjacent. Use bcrypt/argon2 or a real KDF. |

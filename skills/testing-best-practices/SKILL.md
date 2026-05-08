@@ -197,3 +197,14 @@ test.each([
 8. **Follow the pyramid** — ~70% unit, ~20% integration, ~10% E2E
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
+
+## Anti-Rationalizations
+
+| Excuse | Rebuttal |
+|--------|----------|
+| "I'll write tests after the implementation works" | "Later" never comes. Write the failing test first — it forces you to define done. |
+| "This is too simple to need a test" | If it's simple, the test is one line. Write it. |
+| "I tested it manually, it works" | Manual tests don't run in CI. The next refactor breaks it silently. |
+| "Mocking the DB is fine here" | Mocked-DB tests pass while real migrations fail. Hit a real DB at the integration layer. |
+| "100% coverage means it's well tested" | Coverage measures lines executed, not behavior verified. A test with no meaningful assertion is worthless. |
+| "The test is flaky, just retry it in CI" | A flaky test is a broken test. Fix the race or delete it — retries hide real bugs. |
