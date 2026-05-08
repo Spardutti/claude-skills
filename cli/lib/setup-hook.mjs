@@ -51,23 +51,49 @@ if [ -f "$MARKER" ]; then
 fi
 
 cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries. (3) Run this exact Bash command to record approval: touch /tmp/claude-skill-gate-$LAST_PROMPT_UUID  (4) Then retry the file edit. The marker is unique to this user prompt and is auto-cleaned on the next prompt."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries — this auto-clears the gate. If all skills are SKIP, run this exact Bash command instead: touch /tmp/claude-skill-gate-$LAST_PROMPT_UUID  (3) Then retry the file edit. The marker is unique to this user prompt and is auto-cleaned on the next prompt."}}
 EOF
 exit 0
 `;
 
+// PostToolUse on Skill: auto-creates the gate marker so the model doesn't
+// need an explicit touch. Uses the same UUID-detection logic as the gate.
+const AUTO_MARK_SCRIPT = `#!/bin/bash
+# PostToolUse on Skill: auto-marks the skill-gate as satisfied.
+
+INPUT=$(cat)
+
+TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"transcript_path":"[^"]*"' | head -1 | sed 's/"transcript_path":"//; s/"$//')
+if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+  exit 0
+fi
+
+LAST_LINE=$(grep -E '"role":"user","content":"' "$TRANSCRIPT" 2>/dev/null | tail -1)
+LAST_PROMPT_UUID=$(printf '%s' "$LAST_LINE" | grep -o '"uuid":"[^"]*"' | head -1 | sed 's/"uuid":"//;s/"$//')
+if [ -z "$LAST_PROMPT_UUID" ]; then
+  exit 0
+fi
+
+touch "/tmp/claude-skill-gate-$LAST_PROMPT_UUID"
+exit 0
+`;
+
 const GATE_FILENAME = "skill-gate.sh";
+const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 
 export async function setupHook(targetDir = process.cwd()) {
   const resolved = resolve(targetDir);
   const hooksDir = join(resolved, ".claude", "hooks");
   const gatePath = join(hooksDir, GATE_FILENAME);
+  const autoMarkPath = join(hooksDir, AUTO_MARK_FILENAME);
   const settingsPath = join(resolved, ".claude", "settings.json");
 
   await mkdir(hooksDir, { recursive: true });
   await writeFile(gatePath, GATE_SCRIPT, { mode: 0o755 });
   await chmod(gatePath, 0o755);
+  await writeFile(autoMarkPath, AUTO_MARK_SCRIPT, { mode: 0o755 });
+  await chmod(autoMarkPath, 0o755);
 
   let settings = {};
   try {
@@ -103,8 +129,25 @@ export async function setupHook(targetDir = process.cwd()) {
     settings.hooks.PreToolUse = [gateEntry];
   }
 
+  // Register PostToolUse auto-mark on Skill.
+  const autoMarkCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${AUTO_MARK_FILENAME}`;
+  const autoMarkEntry = {
+    matcher: "Skill",
+    hooks: [{ type: "command", command: autoMarkCommand }],
+  };
+
+  if (Array.isArray(settings.hooks.PostToolUse)) {
+    const exists = settings.hooks.PostToolUse.some((entry) =>
+      entry.hooks?.some((h) => h.command?.endsWith(AUTO_MARK_FILENAME))
+    );
+    if (!exists) settings.hooks.PostToolUse.push(autoMarkEntry);
+  } else {
+    settings.hooks.PostToolUse = [autoMarkEntry];
+  }
+
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o644 });
 
   console.log(`  Hook installed: .claude/hooks/${GATE_FILENAME}`);
+  console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }
