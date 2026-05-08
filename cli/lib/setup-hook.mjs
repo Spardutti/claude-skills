@@ -2,25 +2,15 @@ import { mkdir, writeFile, readFile, chmod } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 // PreToolUse gate on Write|Edit|MultiEdit. Blocks the tool call unless
-// a per-prompt marker file exists at /tmp/claude-skill-gate-<UUID>,
-// where <UUID> is the uuid of the most recent typed user prompt. The
-// assistant creates the marker via Bash; Bash output is flushed
-// synchronously, so the marker is race-free against the message-buffering
-// behavior that broke the earlier text-sentinel approach (Claude Code
-// writes assistant content blocks to JSONL only after the turn completes,
-// so [skills-checked] text emitted in the same message as a tool_use is
-// invisible to PreToolUse). /tmp keeps the marker out of the project
-// directory so it can't leak into commits.
-//
-// LAST_PROMPT_UUID is detected by matching user-role lines whose content
-// is a JSON string ("role":"user","content":"..."), which excludes
-// tool_results, skill loads, task notifications, and slash-command
-// payloads (all of which use array content).
+// a per-session marker file exists at /tmp/claude-skill-gate-<SESSION_ID>.
+// Per-session (not per-prompt) so simple confirmations like "yes" don't
+// re-lock the gate after evaluation has already happened in the session.
+// The PostToolUse hook on Skill creates the marker automatically; for
+// all-SKIP cases the model can `touch` the path manually.
 //
 // Pass-through cases:
 //   - project has no .claude/skills/*/SKILL.md files
-//   - transcript_path missing or unreadable
-//   - no typed user prompt found in transcript
+//   - session_id missing from hook input
 const GATE_SCRIPT = `#!/bin/bash
 # PreToolUse gate: forces skill evaluation before file-writing tools run.
 
@@ -33,48 +23,34 @@ if ! find "$PROJECT_DIR" -path '*/.claude/skills/*/SKILL.md' 2>/dev/null | grep 
   exit 0
 fi
 
-TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"transcript_path":"[^"]*"' | head -1 | sed 's/"transcript_path":"//; s/"$//')
-if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id":"[^"]*"' | head -1 | sed 's/"session_id":"//; s/"$//')
+if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
 
-LAST_LINE=$(grep -E '"role":"user","content":"' "$TRANSCRIPT" 2>/dev/null | tail -1)
-LAST_PROMPT_UUID=$(printf '%s' "$LAST_LINE" | grep -o '"uuid":"[^"]*"' | head -1 | sed 's/"uuid":"//;s/"$//')
-if [ -z "$LAST_PROMPT_UUID" ]; then
-  exit 0
-fi
-
-MARKER="/tmp/claude-skill-gate-$LAST_PROMPT_UUID"
+MARKER="/tmp/claude-skill-gate-$SESSION_ID"
 if [ -f "$MARKER" ]; then
-  find /tmp -maxdepth 1 -name 'claude-skill-gate-*' ! -name "claude-skill-gate-$LAST_PROMPT_UUID" -delete 2>/dev/null
   exit 0
 fi
 
 cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries — this auto-clears the gate. If all skills are SKIP, run this exact Bash command instead: touch /tmp/claude-skill-gate-$LAST_PROMPT_UUID  (3) Then retry the file edit. The marker is unique to this user prompt and is auto-cleaned on the next prompt."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits in this session. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries — this auto-clears the gate for the rest of the session. If all skills are SKIP, run this exact Bash command instead: touch /tmp/claude-skill-gate-$SESSION_ID  (3) Then retry the file edit."}}
 EOF
 exit 0
 `;
 
-// PostToolUse on Skill: auto-creates the gate marker so the model doesn't
-// need an explicit touch. Uses the same UUID-detection logic as the gate.
+// PostToolUse on Skill: auto-creates the per-session gate marker.
 const AUTO_MARK_SCRIPT = `#!/bin/bash
-# PostToolUse on Skill: auto-marks the skill-gate as satisfied.
+# PostToolUse on Skill: auto-marks the skill-gate as satisfied for the session.
 
 INPUT=$(cat)
 
-TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"transcript_path":"[^"]*"' | head -1 | sed 's/"transcript_path":"//; s/"$//')
-if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id":"[^"]*"' | head -1 | sed 's/"session_id":"//; s/"$//')
+if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
 
-LAST_LINE=$(grep -E '"role":"user","content":"' "$TRANSCRIPT" 2>/dev/null | tail -1)
-LAST_PROMPT_UUID=$(printf '%s' "$LAST_LINE" | grep -o '"uuid":"[^"]*"' | head -1 | sed 's/"uuid":"//;s/"$//')
-if [ -z "$LAST_PROMPT_UUID" ]; then
-  exit 0
-fi
-
-touch "/tmp/claude-skill-gate-$LAST_PROMPT_UUID"
+touch "/tmp/claude-skill-gate-$SESSION_ID"
 exit 0
 `;
 
