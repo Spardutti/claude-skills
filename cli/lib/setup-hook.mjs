@@ -34,7 +34,7 @@ if [ -f "$MARKER" ]; then
 fi
 
 cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Skill evaluation required before file edits in this session. (1) List each available skill as ACTIVATE or SKIP with a one-line reason. (2) Call Skill() for any ACTIVATE entries — this auto-clears the gate for the rest of the session. If all skills are SKIP, run this exact Bash command instead: touch /tmp/claude-skill-gate-$SESSION_ID  (3) Then retry the file edit."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: skill evaluation required before file edits in this session.\\n\\nStep 1 — evaluate every available skill as ACTIVATE or SKIP with a one-line reason.\\n\\nStep 2 — you MUST take EXACTLY ONE of these tool actions to clear the gate. Listing skills in text is NOT enough; retrying the edit without doing one of these will be denied again:\\n  (a) If any skill is ACTIVATE → call Skill(name) for it. This auto-clears the gate.\\n  (b) If ALL skills are SKIP → run this Bash tool call: touch /tmp/claude-skill-gate-$SESSION_ID\\n\\nStep 3 — only after Step 2 completes, retry the file edit."}}
 EOF
 exit 0
 `;
