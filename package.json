@@ -1,0 +1,12 @@
+{
+  "name": "claude-skills-dev",
+  "private": true,
+  "description": "Dev tooling for the claude-skills repo (not published — the published package is cli/)",
+  "scripts": {
+    "validate-skills": "node scripts/validate-skills.mjs",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
