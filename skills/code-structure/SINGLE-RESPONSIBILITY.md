@@ -1,14 +1,20 @@
----
-name: single-responsibility
-category: Architecture
-description: "MUST USE when creating or editing any code file in any language. Enforces Single Responsibility Principle: max 200 lines/file, max 30 lines/function, one reason to change per unit."
----
-
-# Single Responsibility Principle (Language-Agnostic)
+# Single Responsibility Principle
 
 Every file, function, class, and module does **one thing**. If you can describe it with "and", split it.
 
 A unit should have **one reason to change** — it serves one actor or stakeholder. If changes from the business team AND the ops team both require editing the same file, that file has two responsibilities.
+
+## Contents
+
+- Hard limits
+- Separation of concerns (computation vs side effects, CQS, policy vs mechanism)
+- Class / module design (one resource per class, levels of abstraction)
+- Function design (early returns, pipeline over monolith)
+- File organization
+- Smell tests
+- When NOT to split
+- Rules
+- Anti-rationalizations
 
 ## Hard Limits
 
@@ -163,11 +169,7 @@ def update_manifest(config):
 fn get_status(mission: &Mission) -> &str {
     if mission.is_active {
         if mission.has_analysis {
-            if mission.analysis.is_complete {
-                "complete"
-            } else {
-                "analyzing"
-            }
+            if mission.analysis.is_complete { "complete" } else { "analyzing" }
         } else {
             "pending"
         }
@@ -188,18 +190,13 @@ fn get_status(mission: &Mission) -> &str {
 ### Pipeline Over Monolith
 
 ```python
-# BAD: one function does everything
+# BAD: one function validates, transforms, AND groups
 def process_data(raw_data):
     validated = []
     for item in raw_data:
         if item.get("name") and item.get("value") > 0:
             validated.append(item)
-    transformed = []
-    for item in validated:
-        transformed.append({
-            "name": item["name"].upper(),
-            "value": item["value"] * 100,
-        })
+    transformed = [{"name": i["name"].upper(), "value": i["value"] * 100} for i in validated]
     grouped = {}
     for item in transformed:
         grouped.setdefault(item["name"], []).append(item)
@@ -224,49 +221,36 @@ def process_data(raw_data):
 
 ## File Organization
 
-### One Export Focus Per File
+One export focus per file. Colocate by proximity of change:
+
+- Types shared across a module → a `types` file; types used in one file → define inline.
+- Utility used once → inline it; used 2+ times within a module → a local `utils/`; used across modules → shared `lib/`/`common/`.
 
 ```
-# BAD: everything in one file
-services/
-  api.py          # handles users, orders, payments, emails
-
-# GOOD: one concern per file
-services/
-  user_service.py
-  order_service.py
-  payment_service.py
-  email_service.py
+# BAD: services/api.py handles users, orders, payments, emails
+# GOOD: user_service.py · order_service.py · payment_service.py · email_service.py
 ```
-
-### Colocation Rules
-
-- Types/interfaces shared across a module → `types` file
-- Types used in one file → define in that file
-- Utility used once → inline it
-- Utility used 2+ times within a module → local `utils/` directory
-- Utility used across modules → shared `lib/` or `common/`
 
 ## Smell Tests
 
 Your code violates SRP if:
 
-1. You scroll to understand a single function
-2. You need comments to explain control flow
-3. A test requires 4+ mocks to set up
-4. Changing one thing breaks unrelated behavior
-5. You describe the file with "and" (fetches data **and** formats it **and** renders it)
-6. A function has more than 3 conditional branches
-7. A file imports from more than 5 unrelated modules
+1. You scroll to understand a single function.
+2. You need comments to explain control flow.
+3. A test requires 4+ mocks to set up.
+4. Changing one thing breaks unrelated behavior.
+5. You describe the file with "and" (fetches data **and** formats it **and** renders it).
+6. A function has more than 3 conditional branches.
+7. A file imports from more than 5 unrelated modules.
 
 ## When NOT to Split
 
 Don't over-apply SRP. Keep together when:
 
-- Two things **always change together** and serve the same actor
-- Splitting would create indirection with no testability gain
-- The unit is under 30 lines and reads clearly as-is
-- Three similar lines are better than a premature abstraction
+- Two things **always change together** and serve the same actor.
+- Splitting would create indirection with no testability gain.
+- The unit is under 30 lines and reads clearly as-is.
+- Three similar lines are better than a premature abstraction.
 
 ## Rules
 
@@ -285,7 +269,7 @@ Don't over-apply SRP. Keep together when:
 
 | Excuse | Rebuttal |
 |--------|----------|
-| "It's only 250 lines, that's fine" | The rule is 200. The next change makes it 280. Split now while the seams are still obvious. |
+| "It's only 250 lines, that's fine" | The rule is 200. The next change makes it 280. Split now while the seams are obvious. |
 | "Splitting would just create indirection" | If the parts have different reasons to change, the indirection is the point. |
 | "These two things always change together" | Then keep them — but verify with `git log`, not vibes. "Always" usually means "twice so far". |
 | "I'll refactor this later, after the feature ships" | Post-ship refactors don't get prioritized. Split as part of this PR or it stays forever. |

@@ -3,6 +3,10 @@
 Every file, component, hook, and function does **one thing**. If you can
 describe it with "and", split it.
 
+This file *applies* the Single Responsibility and Avoid-Hasty-Abstractions
+principles to React. For the language-agnostic principle — why it matters,
+separation of concerns, the Rule of Three — see the `code-structure` skill.
+
 ## Contents
 
 - Hard limits

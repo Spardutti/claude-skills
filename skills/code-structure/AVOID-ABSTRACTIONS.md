@@ -1,14 +1,20 @@
----
-name: avoid-hasty-abstractions
-category: Architecture
-description: "MUST USE when tempted to extract a helper, base class, or shared utility from duplicated code. Teaches AHA / Rule of Three — prefer duplication over the wrong abstraction."
----
-
 # Avoid Hasty Abstractions (AHA)
 
 Duplication is cheap. The **wrong abstraction** is expensive — it infects every caller with parameters, flags, and conditionals that grow forever.
 
 > "Prefer duplication over the wrong abstraction." — Sandi Metz
+
+## Contents
+
+- The core rule
+- The failure pattern to recognize
+- BAD/GOOD pairs (mode flags, boolean creep, inheritance, single-use helpers, over-generic utilities)
+- When extraction IS correct
+- Shape vs intent
+- Undoing a wrong abstraction
+- Smell tests
+- Rules
+- Anti-rationalizations
 
 ## The Core Rule
 
@@ -23,7 +29,7 @@ Duplication is cheap. The **wrong abstraction** is expensive — it infects ever
 1. Two similar blocks exist.
 2. Someone extracts a shared helper. Feels clean.
 3. New requirement arrives — almost fits the helper.
-4. A boolean param is added: `doThing(x, { skipValidation: true })`.
+4. A boolean param is added: doThing(x, { skipValidation: true }).
 5. Another requirement: another flag. Then a mode string.
 6. Helper is now a maze of conditionals serving no caller well.
 7. Every change to any caller risks breaking the others.
@@ -39,27 +45,17 @@ The fastest way out: **inline it back into each caller**, then see what the real
 # BAD: extracted too early; now a flag leaks caller-specific behavior
 def send_notification(user, message, kind):
     if kind == "welcome":
-        subject = f"Welcome, {user.name}"
-        template = "welcome.html"
-        cc_support = False
+        subject, template, cc_support = f"Welcome, {user.name}", "welcome.html", False
     elif kind == "password_reset":
-        subject = "Reset your password"
-        template = "reset.html"
-        cc_support = True
+        subject, template, cc_support = "Reset your password", "reset.html", True
     else:
         raise ValueError(kind)
-    body = render(template, user=user, message=message)
-    recipients = [user.email]
-    if cc_support:
-        recipients.append("support@co.com")
-    smtp.send(subject, body, recipients)
-```
+    recipients = [user.email] + (["support@co.com"] if cc_support else [])
+    smtp.send(subject, render(template, user=user, message=message), recipients)
 
-```python
 # GOOD: two purpose-named functions; small shared primitive only
 def send_welcome(user):
-    body = render("welcome.html", user=user)
-    smtp.send(f"Welcome, {user.name}", body, [user.email])
+    smtp.send(f"Welcome, {user.name}", render("welcome.html", user=user), [user.email])
 
 def send_password_reset(user, message):
     body = render("reset.html", user=user, message=message)
@@ -72,40 +68,26 @@ The duplicated `render` + `smtp.send` lines are *not* a problem — they're a vo
 
 ```typescript
 // BAD: every caller passes a different flag combination
-function fetchUser(
-  id: string,
-  opts: {
-    includeDeleted?: boolean;
-    withPosts?: boolean;
-    withPostsLimit?: number;
-    skipCache?: boolean;
-    raw?: boolean;
-  } = {},
-) {
+function fetchUser(id: string, opts: {
+  includeDeleted?: boolean; withPosts?: boolean; skipCache?: boolean; raw?: boolean;
+} = {}) {
   const cache = opts.skipCache ? null : userCache.get(id);
   if (cache && !opts.raw) return cache;
-  const query = opts.includeDeleted ? qAll(id) : qActive(id);
-  const user = db.one(query);
-  if (opts.withPosts) {
-    user.posts = db.many(qPosts(id, opts.withPostsLimit ?? 10));
-  }
+  const user = db.one(opts.includeDeleted ? qAll(id) : qActive(id));
+  if (opts.withPosts) user.posts = db.many(qPosts(id));
   if (!opts.skipCache) userCache.set(id, user);
   return user;
 }
-```
 
-```typescript
 // GOOD: one function per real use case; no flags
 function getUser(id: string) {
   return userCache.get(id) ?? userCache.set(id, db.one(qActive(id)));
 }
-
 function getUserWithPosts(id: string, limit = 10) {
   const user = db.one(qActive(id));
   user.posts = db.many(qPosts(id, limit));
   return user;
 }
-
 function getUserIncludingDeleted(id: string) {
   return db.one(qAll(id));
 }
@@ -120,37 +102,20 @@ Rule of thumb: **every boolean parameter hides two functions in a trench coat.**
 abstract class ReportBase {
   abstract fetchData(): Row[];
   abstract formatRow(r: Row): string;
-  render() {
-    const rows = this.fetchData();
-    return rows.map((r) => this.formatRow(r)).join("\n");
-  }
+  render() { return this.fetchData().map((r) => this.formatRow(r)).join("\n"); }
 }
-
-class SalesReport extends ReportBase {
-  fetchData() { return salesRepo.all(); }
-  formatRow(r: Row) { return `${r.date} ${r.amount}`; }
-}
-
 class AuditReport extends ReportBase {
   fetchData() { return auditRepo.all(); }
   formatRow(r: Row) { return `[${r.actor}] ${r.action}`; }
-  // needs a header — subclass has to override render() too, fighting the base
-  render() { return "=== AUDIT ===\n" + super.render(); }
+  render() { return "=== AUDIT ===\n" + super.render(); } // fighting the base
 }
-```
 
-```typescript
 // GOOD: two small, independent functions. No inheritance, no coupling.
 function renderSalesReport(): string {
-  return salesRepo.all()
-    .map((r) => `${r.date} ${r.amount}`)
-    .join("\n");
+  return salesRepo.all().map((r) => `${r.date} ${r.amount}`).join("\n");
 }
-
 function renderAuditReport(): string {
-  const body = auditRepo.all()
-    .map((r) => `[${r.actor}] ${r.action}`)
-    .join("\n");
+  const body = auditRepo.all().map((r) => `[${r.actor}] ${r.action}`).join("\n");
   return `=== AUDIT ===\n${body}`;
 }
 ```
@@ -160,24 +125,15 @@ function renderAuditReport(): string {
 ```go
 // BAD: 4-line "helper" used in exactly one place
 func formatUserLabel(u User) string {
-    if u.DisplayName != "" {
-        return u.DisplayName
-    }
+    if u.DisplayName != "" { return u.DisplayName }
     return u.Email
 }
+func RenderHeader(u User) string { return "Hello, " + formatUserLabel(u) }
 
-func RenderHeader(u User) string {
-    return "Hello, " + formatUserLabel(u)
-}
-```
-
-```go
 // GOOD: inline it; the indirection wasn't buying anything
 func RenderHeader(u User) string {
     name := u.DisplayName
-    if name == "" {
-        name = u.Email
-    }
+    if name == "" { name = u.Email }
     return "Hello, " + name
 }
 ```
@@ -188,35 +144,24 @@ Extract when the helper earns its name by being *called from multiple places* or
 
 ```python
 # BAD: a "flexible" helper whose config is longer than inlining it
-def process_items(items, *, filter_fn=None, map_fn=None,
-                  group_by=None, sort_key=None, reverse=False):
+def process_items(items, *, filter_fn=None, map_fn=None, group_by=None,
+                  sort_key=None, reverse=False):
     out = items
-    if filter_fn:   out = [x for x in out if filter_fn(x)]
-    if map_fn:      out = [map_fn(x) for x in out]
-    if sort_key:    out = sorted(out, key=sort_key, reverse=reverse)
+    if filter_fn: out = [x for x in out if filter_fn(x)]
+    if map_fn:    out = [map_fn(x) for x in out]
+    if sort_key:  out = sorted(out, key=sort_key, reverse=reverse)
     if group_by:
         g = {}
         for x in out: g.setdefault(group_by(x), []).append(x)
         return g
     return out
 
-# caller:
-report = process_items(
-    orders,
-    filter_fn=lambda o: o.status == "paid",
-    map_fn=lambda o: (o.customer, o.total),
-    group_by=lambda x: x[0],
-)
-```
-
-```python
 # GOOD: just write the pipeline; it's clearer and shorter
 def report_by_customer(orders):
     paid = (o for o in orders if o.status == "paid")
-    pairs = ((o.customer, o.total) for o in paid)
     groups = {}
-    for customer, total in pairs:
-        groups.setdefault(customer, []).append(total)
+    for o in paid:
+        groups.setdefault(o.customer, []).append(o.total)
     return groups
 ```
 
@@ -225,24 +170,22 @@ def report_by_customer(orders):
 Extract when **all** of these hold:
 
 1. The pattern appears 3+ times with *identical intent*, not just identical shape.
-2. You can give it a name that describes **what**, not **how** (`calculateTax`, not `processWithFlags`).
+2. You can name it for **what** it does, not **how** (`calculateTax`, not `processWithFlags`).
 3. No caller needs a boolean/mode parameter to bend it to their case.
 4. Callers would break together for the same reason if the logic is wrong.
 
 If any of these fail, keep duplicating.
 
-## Shape vs. Intent
+## Shape vs Intent
 
 Two blocks can look identical and still mean different things. Ask: *if the business rule changed for one, would I want the other to change too?*
 
-- **Same intent** → one abstraction. (e.g. "format currency for display.")
-- **Coincidentally same shape** → leave duplicated. (e.g. two validators that both happen to loop over a list with an `if`.)
+- **Same intent** → one abstraction (e.g. "format currency for display").
+- **Coincidentally same shape** → leave duplicated (e.g. two validators that both happen to loop with an `if`).
 
 Coincidental duplication is the most common source of wrong abstractions.
 
 ## Undoing a Wrong Abstraction
-
-When you find one:
 
 1. Inline the abstraction back into every caller.
 2. Delete the shared helper.
