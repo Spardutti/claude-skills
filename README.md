@@ -41,7 +41,7 @@ The CLI will:
 
 ## Skill Catalog
 
-**14 skills**, grouped the same way the installer presents them.
+**13 skills**, grouped the same way the installer presents them.
 
 > [!NOTE]
 > Skills marked **📦 Bundle** ship a concise always-loaded entry point plus reference files Claude reads only when a task needs them — comprehensive coverage at a low context cost.
@@ -69,31 +69,22 @@ The CLI will:
 |-------|----------------|
 | `sql` 📦 | Schema design, data types, indexing & `EXPLAIN`, joins & subqueries, ORM patterns (N+1, transactions, locking), safe migrations |
 
-### TypeScript
-
-| Skill | What it covers |
-|-------|----------------|
-| `typescript-best-practices` | TypeScript 6.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
-
-### Quality
-
-| Skill | What it covers |
-|-------|----------------|
-| `testing-best-practices` | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite |
-| `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
-
-### Architecture
-
-| Skill | What it covers |
-|-------|----------------|
-| `single-responsibility` | Language-agnostic SRP — file-size limits, CQS, separation of concerns, smell tests |
-| `avoid-hasty-abstractions` | AHA / Rule of Three — prefer duplication over the wrong abstraction, boolean-parameter creep, undoing bad extractions |
-
 ### Desktop
 
 | Skill | What it covers |
 |-------|----------------|
 | `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
+
+### Foundations
+
+Cross-cutting craft — applies to any stack, any language.
+
+| Skill | What it covers |
+|-------|----------------|
+| `code-structure` 📦 | Single Responsibility (when to split) + Avoid Hasty Abstractions (when *not* to extract) — hard size limits, separation of concerns, the Rule of Three |
+| `typescript-best-practices` | TypeScript 6.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
+| `testing-best-practices` | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite |
+| `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
 
 ## Commands
 
