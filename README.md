@@ -1,85 +1,12 @@
 # Claude Skills
 
-Personal collection of reusable Claude Code **skills**, **slash commands**, and **subagents**. Install them into any project with one command — pick what you want from an interactive menu, and any subagents declared by the commands you pick get installed automatically.
+> An interactive CLI that installs a curated catalog of Claude Code **skills**, **slash commands**, and **subagents** into any project.
 
-## Skills
+[![npm version](https://img.shields.io/npm/v/@spardutti/claude-skills)](https://www.npmjs.com/package/@spardutti/claude-skills)
+[![npm downloads](https://img.shields.io/npm/dm/@spardutti/claude-skills)](https://www.npmjs.com/package/@spardutti/claude-skills)
+[![license](https://img.shields.io/npm/l/@spardutti/claude-skills)](./LICENSE)
 
-### Frontend
-
-| Skill | Description |
-|-------|-------------|
-| `react-best-practices` | React 19 — component design, state management, performance, React 19 features, TypeScript integration |
-| `react-use-effect` | React 19 useEffect best practices and anti-patterns |
-| `react-query` | TanStack React Query with @lukemorales/query-key-factory patterns |
-| `react-single-responsibility` | React single responsibility — component splitting, hook isolation, file size limits, complexity rules |
-| `tanstack-router-best-practices` | TanStack Router — file-based routing, type-safe navigation, loaders, search params, auth guards |
-| `trpc-react-query` | tRPC v11 — queryOptions/mutationOptions patterns, router organization, middleware, cache invalidation, optimistic updates |
-| `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
-| `zustand` | Zustand — store design, selectors, persist/immer middleware, slices pattern, devtools, transient updates |
-| `dnd-kit` | @dnd-kit — sortable lists, sensors, collision detection, drag overlays, multi-container (kanban), accessibility |
-| `framer-motion` | Motion (Framer Motion) — AnimatePresence, layout animations, variants, gestures, useAnimate, performance |
-
-### Desktop
-
-| Skill | Description |
-|-------|-------------|
-| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
-
-### TypeScript
-
-| Skill | Description |
-|-------|-------------|
-| `typescript-best-practices` | TypeScript 5.x — type design, type safety, generics, error handling, tsconfig |
-
-### Backend
-
-| Skill | Description |
-|-------|-------------|
-| `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
-| `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
-| `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
-| `pydantic-best-practices` | Pydantic v2 — model_config, field/model validators, Annotated types, discriminated unions, computed_field, strict mode, TypeAdapter |
-| `celery-best-practices` | Celery — idempotency, acks_late, autoretry with backoff/jitter, canvas (chain/group/chord), routing, priorities, beat, time limits |
-| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
-| `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, relational queries, migrations, drizzle-kit workflow, type inference |
-| `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
-| `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
-
-### Database
-
-| Skill | Description |
-|-------|-------------|
-| `sql-joins` | SQL joins — LEFT JOIN traps, fan-out, NOT IN NULL bug, EXISTS vs IN, FK design, junction tables, CASCADE pitfalls |
-| `sql-indexing` | SQL indexing — composite order, covering/partial/expression indexes, SARGability, EXPLAIN interpretation, keyset pagination |
-| `sql-schema-design` | SQL schema — normalization, data types (TIMESTAMPTZ, NUMERIC), constraints, anti-patterns, safe migrations |
-| `sql-orm-patterns` | SQL ORM — N+1 fixes for Prisma/Django/SQLAlchemy/ActiveRecord/TypeORM, transactions, isolation levels, locking |
-
-### Architecture
-
-| Skill | Description |
-|-------|-------------|
-| `single-responsibility` | Single Responsibility Principle — language-agnostic SRP, file size limits, CQS, separation of concerns, smell tests |
-| `avoid-hasty-abstractions` | AHA / Rule of Three — prefer duplication over the wrong abstraction, boolean-parameter creep, undoing bad extractions |
-
-### Quality
-
-| Skill | Description |
-|-------|-------------|
-| `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
-| `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
-
-## Commands
-
-Portable slash commands for common git workflows. Installed to `.claude/commands/` in your project.
-
-| Command | Description |
-|---------|-------------|
-| `/commit` | Smart commit — branch safety, atomic staging, conventional commits |
-| `/pr` | Create PR — auto-detect base branch, structured summary and test plan |
-| `/release` | Release flow — dev→main PR with semver, changelog, tag, and GitHub release |
-| `/refactor` | Detect size/complexity/duplication/coupling issues via 4 parallel Haiku subagents, then refactor |
-| `/deep-review` | Multi-agent deep code review — 5 parallel Sonnet subagents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
-| `/plan-feature` | Integration-first feature planning — 3 parallel Haiku subagents scan for reusable code, established patterns, and touch points before producing a short integration plan |
+Skills are reference playbooks Claude Code loads while it codes — enforcing current best practices for the tools you actually use. This repo is the source catalog; the CLI lets you pick exactly what each project needs from an interactive menu, and pulls in any subagents your chosen commands depend on automatically.
 
 ## Quick Start
 
@@ -89,69 +16,156 @@ Run from any project directory:
 npx @spardutti/claude-skills
 ```
 
+```text
+  Claude Skills Installer v2.0.0
+
+  ── Frontend ──────────────────────────────
+  ◉ react              ◯ tanstack-query
+  ◯ tanstack-router
+  ── Backend ───────────────────────────────
+  ◉ fastapi            ◯ docker-best-practices
+  ◯ drf-best-practices ◯ drizzle-orm
+  ── Database ──────────────────────────────
+  ◉ sql
+
+  ↑↓ move · space select · enter confirm
+```
+
 The CLI will:
 
 1. Fetch the latest skills, commands, and agents from GitHub
-2. Let you pick which skills to install → `.claude/skills/`
-3. Let you pick which commands to install → `.claude/commands/`
-4. Auto-install any subagents declared by the selected commands → `.claude/agents/`
-5. **Optionally set up automatic skill evaluation** (recommended — see below)
+2. Let you pick skills to install → `.claude/skills/`
+3. Let you pick commands to install → `.claude/commands/`
+4. Auto-install any subagents the selected commands declare → `.claude/agents/`
+5. Optionally set up the **skill-evaluation hook** (recommended — see [How It Works](#how-it-works))
 
-## Automatic Skill Evaluation
+## Skill Catalog
 
-After installing skills, the CLI asks if you want to set up automatic skill evaluation. If you say yes, it will:
+**14 skills**, grouped the same way the installer presents them.
 
-- **Install two hooks** in `.claude/hooks/`:
-  - `skill-gate.sh` — PreToolUse gate on `Write|Edit|MultiEdit`
-  - `skill-gate-automark.sh` — PostToolUse on `Skill` that auto-clears the gate
-- **Update your `CLAUDE.md`** with the skill-evaluation rule
+> [!NOTE]
+> Skills marked **📦 Bundle** ship a concise always-loaded entry point plus reference files Claude reads only when a task needs them — comprehensive coverage at a low context cost.
 
-The gate hard-blocks `Write`, `Edit`, and `MultiEdit` until a per-session marker file exists at `/tmp/claude-skill-gate-<SESSION_ID>`. The marker is created automatically the first time Claude invokes any `Skill()` in the session — so the normal flow is: Claude lists skills as ACTIVATE/SKIP, calls `Skill()` for the ACTIVATE ones, and the gate clears for the rest of the session. If every skill is SKIP, Claude clears the gate by running `touch /tmp/claude-skill-gate-<SESSION_ID>`.
+### Frontend
 
-The marker is **per-session, not per-turn** — short follow-ups like "yes" don't re-lock the gate after evaluation has already happened.
+| Skill | What it covers |
+|-------|----------------|
+| `react` 📦 | React 19.2 — `use`, Actions, `ref` as prop, Rules of Hooks, React Compiler v1.0, component splitting, `useEffect` avoidance, performance, loading/empty states, Zustand, Tailwind v4 tokens |
+| `tanstack-query` 📦 | TanStack Query v5 — queries, mutations (pessimistic & optimistic), `useInfiniteQuery`/`useSuspenseQuery`, query-key factories, v4→v5 migration |
+| `tanstack-router` | File-based routing, type-safe navigation, loaders & caching, search params, `beforeLoad` auth guards, pending UI that prevents frozen-feeling navigation |
 
-Unlike a soft reminder injected into context (which Claude can ignore), the gate denies the tool call outright — so the only path forward is to actually evaluate skills.
+### Backend
 
-The gate auto-passes when the project has no `.claude/skills/*/SKILL.md` files, so it's safe to leave on globally.
+| Skill | What it covers |
+|-------|----------------|
+| `fastapi` 📦 | FastAPI — async correctness, `Annotated` dependency injection, `lifespan`, response models, testing with dependency overrides; bundle covers Pydantic, Alembic, Celery, and list endpoints (pagination/filtering/search/sorting) |
+| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
+| `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, migration safety, type inference |
+| `docker-best-practices` | Multi-stage builds, layer caching, security hardening, Compose Watch, health checks |
 
-### What gets created
+### Database
 
-**`.claude/settings.json`** — Registers both hooks:
+| Skill | What it covers |
+|-------|----------------|
+| `sql` 📦 | Schema design, data types, indexing & `EXPLAIN`, joins & subqueries, ORM patterns (N+1, transactions, locking), safe migrations |
+
+### TypeScript
+
+| Skill | What it covers |
+|-------|----------------|
+| `typescript-best-practices` | TypeScript 6.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
+
+### Quality
+
+| Skill | What it covers |
+|-------|----------------|
+| `testing-best-practices` | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite |
+| `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
+
+### Architecture
+
+| Skill | What it covers |
+|-------|----------------|
+| `single-responsibility` | Language-agnostic SRP — file-size limits, CQS, separation of concerns, smell tests |
+| `avoid-hasty-abstractions` | AHA / Rule of Three — prefer duplication over the wrong abstraction, boolean-parameter creep, undoing bad extractions |
+
+### Desktop
+
+| Skill | What it covers |
+|-------|----------------|
+| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
+
+## Commands
+
+Portable slash commands installed to `.claude/commands/`. Some orchestrate parallel subagents — those are pulled in automatically.
+
+| Command | What it does |
+|---------|--------------|
+| `/ship` | Unified delivery pipeline — commit → PR → merge → release. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
+| `/preplan` | Resolve a fuzzy feature idea into concrete decisions — 6 fixed phases, one question at a time, ends with a decision log. Run before `/plan-feature` |
+| `/plan-feature` | Integration-first feature planning — 3 parallel subagents scan for reusable code, patterns, and touch points before producing a short plan |
+| `/refactor` | Detect size / complexity / duplication / coupling issues via 4 parallel subagents, then refactor |
+| `/deep-review` | Multi-agent deep code review — 5 parallel subagents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
+
+## How It Works
+
+The CLI installs three kinds of artifact into your project's `.claude/` directory:
+
+- **Skills** → `.claude/skills/` — playbooks Claude loads while coding.
+- **Commands** → `.claude/commands/` — slash commands you invoke directly.
+- **Subagents** → `.claude/agents/` — declared by commands via `requires-agents`, installed for you.
+
+### Tracking & Updates
+
+Every install writes a manifest at `.claude/.claude-skills.json` recording what the CLI installed and the catalog version. On the next run it uses the manifest to:
+
+- **Pre-check what you already have** in the picker — re-running doubles as an update screen; toggle to add or remove.
+- **Detect stale items** — skills/commands renamed or removed from the catalog upstream (e.g. when several skills are merged into a bundle) are flagged, and the CLI offers to delete them.
+- **Never touch what it didn't install** — the manifest is the CLI's own record; hand-written skills are invisible to it and always safe.
+
+```bash
+npx @spardutti/claude-skills --sync
+```
+
+`--sync` refreshes every tracked item to the latest catalog and prunes stale ones in one shot — no menu. For a project that predates the manifest, the first normal run offers a one-time cleanup of `.claude/` content no longer in the catalog.
+
+### Automatic Skill Evaluation
+
+After installing skills, the CLI offers to set up a hook that **guarantees** Claude evaluates your skills before writing code — instead of a soft reminder it can ignore.
+
+It installs two hooks and appends a rule to your `CLAUDE.md`:
+
+- `skill-gate.sh` — a `PreToolUse` gate on `Write|Edit|MultiEdit`
+- `skill-gate-automark.sh` — a `PostToolUse` hook on `Skill` that clears the gate
+
+<details>
+<summary>How the gate works</summary>
+
+The gate hard-blocks `Write`, `Edit`, and `MultiEdit` until a per-session marker exists at `/tmp/claude-skill-gate-<SESSION_ID>`. The marker is created automatically the first time Claude invokes any `Skill()` in the session — so the normal flow is: Claude lists skills as ACTIVATE/SKIP, calls `Skill()` for the ACTIVATE ones, and the gate clears for the rest of the session. If every skill is SKIP, Claude clears the gate with `touch /tmp/claude-skill-gate-<SESSION_ID>`.
+
+The marker is **per-session, not per-turn** — short follow-ups like "yes" don't re-lock it. The gate auto-passes when a project has no `.claude/skills/*/SKILL.md`, so it's safe to leave on globally.
+
+It registers in `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh"
-          }
-        ]
-      }
+      { "matcher": "Write|Edit|MultiEdit", "hooks": [
+        { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh" } ] }
     ],
     "PostToolUse": [
-      {
-        "matcher": "Skill",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh"
-          }
-        ]
-      }
+      { "matcher": "Skill", "hooks": [
+        { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh" } ] }
     ]
   }
 }
 ```
 
-**`CLAUDE.md`** — Appends the skill-evaluation rule that tells Claude to enumerate skills as ACTIVATE/SKIP and call `Skill()` for ACTIVATE entries before writing code.
+</details>
 
-## Manual Install
-
-If you don't want to use the CLI, copy files directly into your project:
+<details>
+<summary>Manual install (without the CLI)</summary>
 
 ```bash
 # Skills
@@ -160,15 +174,33 @@ cp -r skills/<skill-name> /path/to/project/.claude/skills/
 # Commands
 cp commands/<command-name>.md /path/to/project/.claude/commands/
 
-# Subagents (required by some commands — see the command's `requires-agents` frontmatter)
+# Subagents — see the command's `requires-agents` frontmatter
 cp agents/<agent-name>.md /path/to/project/.claude/agents/
 ```
 
+</details>
+
 ## Repository Layout
 
+```text
+skills/        Skill playbooks — some are bundles (SKILL.md + on-demand reference files)
+commands/      Slash commands installed to .claude/commands/
+agents/        Subagent definitions — commands declare which they need via requires-agents
+scripts/       validate-skills.mjs — checks skill length caps and reference integrity
+cli/           The npm installer (npx @spardutti/claude-skills); version in cli/package.json
+.husky/        pre-push hook running the skill validator
+package.json   Private dev-tooling package (claude-skills-dev) — not the published one
 ```
-skills/           Reference playbooks loaded by Claude during coding tasks
-commands/         Slash commands installed to .claude/commands/
-agents/           Subagent definitions — commands declare which ones they need
-cli/              The npm installer (npx @spardutti/claude-skills)
-```
+
+## Contributing
+
+Skills live in `skills/<name>/SKILL.md`. Authoring conventions are in [CLAUDE.md](./CLAUDE.md) — the short version:
+
+- BAD/GOOD code pairs are the primary teaching tool; end every skill with a **Rules** section.
+- `SKILL.md` ≤ 350 lines; reference files ≤ 500 and need a `## Contents` TOC past 100 lines.
+- References are one level deep — `SKILL.md` links them, they don't link each other.
+- `npm run validate-skills` enforces this; it also runs on `pre-push`.
+
+## License
+
+MIT
