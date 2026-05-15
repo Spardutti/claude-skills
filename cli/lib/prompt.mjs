@@ -14,7 +14,9 @@ function stripQuotes(str) {
   return str.replace(/^["']|["']$/g, "");
 }
 
-export async function promptSkillSelection(skills) {
+export async function promptSkillSelection(skills, installed = []) {
+  const installedSet = new Set(installed);
+
   // Group skills by category preserving order
   const grouped = new Map();
   for (const cat of CATEGORY_ORDER) {
@@ -31,6 +33,7 @@ export async function promptSkillSelection(skills) {
         name: chalk.bold(humanName(skill)),
         value: skill,
         description: chalk.dim(stripQuotes(skill.description)),
+        checked: installedSet.has(skill.dirName), // pre-check what's already installed
       });
     }
   }
@@ -53,7 +56,8 @@ export async function promptSkillSelection(skills) {
   return selected;
 }
 
-export async function promptCommandSelection(commands) {
+export async function promptCommandSelection(commands, installed = []) {
+  const installedSet = new Set(installed);
   const grouped = new Map();
   for (const cat of COMMAND_CATEGORY_ORDER) {
     const items = commands.filter((c) => c.category === cat);
@@ -76,6 +80,7 @@ export async function promptCommandSelection(commands) {
         name: chalk.bold(humanName(cmd)),
         value: cmd,
         description: chalk.dim(stripQuotes(cmd.description)),
+        checked: installedSet.has(cmd.fileName), // pre-check what's already installed
       });
     }
   }
@@ -96,4 +101,15 @@ export async function promptCommandSelection(commands) {
   });
 
   return selected;
+}
+
+// Checkbox of removable items — used for catalog orphans and untracked stale content.
+// `preChecked` true when the items are known-stale (manifest orphans).
+export async function promptRemoval(names, message, preChecked = false) {
+  if (names.length === 0) return [];
+  return checkbox({
+    message,
+    choices: names.map((n) => ({ name: n, value: n, checked: preChecked })),
+    theme: { icon: { cursor: ">" }, style: { highlight: (t) => chalk.cyan(t) } },
+  });
 }
