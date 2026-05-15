@@ -1,10 +1,10 @@
 ---
 name: typescript-best-practices
 category: TypeScript
-description: "MUST USE when writing or editing TypeScript types, interfaces, generics, type guards, error handling patterns, or tsconfig configuration. Enforces TypeScript 5.x strict-mode best practices and type safety patterns."
+description: "MUST USE when writing or editing TypeScript types, interfaces, generics, type guards, error handling patterns, or tsconfig configuration. Enforces TypeScript 6.x strict-mode best practices and type safety patterns."
 ---
 
-# TypeScript Best Practices (TypeScript 5.x)
+# TypeScript Best Practices (TypeScript 6.x)
 
 ## Type Design
 
@@ -122,6 +122,17 @@ const colors = { red: [255, 0, 0], green: "#00ff00" } satisfies Record<string, s
 colors.green.toUpperCase(); // OK
 ```
 
+### `as const satisfies` — lock literals and validate
+
+```typescript
+// Freezes literal types AND checks the shape — the idiom for config objects
+const config = {
+  retries: 3,
+  mode: "strict",
+} as const satisfies AppConfig;
+config.mode; // type is "strict", not string — and the shape was checked
+```
+
 ### Validate External Data (Zod)
 
 ```typescript
@@ -147,12 +158,44 @@ function parse(input: string | string[]): number | number[] {
 // Generic constraints
 function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[key]; }
 
+// const type parameter: preserve literal inference without caller-side `as const`
+function asTuple<const T extends readonly unknown[]>(t: T): T { return t; }
+const pair = asTuple(["a", "b"]); // readonly ["a", "b"] — not string[]
+
 // Parameter objects over long param lists
 interface CreateUserParams { name: string; email: string; role: "admin" | "user"; }
 function createUser(params: CreateUserParams) {}
 
 // Infer return types internally, annotate on exports
 export function fetchUsers(): Promise<User[]> { return api.get("/users"); }
+```
+
+## Type-Only Imports
+
+With `verbatimModuleSyntax` (see tsconfig), imports used only as types must be marked `type` — they are erased from the JS output, preventing accidental runtime imports and breaking import cycles.
+
+```typescript
+// GOOD: type-only import — erased at compile time
+import type { User } from "./types";
+
+// GOOD: inline `type` for a mixed import
+import { type Role, createUser } from "./users";
+```
+
+## Resource Management — `using`
+
+`using` (and `await using`) auto-dispose a resource when the scope exits, even on throw. The resource implements `Symbol.dispose` / `Symbol.asyncDispose`.
+
+```typescript
+function openConn(url: string) {
+  const conn = connect(url);
+  return { conn, [Symbol.dispose]() { conn.close(); } };
+}
+
+function query() {
+  using db = openConn(DATABASE_URL); // db.conn.close() runs automatically
+  return db.conn.run("SELECT 1");     // ...even if this throws
+}
 ```
 
 ## Common Pitfalls
@@ -236,6 +279,8 @@ async function fetchUser(id: string): Promise<Result<User, AppError>> {
 }
 ```
 
+Under **TypeScript 6.0** (current stable), `strict`, `module: "esnext"`, and a modern `target` are defaults — the block above keeps them explicit for clarity and older toolchains. `moduleResolution` values `node` / `node10` / `classic` and `baseUrl` are deprecated in 6.0; `paths` works without `baseUrl`.
+
 ## Rules
 
 1. **Always** enable `strict: true` and `noUncheckedIndexedAccess`
@@ -247,4 +292,7 @@ async function fetchUser(id: string): Promise<Result<User, AppError>> {
 7. **Never** use numeric enums — use union types or const objects
 8. **Never** use type assertions (`as`) when a type guard is possible
 9. **Prefer** `satisfies` over type annotations when you need both validation and inference
-10. **Prefer** `as const` for literal arrays and config objects
+10. **Prefer** `as const` for literal arrays and config objects; `as const satisfies T` when you also need a shape check
+11. **Prefer** `const` type parameters over caller-side `as const` for literal-preserving generics
+12. **Use** `using` / `await using` for resources that need deterministic cleanup
+13. **Mark type-only imports** with `import type` — required under `verbatimModuleSyntax`
