@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, chmod } from "node:fs/promises";
+import { mkdir, writeFile, readFile, chmod, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 // PreToolUse gate on Write|Edit|MultiEdit. Blocks the tool call unless
@@ -144,80 +144,11 @@ printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision"
 exit 0
 `;
 
-// PreToolUse audit runner: runs each installed skill's audit.sh against the
-// write target. Denies the write if any audit exits 2. Defers (exits 0) when
-// the skill-gate marker isn't set yet — the gate handles that case.
-//
-// Honors .claude/skill-audit-ignore (one skill name per line, # comments OK).
-const AUDIT_RUNNER_SCRIPT = `#!/bin/bash
-# PreToolUse skill-audit runner.
-
-INPUT=$(cat)
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-
-SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id":"[^"]*"' | head -1 | sed 's/"session_id":"//; s/"$//')
-if [ -z "$SESSION_ID" ]; then
-  exit 0
-fi
-
-# Defer until the skill-gate has been satisfied in this session.
-if [ ! -f "/tmp/claude-skill-gate-$SESSION_ID" ]; then
-  exit 0
-fi
-
-FILE_PATH=$(printf '%s' "$INPUT" | grep -o '"file_path":"[^"]*"' | head -1 | sed 's/"file_path":"//; s/"$//')
-if [ -z "$FILE_PATH" ]; then
-  exit 0
-fi
-
-SKILLS_DIR="$PROJECT_DIR/.claude/skills"
-[ ! -d "$SKILLS_DIR" ] && exit 0
-
-IGNORE_FILE="$PROJECT_DIR/.claude/skill-audit-ignore"
-is_ignored() {
-  [ ! -f "$IGNORE_FILE" ] && return 1
-  grep -qE "^[[:space:]]*\${1}[[:space:]]*(#.*)?$" "$IGNORE_FILE"
-}
-
-# Portable JSON string escape for the deny reason.
-json_escape() {
-  local s="$1"
-  s="\${s//\\\\/\\\\\\\\}"
-  s="\${s//\\"/\\\\\\"}"
-  s="\${s//$'\\n'/\\\\n}"
-  s="\${s//$'\\r'/\\\\r}"
-  s="\${s//$'\\t'/\\\\t}"
-  printf '"%s"' "$s"
-}
-
-for audit in "$SKILLS_DIR"/*/audit.sh; do
-  [ ! -f "$audit" ] && continue
-  [ ! -x "$audit" ] && continue
-  skill_name=$(basename "$(dirname "$audit")")
-  if is_ignored "$skill_name"; then
-    continue
-  fi
-
-  output=$("$audit" "$FILE_PATH" 2>&1 >/dev/null)
-  rc=$?
-
-  if [ $rc -eq 2 ]; then
-    reason=$(json_escape "$output")
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\\n' "$reason"
-    exit 0
-  fi
-done
-
-exit 0
-`;
-
 const GATE_FILENAME = "skill-gate.sh";
 const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
 const APPLICATION_GATE_FILENAME = "skill-application-gate.sh";
-const AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
+const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
 export async function setupHook(targetDir = process.cwd()) {
   const resolved = resolve(targetDir);
@@ -225,7 +156,6 @@ export async function setupHook(targetDir = process.cwd()) {
   const gatePath = join(hooksDir, GATE_FILENAME);
   const autoMarkPath = join(hooksDir, AUTO_MARK_FILENAME);
   const applicationGatePath = join(hooksDir, APPLICATION_GATE_FILENAME);
-  const auditRunnerPath = join(hooksDir, AUDIT_RUNNER_FILENAME);
   const settingsPath = join(resolved, ".claude", "settings.json");
 
   await mkdir(hooksDir, { recursive: true });
@@ -235,8 +165,13 @@ export async function setupHook(targetDir = process.cwd()) {
   await chmod(autoMarkPath, 0o755);
   await writeFile(applicationGatePath, APPLICATION_GATE_SCRIPT, { mode: 0o755 });
   await chmod(applicationGatePath, 0o755);
-  await writeFile(auditRunnerPath, AUDIT_RUNNER_SCRIPT, { mode: 0o755 });
-  await chmod(auditRunnerPath, 0o755);
+
+  // Remove the legacy audit-runner hook file from prior installs (2.3.x).
+  try {
+    await unlink(join(hooksDir, LEGACY_AUDIT_RUNNER_FILENAME));
+  } catch {
+    // not present — fine
+  }
 
   let settings = {};
   try {
@@ -254,6 +189,13 @@ export async function setupHook(targetDir = process.cwd()) {
     if (settings.hooks.UserPromptSubmit.length === 0) {
       delete settings.hooks.UserPromptSubmit;
     }
+  }
+
+  // Clean up legacy PreToolUse audit-runner hook (2.3.x — removed in 2.4.0).
+  if (Array.isArray(settings.hooks.PreToolUse)) {
+    settings.hooks.PreToolUse = settings.hooks.PreToolUse.filter(
+      (entry) => !entry.hooks?.some((h) => h.command?.endsWith(LEGACY_AUDIT_RUNNER_FILENAME))
+    );
   }
 
   // Register PreToolUse gate.
@@ -283,17 +225,6 @@ export async function setupHook(targetDir = process.cwd()) {
   );
   if (!applicationAlreadyRegistered) settings.hooks.PreToolUse.push(applicationEntry);
 
-  // Register PreToolUse audit runner (after the gates).
-  const auditCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${AUDIT_RUNNER_FILENAME}`;
-  const auditEntry = {
-    matcher: "Write|Edit|MultiEdit",
-    hooks: [{ type: "command", command: auditCommand }],
-  };
-  const auditAlreadyRegistered = settings.hooks.PreToolUse.some((entry) =>
-    entry.hooks?.some((h) => h.command?.endsWith(AUDIT_RUNNER_FILENAME))
-  );
-  if (!auditAlreadyRegistered) settings.hooks.PreToolUse.push(auditEntry);
-
   // Register PostToolUse auto-mark on Skill.
   const autoMarkCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${AUTO_MARK_FILENAME}`;
   const autoMarkEntry = {
@@ -315,6 +246,5 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Hook installed: .claude/hooks/${GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${APPLICATION_GATE_FILENAME}`);
-  console.log(`  Hook installed: .claude/hooks/${AUDIT_RUNNER_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }
