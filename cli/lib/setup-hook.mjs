@@ -39,9 +39,12 @@ EOF
 exit 0
 `;
 
-// PostToolUse on Skill: auto-creates the per-session gate marker.
+// PostToolUse on Skill: auto-creates the per-session gate marker AND a
+// per-skill "loaded" marker. The application gate uses the loaded marker
+// to require the model to explicitly apply each loaded skill before the
+// first Write/Edit in this session.
 const AUTO_MARK_SCRIPT = `#!/bin/bash
-# PostToolUse on Skill: auto-marks the skill-gate as satisfied for the session.
+# PostToolUse on Skill: marks gate satisfied + records loaded skill.
 
 INPUT=$(cat)
 
@@ -51,6 +54,93 @@ if [ -z "$SESSION_ID" ]; then
 fi
 
 touch "/tmp/claude-skill-gate-$SESSION_ID"
+
+SKILL_NAME=$(printf '%s' "$INPUT" | grep -o '"skill":"[^"]*"' | head -1 | sed 's/"skill":"//; s/"$//')
+if [ -n "$SKILL_NAME" ]; then
+  # Sanitize: only allow [A-Za-z0-9_-] in the marker filename.
+  SAFE_NAME=$(printf '%s' "$SKILL_NAME" | tr -cd 'A-Za-z0-9_-')
+  if [ -n "$SAFE_NAME" ]; then
+    touch "/tmp/claude-skill-loaded-$SESSION_ID-$SAFE_NAME"
+  fi
+fi
+
+exit 0
+`;
+
+// PreToolUse application gate: requires the model to explicitly apply each
+// loaded skill before the first Write/Edit. Reads SKILL.md's Rules section
+// and inlines it in the deny message. One ack per skill per session.
+const APPLICATION_GATE_SCRIPT = `#!/bin/bash
+# PreToolUse application gate: blocks file edits until each loaded skill
+# has been explicitly applied (acked) for this session.
+
+INPUT=$(cat)
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id":"[^"]*"' | head -1 | sed 's/"session_id":"//; s/"$//')
+if [ -z "$SESSION_ID" ]; then
+  exit 0
+fi
+
+# Defer to the loading gate until it's been satisfied this session.
+if [ ! -f "/tmp/claude-skill-gate-$SESSION_ID" ]; then
+  exit 0
+fi
+
+# Find the first loaded-but-unacked skill (handle one at a time; the next
+# blocked write will surface the next skill).
+UNACKED=""
+for marker in /tmp/claude-skill-loaded-$SESSION_ID-*; do
+  [ ! -f "$marker" ] && continue
+  skill_name="\${marker##/tmp/claude-skill-loaded-$SESSION_ID-}"
+  if [ ! -f "/tmp/claude-skill-acked-$SESSION_ID-$skill_name" ]; then
+    UNACKED="$skill_name"
+    break
+  fi
+done
+
+if [ -z "$UNACKED" ]; then
+  exit 0
+fi
+
+SKILL_MD="$PROJECT_DIR/.claude/skills/$UNACKED/SKILL.md"
+RULES=""
+if [ -f "$SKILL_MD" ]; then
+  RULES=$(awk '/^## Rules/{flag=1} /^## /{if(flag && !/^## Rules/)exit} flag' "$SKILL_MD")
+fi
+if [ -z "$RULES" ]; then
+  RULES="(Rules section not found in $SKILL_MD — refer to the loaded skill content already in context.)"
+fi
+
+MSG="BLOCKED: skill '$UNACKED' was loaded but not yet applied to your work.
+
+Before this Write/Edit, you must:
+
+1. State the specific rules from '$UNACKED' that apply to the file you're about to write.
+2. State how your next write respects each rule.
+3. Then ack the application by running this Bash tool call:
+     touch /tmp/claude-skill-acked-$SESSION_ID-$UNACKED
+
+One ack per skill per session. After acking, retry the Write/Edit.
+
+Rules from $UNACKED/SKILL.md:
+
+$RULES"
+
+json_escape() {
+  local s="$1"
+  s="\${s//\\\\/\\\\\\\\}"
+  s="\${s//\\"/\\\\\\"}"
+  s="\${s//$'\\n'/\\\\n}"
+  s="\${s//$'\\r'/\\\\r}"
+  s="\${s//$'\\t'/\\\\t}"
+  printf '"%s"' "$s"
+}
+
+REASON=$(json_escape "$MSG")
+printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\\n' "$REASON"
 exit 0
 `;
 
@@ -125,6 +215,7 @@ exit 0
 
 const GATE_FILENAME = "skill-gate.sh";
 const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
+const APPLICATION_GATE_FILENAME = "skill-application-gate.sh";
 const AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 
@@ -133,6 +224,7 @@ export async function setupHook(targetDir = process.cwd()) {
   const hooksDir = join(resolved, ".claude", "hooks");
   const gatePath = join(hooksDir, GATE_FILENAME);
   const autoMarkPath = join(hooksDir, AUTO_MARK_FILENAME);
+  const applicationGatePath = join(hooksDir, APPLICATION_GATE_FILENAME);
   const auditRunnerPath = join(hooksDir, AUDIT_RUNNER_FILENAME);
   const settingsPath = join(resolved, ".claude", "settings.json");
 
@@ -141,6 +233,8 @@ export async function setupHook(targetDir = process.cwd()) {
   await chmod(gatePath, 0o755);
   await writeFile(autoMarkPath, AUTO_MARK_SCRIPT, { mode: 0o755 });
   await chmod(autoMarkPath, 0o755);
+  await writeFile(applicationGatePath, APPLICATION_GATE_SCRIPT, { mode: 0o755 });
+  await chmod(applicationGatePath, 0o755);
   await writeFile(auditRunnerPath, AUDIT_RUNNER_SCRIPT, { mode: 0o755 });
   await chmod(auditRunnerPath, 0o755);
 
@@ -178,7 +272,18 @@ export async function setupHook(targetDir = process.cwd()) {
     settings.hooks.PreToolUse = [gateEntry];
   }
 
-  // Register PreToolUse audit runner (after the gate).
+  // Register PreToolUse application gate (after the loading gate).
+  const applicationCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${APPLICATION_GATE_FILENAME}`;
+  const applicationEntry = {
+    matcher: "Write|Edit|MultiEdit",
+    hooks: [{ type: "command", command: applicationCommand }],
+  };
+  const applicationAlreadyRegistered = settings.hooks.PreToolUse.some((entry) =>
+    entry.hooks?.some((h) => h.command?.endsWith(APPLICATION_GATE_FILENAME))
+  );
+  if (!applicationAlreadyRegistered) settings.hooks.PreToolUse.push(applicationEntry);
+
+  // Register PreToolUse audit runner (after the gates).
   const auditCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${AUDIT_RUNNER_FILENAME}`;
   const auditEntry = {
     matcher: "Write|Edit|MultiEdit",
@@ -209,6 +314,7 @@ export async function setupHook(targetDir = process.cwd()) {
 
   console.log(`  Hook installed: .claude/hooks/${GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
+  console.log(`  Hook installed: .claude/hooks/${APPLICATION_GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${AUDIT_RUNNER_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }
