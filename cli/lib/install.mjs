@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
 
@@ -24,6 +24,13 @@ export async function installSkills(skills, targetDir = process.cwd()) {
     const skillDir = join(baseDir, skill.dirName);
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(skillDir, "SKILL.md"), skill.content);
+
+    for (const peer of skill.peerFiles ?? []) {
+      const peerPath = join(skillDir, peer.name);
+      await writeFile(peerPath, peer.content);
+      if (peer.executable) await chmod(peerPath, 0o755);
+    }
+
     console.log(`  ${chalk.green("✔")} ${chalk.bold(humanName(skill))} ${chalk.dim(`→ .claude/skills/${skill.dirName}/`)}`);
   }
 }

@@ -67,17 +67,57 @@ async function fetchListing({ apiUrl, label, entryFilter, buildRawUrl, mapEntry,
   return results.filter(Boolean);
 }
 
-export function fetchSkills() {
-  return fetchListing({
-    apiUrl: CONTENTS_API,
-    label: "skills",
-    entryFilter: (e) => e.type === "dir",
-    buildRawUrl: (dir) => `${RAW_BASE}/${dir.name}/SKILL.md`,
-    mapEntry: (dir, content) => {
-      const { name, description, category } = parseFrontmatter(content, dir.name);
-      return { dirName: dir.name, name, description, category, content };
-    },
-  });
+export async function fetchSkills() {
+  const headers = getAuthHeaders();
+  const res = await fetch(CONTENTS_API, { headers });
+
+  if (!res.ok) {
+    if (res.status === 403 || res.status === 429) {
+      throw new Error("GitHub API rate limit exceeded. Try again later or install gh CLI (https://cli.github.com).");
+    }
+    throw new Error(`Failed to list skills: ${res.status} ${res.statusText}`);
+  }
+
+  const dirs = (await res.json()).filter((e) => e.type === "dir");
+
+  const skills = await Promise.all(
+    dirs.map(async (dir) => {
+      try {
+        const listRes = await fetch(`${CONTENTS_API}/${dir.name}`, { headers });
+        if (!listRes.ok) {
+          console.warn(`  Warning: Failed to list skill ${dir.name}, skipping`);
+          return null;
+        }
+        const files = (await listRes.json()).filter((e) => e.type === "file");
+
+        const fetched = await Promise.all(
+          files.map(async (f) => {
+            const r = await fetch(`${RAW_BASE}/${dir.name}/${f.name}`, { headers });
+            if (!r.ok) {
+              console.warn(`  Warning: Failed to fetch ${dir.name}/${f.name}, skipping`);
+              return null;
+            }
+            return { name: f.name, content: await r.text(), executable: f.name.endsWith(".sh") };
+          })
+        );
+
+        const valid = fetched.filter(Boolean);
+        const skillMd = valid.find((f) => f.name === "SKILL.md");
+        if (!skillMd) {
+          console.warn(`  Warning: ${dir.name}/SKILL.md missing, skipping`);
+          return null;
+        }
+        const peerFiles = valid.filter((f) => f.name !== "SKILL.md");
+        const { name, description, category } = parseFrontmatter(skillMd.content, dir.name);
+        return { dirName: dir.name, name, description, category, content: skillMd.content, peerFiles };
+      } catch {
+        console.warn(`  Warning: Failed to fetch ${dir.name}, skipping`);
+        return null;
+      }
+    })
+  );
+
+  return skills.filter(Boolean);
 }
 
 export function fetchCommands() {
