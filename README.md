@@ -97,6 +97,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 | `/plan-feature` | Integration-first feature planning — 3 parallel subagents scan for reusable code, patterns, and touch points before producing a short plan |
 | `/refactor` | Detect size / complexity / duplication / coupling issues via 4 parallel subagents, then refactor |
 | `/deep-review` | Multi-agent deep code review — 5 parallel subagents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
+| `/test-review` | Write-then-verify test review — scopes to the diff, runs red-green + mutation gates, then an isolated read-only subagent proves each test would catch a regression instead of rubber-stamping it |
 | `/lockdown` | Per-repo supply-chain hardening — detects the package managers, Dockerfiles, and CI in use, then guides you through and applies install-time, deploy, and pipeline hardening for npm/pnpm, pip/uv, Docker, and GitHub Actions |
 
 ## How It Works
