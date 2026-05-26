@@ -50,6 +50,7 @@ export const router = createRouter({
   routeTree,
   context: { queryClient, auth: { isAuthenticated: false, user: null } },
   defaultPreload: 'intent',
+  defaultPreloadStaleTime: 0,   // let TanStack Query own caching — see Loader Caching
   defaultPendingComponent: () => <RouteSkeleton />,
   defaultPendingMs: 1000,
   defaultPendingMinMs: 500,
@@ -130,6 +131,16 @@ function PostComponent() {
 }
 ```
 
+The loader only **primes the cache** — treat it as a fire-and-forget event handler, not a data source. The *component* decides whether data blocks, via the hook it picks: `useSuspenseQuery` (blocks until ready) or `useQuery` (renders a fallback while it loads). **Never read Query data with `Route.useLoaderData()`** — Query refetches on focus/reconnect, honors invalidation, and avoids garbage collection only while a query has an **active observer** (a mounted hook). `useLoaderData` gives it none, so the data silently goes stale and can be evicted.
+
+```tsx
+// Deferred: prefetchQuery (not awaited) primes without blocking; useQuery renders a fallback
+loader: ({ context: { queryClient }, params: { postId } }) => {
+  queryClient.prefetchQuery(postQueryOptions(postId))
+},
+// in the component: const { data, isPending } = useQuery(postQueryOptions(postId))
+```
+
 ### loaderDeps — re-run loader when search params change
 
 ```tsx
@@ -153,7 +164,7 @@ export const Route = createFileRoute('/posts')({
 })
 ```
 
-After a mutation, force a reload with `router.invalidate()`. When TanStack Query owns caching (`ensureQueryData` + `useSuspenseQuery`), Query's own `staleTime` governs refetching — set it there and the router `staleTime` matters less.
+After a mutation, force a reload with `router.invalidate()`. When TanStack Query owns caching (`ensureQueryData`/`prefetchQuery` + query hooks), don't tune the router's `staleTime` — set `defaultPreloadStaleTime: 0` so the router's own stale-while-revalidate preload cache (default 30s) doesn't fight Query's. Let Query's `staleTime` be the single source of truth: one player controls caching.
 
 ### Parallel and Deferred Data
 
@@ -296,11 +307,11 @@ File-based routing auto-splits critical (`loader`, `beforeLoad`) from non-critic
 2. **Always** use `createRootRouteWithContext` to inject `queryClient` and auth, and register the router type via `declare module`.
 3. **Always** give the root route a no-op `loader: () => null` so pending UI works for every descendant.
 4. **Always** set `defaultPendingComponent` / `defaultErrorComponent` at the router — no route should ship without pending and error UI.
-5. **Always** use `Route.useParams()` / `Route.useSearch()` / `Route.useLoaderData()` — never generic hooks without `from`.
-6. **Always** use `ensureQueryData` in loaders, `useSuspenseQuery` in components.
+5. **Always** use the `Route.*` hooks (`Route.useParams()` / `Route.useSearch()` / `Route.useLoaderData()`) over generic hooks without `from`, for type safety. But with TanStack Query, read query data via `useSuspenseQuery`/`useQuery`, **never `useLoaderData`** — Query needs an active observer to refetch, invalidate, and avoid GC.
+6. **With Query, the loader primes the cache** (`ensureQueryData` to block, `prefetchQuery` to defer) and the component reads it (`useSuspenseQuery` to block, `useQuery` for a fallback). Set `defaultPreloadStaleTime: 0` so only Query controls caching.
 7. **Always** validate search params with Zod `.catch()` for defaults, and use `loaderDeps` when a loader depends on them.
 8. **Guard auth once** on a pathless `_authenticated` layout via `beforeLoad` — never re-check auth in every route's loader.
-9. **Tune loader `staleTime`** so unchanged data is not refetched on every navigation; `router.invalidate()` after mutations.
+9. **Tune loader `staleTime`** so unchanged data is not refetched on every navigation; `router.invalidate()` after mutations. (When Query owns caching, set `defaultPreloadStaleTime: 0` and tune Query's `staleTime` instead — see Rule 6.)
 10. **Use skeletons, not spinners**, for `pendingComponent` — match the real content's dimensions to avoid layout shift.
 11. **Never** fetch data in components — use route loaders or query hooks.
 12. **Never** use `redirect()` without `throw`; re-throw redirects with `isRedirect` if a `beforeLoad` try/catches.
