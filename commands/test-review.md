@@ -3,7 +3,7 @@ name: test-review
 description: "Write-then-verify test review — write tests in your normal flow, then mechanical gates (red-green + mutation) plus an isolated read-only reviewer subagent prove each test would actually catch a regression instead of rubber-stamping it"
 category: Workflow
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task
-requires-agents: [test-review-quality]
+requires-agents: [test-review-gates, test-review-quality]
 argument-hint: "[test file, source file, or empty for the diff]"
 ---
 
@@ -54,19 +54,39 @@ the gap — don't block.
 
 ## Step 2 — Mechanical gates (objective, no judgment)
 
-Run the in-scope suite — it must pass before verifying. Then, per source unit under test:
+Run the in-scope suite — it must pass before verifying. Then run the **red-green**
+(implementation-removal) and **mutation** gates per source unit. These gates fault source
+files, and they're embarrassingly parallel — so **how** you run them depends on scope:
+
+**One source unit → run inline (serial).** Spinning up a worktree isn't worth it for a
+single file.
 
 - **Red-green** — capture the source file's original content, apply a single fault to the
   unit (mutation tool preferred; otherwise manually break one function — invert a
   condition, return a constant, drop an error branch), run its targeting tests, and record
   any test that **stays green**. Restore by writing the captured original back — **never
-  `git checkout`**, which would discard uncommitted work. A test green without a working
-  implementation asserts nothing.
+  `git checkout`** in the real tree, which would discard uncommitted work. A test green
+  without a working implementation asserts nothing.
 - **Mutation** — if a tool is available, run it on the in-scope source and capture
   surviving mutants (`file:line` + the mutation).
 
 Always restore every source file to its original state before continuing, even if a test
 run errors. The working tree must be byte-identical to how you found it.
+
+**More than one source unit → shard across `test-review-gates` (parallel).** Faulting
+source in the real tree can't be parallelized safely, so spawn one `test-review-gates`
+agent per shard via Task — each runs in its own disposable worktree and mutates only its
+copy. Group units into roughly balanced shards (one unit per shard is fine). Pass each:
+
+- **Shard** — its source files, each with targeting test file(s).
+- **Sync list** — every changed file (source + tests) in the working tree, plus the
+  absolute **repo root**, so the agent can sync its worktree to your uncommitted state.
+- **Commands** — how to run the whole suite, a single test file, and the mutation tool
+  (or `none`), from Step 0.
+
+Merge `redGreenFailures` and `survivingMutants` across all shards. If any shard returns
+`suiteGreen: false`, stop and surface its failure — gating a red suite is meaningless. The
+worktrees are discarded on return, so the real tree is never mutated.
 
 ## Step 3 — Independent reviewer (isolated subagent)
 
@@ -106,7 +126,8 @@ returns all `keep`.
 ## Rules
 
 - Always keep the roles separate: you write, the command runs the tools, the subagent judges.
-- Always restore mutated/reverted source from a saved copy — never `git checkout` (it loses uncommitted work).
+- Always shard the gates across parallel `test-review-gates` worktrees when more than one source unit is in scope; run inline only for a single unit.
+- Always restore inline-mutated source from a saved copy — never `git checkout` in the real tree (it loses uncommitted work). Inside a `test-review-gates` worktree, `git checkout` is safe.
 - Always print the resolved scope before running, and surface in-scope code with no test as a gap.
 - Never close the loop on a green suite alone — the red-green and mutation gates are the gate.
 - Never ship a test the reviewer can't tie to a concrete bug it catches.
