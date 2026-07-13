@@ -19,7 +19,7 @@ everything else belongs in events. Before writing one, verify it is needed.
 - Data fetching
 - When an Effect IS correct
 - Cleanup and race conditions
-- Non-reactive values in Effects
+- Non-reactive values in Effects — `useEffectEvent`
 - Subscribing to an external store
 - One-time initialization
 - Dependency array discipline
@@ -252,11 +252,13 @@ useEffect(() => {
 }, [id])
 ```
 
-## Non-Reactive Values in Effects
+## Non-Reactive Values in Effects — `useEffectEvent`
 
 Sometimes an Effect genuinely IS needed but re-runs too often because it
 *reads* a value it should not *react* to (current theme, latest callback).
-Keep that value out of the deps by reading it from a ref you keep current.
+`useEffectEvent` (stable in React 19.2) wraps that non-reactive logic: the
+Effect Event always sees the latest props/state, but is not a dependency, so
+you leave it out of the array honestly.
 
 ```tsx
 // BAD: theme in deps — reconnects the socket every time the theme changes
@@ -267,20 +269,22 @@ useEffect(() => {
   return () => conn.disconnect()
 }, [roomId, theme])
 
-// GOOD: stash the latest theme in a ref; the Effect reacts only to roomId
-const themeRef = useRef(theme)
-useEffect(() => { themeRef.current = theme }) // refreshed after every render
+// GOOD: wrap the non-reactive part in useEffectEvent — it reads the latest
+//       theme, but the Effect reacts only to roomId
+const onConnected = useEffectEvent(() => showToast('Connected!', theme))
 
 useEffect(() => {
   const conn = createConnection(roomId)
-  conn.on('connected', () => showToast('Connected!', themeRef.current))
+  conn.on('connected', () => onConnected())
   conn.connect()
   return () => conn.disconnect()
-}, [roomId]) // theme deliberately excluded — read via ref
+}, [roomId]) // onConnected is NOT a dep — eslint-plugin-react-hooks v6 knows this
 ```
 
-First ask whether the Effect is needed at all. Reach for the ref pattern only
-for a genuine external-system Effect that over-fires on an incidental value.
+An Effect Event may only be called from inside an Effect — never during render or
+passed to another component. Before 19.2 the equivalent was a ref kept current
+(`useRef(theme)` refreshed after every render); use that only if you can't adopt
+19.2. First ask whether the Effect is needed at all.
 
 ## Subscribing to an External Store
 
@@ -363,7 +367,7 @@ Only if answer 8 applies should you reach for an Effect.
 6. **Never chain Effects** — compute all next state in one event handler.
 7. **Always clean up** subscriptions, listeners, and connections.
 8. **Guard async Effects** with an `ignore` flag or `AbortController`.
-9. **Keep non-reactive values out of deps with a ref** when a genuine external-system Effect over-fires on an incidental value.
+9. **Keep non-reactive values out of deps with `useEffectEvent`** (React 19.2+) when a genuine external-system Effect over-fires on an incidental value — the ref-latch pattern is the pre-19.2 fallback.
 10. **Never bounce a child's data up to a parent through an Effect** — lift the fetch to the parent.
 11. **Use `useSyncExternalStore`** for external-store subscriptions.
 12. **Keep dependency arrays honest** — list every reactive value the Effect reads; never silence the linter.

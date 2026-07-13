@@ -1,10 +1,10 @@
 ---
 name: typescript-best-practices
 category: Foundations
-description: "MUST USE when writing or editing TypeScript types, interfaces, generics, type guards, error handling patterns, or tsconfig configuration. Enforces TypeScript 6.x strict-mode best practices and type safety patterns."
+description: "MUST USE when writing or editing TypeScript types, interfaces, generics, type guards, error handling patterns, or tsconfig configuration. Enforces TypeScript 7.x strict-mode best practices and type safety patterns."
 ---
 
-# TypeScript Best Practices (TypeScript 6.x)
+# TypeScript Best Practices (TypeScript 7.x)
 
 ## Type Design
 
@@ -279,7 +279,7 @@ async function fetchUser(id: string): Promise<Result<User, AppError>> {
 }
 ```
 
-Under **TypeScript 6.0** (current stable), `strict`, `module: "esnext"`, and a modern `target` are defaults — the block above keeps them explicit for clarity and older toolchains. `moduleResolution` values `node` / `node10` / `classic` and `baseUrl` are deprecated in 6.0; `paths` works without `baseUrl`.
+Under **TypeScript 7.0** (current stable, GA July 8 2026), `tsc` is the **native Go compiler** — a plain `npm i -D typescript` installs it and type-checks ~10× faster; the old `tsgo` / `@typescript/native-preview` preview package is now just `tsc`. `strict`, `module: "esnext"`, and a modern `target` are defaults — the block above keeps them explicit for clarity and older toolchains. `moduleResolution` values `node` / `node10` / `classic` and `baseUrl` remain deprecated; `paths` works without `baseUrl`. Caveat: 7.0 ships no stable programmatic compiler API yet (lands in 7.1, ~Oct 2026), so editor tooling that depends on it — Vue / Svelte / Astro / Angular template type-checking — may need to stay on 6.x until then.
 
 ## Rules
 

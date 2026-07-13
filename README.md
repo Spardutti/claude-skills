@@ -1,12 +1,22 @@
 # Claude Skills
 
-> An interactive CLI that installs a curated catalog of Claude Code **skills**, **slash commands**, and **subagents** into any project.
+> **Make Claude Code write like a senior engineer who actually keeps up.**
 
 [![npm version](https://img.shields.io/npm/v/@spardutti/claude-skills)](https://www.npmjs.com/package/@spardutti/claude-skills)
 [![npm downloads](https://img.shields.io/npm/dm/@spardutti/claude-skills)](https://www.npmjs.com/package/@spardutti/claude-skills)
 [![license](https://img.shields.io/npm/l/@spardutti/claude-skills)](./LICENSE)
 
-Skills are reference playbooks Claude Code loads while it codes — enforcing current best practices for the tools you actually use. This repo is the source catalog; the CLI lets you pick exactly what each project needs from an interactive menu, and pulls in any subagents your chosen commands depend on automatically.
+Opinionated, always-current best-practice playbooks that load while Claude codes — so it writes today's idioms for the tools you actually use, not the averaged, two-years-stale code its training defaults to. This repo is the source catalog; the CLI installs exactly what each project needs from an interactive menu, pulling in any subagents your chosen commands depend on.
+
+## Why This Exists
+
+Coding agents don't fail because they can't code — they fail because they write **dated** code. A model's knowledge is frozen and averaged: ask for React and it reaches for `useEffect` and manual `useMemo`; ask for TypeScript and it assumes 5.x; it defaults to patterns that were fine two years ago and are wrong today.
+
+The ecosystem's answer has been **process** — planning frameworks, spec-driven workflows, agent orchestration. Those steer *how* the agent works. None of them fix *what the code looks like*.
+
+**This is the other half.** Each skill is a tight, opinionated playbook that pins Claude to current, senior-level practice for one tool — React 19.2 + the React Compiler, TypeScript 7.0, TanStack Query v5, Drizzle, FastAPI, SQL. Claude loads only the skills a task touches, so many can stay installed cheaply. Bring whatever planning framework you like on top; this makes sure the code that comes out isn't 2023-vintage.
+
+**Freshness is the feature.** These track the changelogs as the tools move — the React Compiler going stable, TS 7.0's native compiler, Drizzle Relations v2 — so you don't have to.
 
 ## Quick Start
 
@@ -17,7 +27,7 @@ npx @spardutti/claude-skills
 ```
 
 ```text
-  Claude Skills Installer v2.0.0
+  Claude Skills Installer v2.6.0
 
   ── Frontend ──────────────────────────────
   ◉ react              ◯ tanstack-query
@@ -69,12 +79,6 @@ The CLI will:
 |-------|----------------|
 | `sql` 📦 | Schema design, data types, indexing & `EXPLAIN`, joins & subqueries, ORM patterns (N+1, transactions, locking), safe migrations |
 
-### Desktop
-
-| Skill | What it covers |
-|-------|----------------|
-| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
-
 ### Foundations
 
 Cross-cutting craft — applies to any stack, any language.
@@ -82,7 +86,8 @@ Cross-cutting craft — applies to any stack, any language.
 | Skill | What it covers |
 |-------|----------------|
 | `code-structure` 📦 | Single Responsibility (when to split) + Avoid Hasty Abstractions (when *not* to extract) — hard size limits, separation of concerns, the Rule of Three |
-| `typescript-best-practices` | TypeScript 6.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
+| `debugging` | Root cause before patching — reproduce, trace the failure backward to its origin, one hypothesis at a time, the 3-attempts-then-question-the-design rule |
+| `typescript-best-practices` | TypeScript 7.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
 | `testing-best-practices` | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite |
 | `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
 

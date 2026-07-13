@@ -162,6 +162,37 @@ const result = await db.query.users.findMany({
 });
 ```
 
+## Relations v2 — Landing in Drizzle v1.0
+
+The relations API above is the **stable 0.45.x** syntax — keep using it until v1.0 ships. Drizzle **v1.0** (currently `drizzle-orm@rc`) replaces per-table `relations()` with a single `defineRelations`, and you pass `{ relations }` to `drizzle()` instead of `{ schema }`. Know the shape so you recognize and can migrate v2 code:
+
+```typescript
+import { defineRelations } from "drizzle-orm";
+import * as schema from "./schema";
+
+// v1 keys → v2 keys:  fields → from,  references → to,  relationName → alias
+export const relations = defineRelations(schema, (r) => ({
+  users: { posts: r.many.posts({ from: r.users.id, to: r.posts.authorId }) },
+  posts: { author: r.one.users({ from: r.posts.authorId, to: r.users.id }) },
+}));
+
+// many-to-many is native in v2 — no relation defined for the junction table:
+//   groups: r.many.groups({
+//     from: r.users.id.through(r.usersToGroups.userId),
+//     to:   r.groups.id.through(r.usersToGroups.groupId),
+//   })
+
+const db = drizzle(client, { relations }); // not { schema }
+```
+
+v2 queries also take **object-style** `where` / `orderBy` and can filter parent rows by a related table's columns (v1 can only filter children):
+
+```typescript
+await db.query.users.findMany({ where: { id: 1 }, with: { posts: true } });
+```
+
+During the `@rc` migration window, v2 lives on `db.query` while your old v1-style callback queries keep working on `db._query`.
+
 ## Queries — Select Only What You Need
 
 ```typescript

@@ -1,66 +1,18 @@
 # @spardutti/claude-skills
 
-Interactive CLI to install reusable [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills into any project.
+> **Make Claude Code write like a senior engineer who actually keeps up.**
 
-## Usage
+Interactive CLI that installs a catalog of opinionated, always-current best-practice
+skills, slash commands, and subagents into any project's `.claude/` directory.
 
 ```bash
 npx @spardutti/claude-skills
 ```
 
-Run this from your project's root directory. The CLI will:
-
-1. Fetch the latest skills from [GitHub](https://github.com/Spardutti/claude-skills)
-2. Let you interactively select which skills to install
-3. Copy them into your project's `.claude/skills/` directory
-4. Ask to set up **automatic skill evaluation** (hook + CLAUDE.md rule)
-
-## Automatic Skill Evaluation
-
-Skills alone don't guarantee Claude will use them. The CLI can optionally set up enforcement:
-
-- **Hook** (`.claude/hooks/skill-forced-eval-hook.sh`) — Runs on every prompt, injects a mandatory skill evaluation sequence into Claude's context
-- **CLAUDE.md rule** (`skill_evaluation` block) — Instructs Claude to list every skill as ACTIVATE/SKIP before writing any code
-
-Together, these force Claude to explicitly evaluate and activate relevant skills instead of silently ignoring them.
-
-## Available Skills
-
-| Skill | Description |
-|-------|-------------|
-| `react-best-practices` | React 19 — component design, state management, performance, React 19 features, TypeScript integration |
-| `react-use-effect` | React 19 useEffect best practices and anti-patterns |
-| `react-query` | TanStack React Query with query-key-factory patterns |
-| `tanstack-router-best-practices` | TanStack Router — file-based routing, type-safe navigation, loaders, search params, auth guards |
-| `typescript-best-practices` | TypeScript 5.x — type design, type safety, generics, error handling, tsconfig |
-| `react-single-responsibility` | React single responsibility — component splitting, hook isolation, file size limits, complexity rules |
-| `tailwind-tokens` | Enforce Tailwind CSS design tokens — no arbitrary values when a token exists |
-| `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
-| `fastapi-best-practices` | FastAPI — async correctness, Pydantic validation, dependency injection, service layer, structured error handling |
-| `security-practices` | Web security — OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
-| `alembic-migrations` | Alembic — naming conventions, autogenerate review, data migration safety, downgrades, production deployment |
-| `testing-best-practices` | Testing — Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, pyramid-balanced coverage |
-| `docker-best-practices` | Docker — multi-stage builds, layer caching, security hardening, Compose Watch for local dev, health checks |
-| `trpc-react-query` | tRPC v11 — queryOptions/mutationOptions patterns, router organization, middleware, cache invalidation, optimistic updates |
-| `express-best-practices` | Express.js — feature-based structure, 3-layer architecture, Zod validation, centralized error handling, security middleware |
-| `fastify-best-practices` | Fastify — plugin architecture, encapsulation, TypeBox validation/serialization, services as decorators, reply helpers, hooks |
-| `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, relational queries, migrations, drizzle-kit workflow, type inference |
-| `zustand` | Zustand — store design, selectors, persist/immer middleware, slices pattern, devtools, transient updates |
-| `tauri-v2` | Tauri v2 — IPC commands, plugins, window management, system tray, global shortcuts, capabilities/permissions, events |
-| `dnd-kit` | @dnd-kit — sortable lists, sensors, collision detection, drag overlays, multi-container (kanban), accessibility |
-| `framer-motion` | Motion (Framer Motion) — AnimatePresence, layout animations, variants, gestures, useAnimate, performance |
-| `single-responsibility` | Single Responsibility Principle — language-agnostic SRP, file size limits, CQS, separation of concerns, smell tests |
-
-## GitHub Authentication
-
-The CLI fetches skills via the GitHub API. Unauthenticated requests are limited to 60/hour. To avoid rate limits:
-
-- Install the [GitHub CLI](https://cli.github.com) and run `gh auth login` — the token is detected automatically
-- Or set `GITHUB_TOKEN` / `GH_TOKEN` as an environment variable
-
-## What are Claude Code Skills?
-
-Skills are markdown files placed in `.claude/skills/` that give Claude Code domain-specific knowledge and guidelines. They help Claude follow your team's patterns and best practices automatically.
+> **Note — this file is a placeholder.** At publish time it is replaced by the
+> repository's root [`README.md`](../README.md) (see the `prepack` script in
+> `package.json`), which is the canonical, always-current documentation — the full
+> skill catalog, commands, setup, and the skill-evaluation hook. Read that one.
 
 ## License
 
