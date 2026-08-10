@@ -37,7 +37,8 @@ loaded" (tighter descriptions, bundling related skills, smarter gating).
 
 - Bump `cli/package.json` version on every shipped change.
 - Semver: new skills or hook/CLI features = minor bump; fixes to existing skills, hook, or CLI = patch bump.
-- Publish flow: bump version → commit → push to `main` → `npm publish ./cli --access public`.
+- Publish flow: bump version → commit → push to `main` → `npm publish ./cli --access public` → **GitHub release**.
+- The GitHub release is part of shipping, not optional: `gh release create v<version> --target main`, tagged `v<version>` to match `cli/package.json`. Notes are grouped by change kind (`## New` / `## Freshness` / `## Removed` / `## Docs` — only the sections that apply), one bullet per skill/command/agent saying what it does, closing with the install line. Match the previous release's shape (`gh release view` the last tag).
 
 ## Structure
 
