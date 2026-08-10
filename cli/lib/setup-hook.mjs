@@ -89,45 +89,56 @@ if [ ! -f "/tmp/claude-skill-gate-$SESSION_ID" ]; then
   exit 0
 fi
 
-# Find the first loaded-but-unacked skill (handle one at a time; the next
-# blocked write will surface the next skill).
+# Collect every loaded-but-unacked skill so a single ack clears them all.
 UNACKED=""
 for marker in /tmp/claude-skill-loaded-$SESSION_ID-*; do
   [ ! -f "$marker" ] && continue
   skill_name="\${marker##/tmp/claude-skill-loaded-$SESSION_ID-}"
   if [ ! -f "/tmp/claude-skill-acked-$SESSION_ID-$skill_name" ]; then
-    UNACKED="$skill_name"
-    break
+    UNACKED="$UNACKED $skill_name"
   fi
 done
+UNACKED="\${UNACKED# }"
 
 if [ -z "$UNACKED" ]; then
   exit 0
 fi
 
-SKILL_MD="$PROJECT_DIR/.claude/skills/$UNACKED/SKILL.md"
-RULES=""
-if [ -f "$SKILL_MD" ]; then
-  RULES=$(awk '/^## Rules/{flag=1} /^## /{if(flag && !/^## Rules/)exit} flag' "$SKILL_MD")
-fi
-if [ -z "$RULES" ]; then
-  RULES="(Rules section not found in $SKILL_MD — refer to the loaded skill content already in context.)"
-fi
+# One touch call with explicit paths — brace expansion is not used because
+# bash leaves a single-element {name} literal, creating a garbage marker.
+ACK_CMD="touch"
+NAMES=""
+RULES_BLOCKS=""
+for skill in $UNACKED; do
+  ACK_CMD="$ACK_CMD /tmp/claude-skill-acked-$SESSION_ID-$skill"
+  NAMES="$NAMES, '$skill'"
+  SKILL_MD="$PROJECT_DIR/.claude/skills/$skill/SKILL.md"
+  RULES=""
+  if [ -f "$SKILL_MD" ]; then
+    RULES=$(awk '/^## Rules/{flag=1} /^## /{if(flag && !/^## Rules/)exit} flag' "$SKILL_MD")
+  fi
+  if [ -z "$RULES" ]; then
+    RULES="(Rules section not found in $SKILL_MD — refer to the loaded skill content already in context.)"
+  fi
+  RULES_BLOCKS="$RULES_BLOCKS
+### Rules from $skill/SKILL.md
 
-MSG="BLOCKED: skill '$UNACKED' was loaded but not yet applied to your work.
+$RULES
+"
+done
+NAMES="\${NAMES#, }"
+
+MSG="BLOCKED: loaded skills not yet applied to your work: $NAMES
 
 Before this Write/Edit, you must:
 
-1. State the specific rules from '$UNACKED' that apply to the file you're about to write.
+1. For each skill listed above, state the specific rules that apply to the file you're about to write.
 2. State how your next write respects each rule.
-3. Then ack the application by running this Bash tool call:
-     touch /tmp/claude-skill-acked-$SESSION_ID-$UNACKED
+3. Then ack all of them in a single Bash tool call:
+     $ACK_CMD
 
 One ack per skill per session. After acking, retry the Write/Edit.
-
-Rules from $UNACKED/SKILL.md:
-
-$RULES"
+$RULES_BLOCKS"
 
 json_escape() {
   local s="$1"
