@@ -98,6 +98,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 | Command | What it does |
 |---------|--------------|
 | `/ship` | Unified delivery pipeline — commit → PR → merge → release. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
+| `/discover` | Find the right problem before deciding what to build — diverges first: names competing interpretations of what you said, stress-tests the framing with a blind critic subagent, then converges on a mental model. Run before `/preplan` |
 | `/preplan` | Resolve a fuzzy feature idea into concrete decisions — 6 fixed phases, one question at a time, ends with a decision log. Run before `/plan-feature` |
 | `/plan-feature` | Integration-first feature planning — 3 parallel subagents scan for reusable code, patterns, and touch points before producing a short plan |
 | `/refactor` | Detect size / complexity / duplication / coupling issues via 4 parallel subagents, then refactor |
