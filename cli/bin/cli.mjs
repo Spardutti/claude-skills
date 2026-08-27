@@ -158,10 +158,12 @@ async function main() {
       await setupClaudeMd();
 
       // Report what the gauntlet will actually run, so a silent no-op is visible.
-      const { test, typecheck } = await detectStack(CWD);
-      if (test) {
-        const found = [typecheck, test].filter(Boolean).join(" + ");
-        console.log(`  ${chalk.dim(`Gauntlet detected ${found} — it will run those on changed files.`)}`);
+      // This asks the installed hook itself — never a second copy of its logic.
+      const gates = await detectStack(CWD);
+      if (gates) {
+        for (const gate of gates.split(";").map((g) => g.trim()).filter(Boolean)) {
+          console.log(`  ${chalk.dim(`Gauntlet gate: ${gate}`)}`);
+        }
       } else {
         console.log(`  ${chalk.yellow("!")} ${chalk.dim("Gauntlet found no test runner here — it will stay asleep.")}`);
         console.log();

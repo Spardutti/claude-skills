@@ -1,5 +1,6 @@
 import { mkdir, writeFile, readFile, chmod, unlink } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
+import { spawn } from "node:child_process";
 
 // PreToolUse gate on Write|Edit|MultiEdit. Blocks the tool call unless
 // a per-session marker file exists at /tmp/claude-skill-gate-<SESSION_ID>.
@@ -469,37 +470,28 @@ const GAUNTLET_FILENAME = "gauntlet.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
-// Mirrors the detect() in scripts/gauntlet.sh. Kept in sync by hand: this one
-// only reports what the hook will find, it never decides anything.
+// Asks the installed hook what it would run, rather than reimplementing its
+// detection here. A second copy drifts: the JS one reported "no test runner"
+// for repos the shell script had already learned to handle.
 export async function detectStack(targetDir = process.cwd()) {
   const dir = resolve(targetDir);
-  const has = async (f) => {
-    try { await readFile(join(dir, f), "utf-8"); return true; } catch { return false; }
-  };
-  const read = async (f) => {
-    try { return await readFile(join(dir, f), "utf-8"); } catch { return ""; }
-  };
-
-  let test = null;
-  let typecheck = null;
-
-  const pkg = await read("package.json");
-  if (pkg) {
-    if (pkg.includes('"vitest"')) test = "vitest";
-    else if (pkg.includes('"jest"')) test = "jest";
-    // A delegating monorepo root has no runner as a direct dependency, but its
-    // own `test` script still runs the right thing.
-    else if (/"test"\s*:/.test(pkg)) test = "npm test";
-    if (/"typecheck"\s*:/.test(pkg)) typecheck = "npm run typecheck";
-    else if (await has("tsconfig.json")) typecheck = "tsc";
-  }
-  if (!test && (await has("pyproject.toml") || await has("pytest.ini") || await has("setup.cfg"))) {
-    test = "pytest";
-    if (await has("mypy.ini") || (await read("pyproject.toml")).includes("tool.mypy")) {
-      typecheck = "mypy";
-    }
-  }
-  return { test, typecheck };
+  const hook = join(dir, ".claude", "hooks", GAUNTLET_FILENAME);
+  return new Promise((done) => {
+    const child = spawn("bash", [hook], {
+      cwd: dir,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: dir, GAUNTLET_DEBUG: "1", GAUNTLET_DRYRUN: "1" },
+    });
+    let err = "";
+    child.stderr.on("data", (c) => { err += c; });
+    child.on("error", () => done(null));
+    child.on("close", () => {
+      const line = err.split("\n").find((l) => l.startsWith("gauntlet: would run:"));
+      if (!line) return done(null);
+      const gates = line.slice("gauntlet: would run:".length).trim();
+      done(gates && !gates.startsWith("nothing") ? gates : null);
+    });
+    child.stdin.end('{"session_id":"install"}');
+  });
 }
 
 // Written only when detection finds nothing — otherwise the hook auto-detects and
