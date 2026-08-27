@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { confirm } from "@inquirer/prompts";
+import { confirm, input } from "@inquirer/prompts";
 import chalk from "chalk";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
 import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../lib/prompt.mjs";
 import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
-import { setupHook } from "../lib/setup-hook.mjs";
+import { setupHook, detectStack, writeGauntletConf } from "../lib/setup-hook.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 import {
   readManifest, writeManifest, computeOrphans, computeRemovals, scanInstalled, removeArtifacts,
@@ -143,17 +143,40 @@ async function main() {
     process.exit(0);
   }
 
-  // --- Hook setup (only if skills were installed) ---
-  if (selectedSkills.length > 0) {
+  // --- Hook setup ---
+  // Offered whenever anything was installed: the skill gates need skills, but the
+  // gauntlet guards any repo with a test runner, commands-only installs included.
+  if (selectedSkills.length > 0 || selectedCommands.length > 0) {
     console.log();
     const shouldSetup = await confirm({
-      message: "Set up skill evaluation hook + CLAUDE.md rule? (Recommended)",
+      message: "Set up hooks — skill evaluation before edits, verification after? (Recommended)",
       default: true,
     });
     if (shouldSetup) {
       console.log();
       await setupHook();
       await setupClaudeMd();
+
+      // Report what the gauntlet will actually run, so a silent no-op is visible.
+      const { test, typecheck } = await detectStack(CWD);
+      if (test) {
+        const found = [typecheck, test].filter(Boolean).join(" + ");
+        console.log(`  ${chalk.dim(`Gauntlet detected ${found} — it will run those on changed files.`)}`);
+      } else {
+        console.log(`  ${chalk.yellow("!")} ${chalk.dim("Gauntlet found no test runner here — it will stay asleep.")}`);
+        console.log();
+        const wantConf = await confirm({
+          message: "Point it at your test command now?",
+          default: false,
+        });
+        if (wantConf) {
+          const cmd = (await input({ message: "Test command:" })).trim();
+          if (cmd) {
+            const written = await writeGauntletConf(CWD, cmd);
+            console.log(`  Config written: ${written.replace(CWD + "/", "")}`);
+          }
+        }
+      }
     }
   }
 

@@ -19,11 +19,11 @@ an isolated reviewer do the proving. A green suite is never the finish line.
 Identify the test runner and how to run (a) the whole suite and (b) a single file. Check
 whether a mutation-testing tool is available:
 
-| Stack | Mutation tool |
-|-------|---------------|
-| JS / TS | Stryker (`npx stryker run`) |
-| Python | `mutmut` or Cosmic Ray |
-| Java | PIT (`pitest`) |
+| Stack | Mutation tool | How to scope it to changed lines |
+|-------|---------------|----------------------------------|
+| JS / TS | Stryker (`npx stryker run`) | `--mutate 'src/foo.ts:12-30'` (`file:startLine[:startCol]-endLine[:endCol]`; cannot be combined with a glob on the same entry), or `--since=<committish>` |
+| Python | `mutmut` or Cosmic Ray | no line-level flag — pass only the changed files to `--paths-to-mutate`, then discard surviving mutants whose line falls outside the changed ranges |
+| Java | PIT (`pitest`) | limit `--targetClasses` to the changed classes, then discard mutants outside the changed ranges (`scmMutationCoverage` was removed upstream — don't rely on it) |
 
 If no mutation tool is installed, note it — Step 2 degrades to red-green-only. Do not
 install tools without asking.
@@ -40,6 +40,12 @@ Decide what to review, in this order:
    changed module.
 3. **No argument, clean tree** → STOP and ask which file or directory to review. Never
    default to the whole suite.
+
+For every in-scope source file, also collect its **changed line ranges**:
+`git diff -U0 <base> -- <file>` and read each `@@ -a,b +c,d @@` header as lines `c` to `c+d-1`.
+When the whole file is new, the range is the whole file. These ranges scope the mutation gate in
+Step 2 — mutating a whole 200-line file after a 10-line change is ~20x the work for no extra
+signal, and it is the single biggest source of wasted wall-clock in this command.
 
 Before running anything, print the resolved set:
 `Reviewing N tests: <list> — pass a path to change this.`
@@ -67,8 +73,10 @@ single file.
   any test that **stays green**. Restore by writing the captured original back — **never
   `git checkout`** in the real tree, which would discard uncommitted work. A test green
   without a working implementation asserts nothing.
-- **Mutation** — if a tool is available, run it on the in-scope source and capture
-  surviving mutants (`file:line` + the mutation).
+- **Mutation** — if a tool is available, run it **scoped to the changed line ranges** from
+  Step 0.5, never the whole file (see the Step 0 table for the per-tool flag). Where the tool
+  has no line-level flag, scope it to the changed files and drop surviving mutants whose line
+  falls outside the ranges. Capture the rest (`file:line` + the mutation).
 
 Always restore every source file to its original state before continuing, even if a test
 run errors. The working tree must be byte-identical to how you found it.
@@ -78,11 +86,16 @@ source in the real tree can't be parallelized safely, so spawn one `test-review-
 agent per shard via Task — each runs in its own disposable worktree and mutates only its
 copy. Group units into roughly balanced shards (one unit per shard is fine). Pass each:
 
-- **Shard** — its source files, each with targeting test file(s).
+- **Shard** — its source files, each with targeting test file(s) and its **changed line
+  ranges** from Step 0.5.
 - **Sync list** — every changed file (source + tests) in the working tree, plus the
   absolute **repo root**, so the agent can sync its worktree to your uncommitted state.
 - **Commands** — how to run the whole suite, a single test file, and the mutation tool
   (or `none`), from Step 0.
+
+Shards run in the background. The moment they are launched, tell the user what is running and
+roughly how long it should take, and that they can keep working — never sit idle in front of the
+user waiting for them. Pick the work back up when the shards land.
 
 Merge `redGreenFailures` and `survivingMutants` across all shards. If any shard returns
 `suiteGreen: false`, stop and surface its failure — gating a red suite is meaningless. The
@@ -129,6 +142,8 @@ returns all `keep`.
 - Always shard the gates across parallel `test-review-gates` worktrees when more than one source unit is in scope; run inline only for a single unit.
 - Always restore inline-mutated source from a saved copy — never `git checkout` in the real tree (it loses uncommitted work). Inside a `test-review-gates` worktree, `git checkout` is safe.
 - Always print the resolved scope before running, and surface in-scope code with no test as a gap.
+- Always scope mutation to the changed line ranges, never the whole file — full-file mutation on a small diff is the biggest source of wasted wall-clock here.
+- Always hand control back while sharded gates run — say what is running and that the user can keep working, then report when the shards land.
 - Never close the loop on a green suite alone — the red-green and mutation gates are the gate.
 - Never ship a test the reviewer can't tie to a concrete bug it catches.
 - Never default to reviewing the whole suite — scope to the argument or the diff, or ask.

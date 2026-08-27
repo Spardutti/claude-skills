@@ -9,7 +9,7 @@ You are a cross-table consistency auditor. Your job is to find queries that clai
 
 ## Input
 
-The orchestrator passes you the diff and the changed files. Read changed files fully.
+The orchestrator passes you the diff and the changed files. Read in full only the changed files that actually contain queries or model references — grep the list first. Reading every changed file is wasted time on a large diff.
 
 ## Procedure
 

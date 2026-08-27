@@ -9,7 +9,7 @@ You are a protocol-conformance auditor. Your job is to verify **every implementa
 
 ## Input
 
-The orchestrator passes you the diff and changed files.
+The orchestrator passes you the diff and changed files. Read in full only the files that declare or implement a protocol/interface — grep the list first rather than reading everything.
 
 ## Procedure
 

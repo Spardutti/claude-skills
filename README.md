@@ -47,7 +47,7 @@ The CLI will:
 2. Let you pick skills to install → `.claude/skills/`
 3. Let you pick commands to install → `.claude/commands/`
 4. Auto-install any subagents the selected commands declare → `.claude/agents/`
-5. Optionally set up the **skill-evaluation hook** (recommended — see [How It Works](#how-it-works))
+5. Optionally set up the **hooks** — skill evaluation before edits, verification after (recommended — see [How It Works](#how-it-works))
 
 ## Skill Catalog
 
@@ -132,10 +132,16 @@ npx @spardutti/claude-skills --sync
 
 After installing skills, the CLI offers to set up a hook that **guarantees** Claude evaluates your skills before writing code — instead of a soft reminder it can ignore.
 
-It installs two hooks and appends a rule to your `CLAUDE.md`:
+It installs four hooks and appends a rule to your `CLAUDE.md`. Three guard the
+**front** — nothing is written until your skills are considered:
 
 - `skill-gate.sh` — a `PreToolUse` gate on `Write|Edit|MultiEdit`
+- `skill-application-gate.sh` — a second `PreToolUse` gate requiring each loaded skill to be applied, not just read
 - `skill-gate-automark.sh` — a `PostToolUse` hook on `Skill` that clears the gate
+
+The fourth guards the **back** — nothing finishes until the code passes:
+
+- `gauntlet.sh` — a `Stop` hook running the fast gates on your changed files (see [Automatic Verification](#automatic-verification-gauntlet))
 
 <details>
 <summary>How the gate works</summary>
@@ -151,11 +157,77 @@ It registers in `.claude/settings.json`:
   "hooks": {
     "PreToolUse": [
       { "matcher": "Write|Edit|MultiEdit", "hooks": [
-        { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh" } ] }
+        { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh" } ] },
+      { "matcher": "Write|Edit|MultiEdit", "hooks": [
+        { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-application-gate.sh" } ] }
     ],
     "PostToolUse": [
       { "matcher": "Skill", "hooks": [
         { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh" } ] }
+    ]
+  }
+}
+```
+
+</details>
+
+### Automatic Verification (Gauntlet)
+
+The same install adds `gauntlet.sh` — a `Stop` hook that runs the cheap, deterministic
+gates on your changed files every time Claude finishes a turn. Green is silent; red
+blocks the turn and hands the failure back to Claude to fix before you ever see it.
+
+Only fast gates live here (target: under ~30s). Mutation testing and deep review stay
+manual — they belong to `/test-review` and `/deep-review`, not to every turn.
+
+At install time the CLI reports what it found, so a silent no-op is never a surprise:
+
+```text
+Gauntlet detected tsc + vitest — it will run those on changed files.
+```
+
+If no test runner is detected it says so, and offers to write a `.claude/gauntlet.conf`
+pointing at your test command. Detection covers vitest, jest, pytest, `tsc`, and `mypy`;
+everything else needs that one config line.
+
+<details>
+<summary>How the gauntlet hook works</summary>
+
+It runs a skip ladder first, cheapest check first, and quits at the first "no":
+
+1. no changed files (planning turns, questions)
+2. no changed **code** files (docs/config only)
+3. this exact diff already passed — the hash of a green run is cached per session
+4. no test runner detected in the repo
+
+Rule 3 is what makes repeated `/ship` runs free: the gates run once per distinct diff.
+
+The stack is auto-detected (vitest / jest / pytest, `tsc` / `mypy`). Override anything in
+a config file — two are read, in this order, and the project's wins key by key:
+
+```text
+~/.claude/gauntlet.conf          your defaults for every project
+<project>/.claude/gauntlet.conf  overrides for this one
+```
+
+```bash
+GAUNTLET_OFF=1                       # disable entirely
+GAUNTLET_TYPECHECK='npm run check'   # "" to skip the gate
+GAUNTLET_TEST='npm test -- $FILES'   # $FILES = changed code files
+GAUNTLET_CODE_EXT='ts|tsx|py'        # what counts as code
+```
+
+Set your house rules once in `~/.claude/gauntlet.conf`; only reach for the project file
+where a repo does something unusual (or set `GAUNTLET_OFF=1` there to opt one out).
+
+It registers in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [
+        { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/gauntlet.sh" } ] }
     ]
   }
 }
@@ -186,6 +258,7 @@ skills/        Skill playbooks — some are bundles (SKILL.md + on-demand refere
 commands/      Slash commands installed to .claude/commands/
 agents/        Subagent definitions — commands declare which they need via requires-agents
 scripts/       validate-skills.mjs — checks skill length caps and reference integrity
+               gauntlet.sh — the Stop-hook verification gates, embedded by the CLI
 cli/           The npm installer (npx @spardutti/claude-skills); version in cli/package.json
 .husky/        pre-push hook running the skill validator
 package.json   Private dev-tooling package (claude-skills-dev) — not the published one
@@ -199,6 +272,19 @@ Skills live in `skills/<name>/SKILL.md`. Authoring conventions are in [CLAUDE.md
 - `SKILL.md` ≤ 350 lines; reference files ≤ 500 and need a `## Contents` TOC past 100 lines.
 - References are one level deep — `SKILL.md` links them, they don't link each other.
 - `npm run validate-skills` enforces this; it also runs on `pre-push`.
+
+To get the validator on **every turn** instead of only on push, drop this into
+this repo's `.claude/gauntlet.conf` — `.claude/` is gitignored, so each contributor adds it
+locally. It has to be the project file, not `~/.claude/gauntlet.conf`: these settings are
+only right for a skills repo:
+
+```bash
+GAUNTLET_CODE_EXT='md|mjs|js|json|sh'   # markdown IS the product here
+GAUNTLET_TYPECHECK=''
+GAUNTLET_TEST='node scripts/validate-skills.mjs'
+```
+
+Without the `CODE_EXT` line the hook treats a skill edit as a docs-only change and skips.
 
 ## License
 

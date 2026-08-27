@@ -21,11 +21,16 @@ git diff $BASE...HEAD --name-only          # changed files list
 git diff $BASE...HEAD                       # full diff
 ```
 
-Read every changed/created file in full. The diff alone is not enough — agents need surrounding context to trace callers, check tables, and verify interfaces.
+Do **not** read the changed files yourself. Every agent has `Read`/`Grep`/`Glob` and pulls the
+surrounding context its own lens needs — pre-reading here is serial work before any agent starts,
+and each agent re-reads what it needs anyway. On a large diff that pre-read is the bulk of the
+wall-clock, paid once by you and again by all five.
+
+You pass the diff and the file list. They fetch the rest.
 
 ## Step 2 — Spawn 5 Parallel Subagents
 
-Launch all 5 agents in a **single message** using the Task tool so they run concurrently. Pass each agent the full diff and the list of changed files in its prompt. Each agent has its own system prompt, tool set, and Sonnet model — you only provide the diff context.
+Launch all 5 agents in a **single message** using the Task tool so they run concurrently. Pass each agent the full diff and the list of changed files in its prompt — nothing more. Each agent has its own system prompt, tool set, and model, and reads whatever else it needs itself.
 
 | Agent type | Catches |
 |------------|---------|
@@ -36,6 +41,10 @@ Launch all 5 agents in a **single message** using the Task tool so they run conc
 | `deep-review-protocol-conformance` | Implementations or test mocks that don't match a Protocol/ABC/interface signature |
 
 Each agent returns a JSON array of findings with `severity`, `file`, `line`, `what`, `why`, `fix`.
+
+The 5 agents run in the background. As soon as they are launched, tell the user what is running and
+roughly how long it should take, and that they can keep working in the meantime — never sit idle in
+front of the user waiting on them. Aggregate and report when they land.
 
 ## Step 3 — Severity Classification
 
@@ -77,7 +86,7 @@ If any CRITICAL issues exist, end with a clear **"BLOCKING — fix before merge"
 
 ## Rules
 
-- Always read changed files in full before spawning agents — the prompt you pass must include diff + file list.
+- Always pass the diff + file list and nothing else — never pre-read changed files for the agents; they read what they need, and pre-reading is serial time paid twice.
 - Always spawn all 5 agents in a single message for parallel execution.
 - Always classify every finding as CRITICAL, WARNING, or INFO.
 - Always report file paths with line numbers (`file.py:42`).

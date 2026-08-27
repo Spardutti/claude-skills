@@ -11,7 +11,7 @@ You run the **objective** gates for one shard of source files — no judgment, n
 ## Input
 
 The orchestrator passes you:
-- **Shard** — the source files to gate, each with its targeting test file(s).
+- **Shard** — the source files to gate, each with its targeting test file(s) and its **changed line ranges** (e.g. `src/account.ts:12-30,58-61`).
 - **Sync list** — every changed file (source + tests) in the user's working tree, with the **repo root** (absolute path of the original checkout). Your worktree is branched from the base and does **not** contain the user's uncommitted/branch changes, so you must pull them in (Step 1).
 - **Commands** — how to run the whole suite, a single test file, and the mutation tool (or `none`).
 
@@ -25,7 +25,7 @@ The orchestrator passes you:
 3. **Confirm green.** Run the shard's targeting tests. If they don't pass, stop and return `suiteGreen: false` with the failure — gating a red suite is meaningless.
 4. **Sanity-fault check (catches misrouted deps).** Inject one obvious fault into a shard source file and run its tests. If **nothing** fails, your tests are importing code from outside the worktree — fix Step 2 before trusting any result. Restore the file.
 5. **Red-green (implementation-removal).** For each source unit in the shard: apply one fault (the mutation tool's single-target mode if it has one; otherwise manually — invert a condition, return a constant, drop an error branch), run that unit's targeting tests, and record any test that **stays green**. Restore with `git checkout -- <file>` — safe here because this is your disposable worktree. A test green without a working implementation asserts nothing.
-6. **Mutation.** If a mutation tool is available, run it scoped to the shard's source files (use the tool's own `--concurrency`). Capture every surviving mutant as `file:line — mutation`.
+6. **Mutation.** If a mutation tool is available, run it scoped to the shard's **changed line ranges** — not the whole file (use the tool's own `--concurrency`). Stryker takes ranges directly (`--mutate 'src/account.ts:12-30'`, syntax `file:startLine[:startCol]-endLine[:endCol]`, not combinable with a glob in the same entry). Tools with no line-level flag (mutmut, PIT) are scoped to the changed files instead — then drop every surviving mutant whose line falls outside the ranges before reporting. Capture the rest as `file:line — mutation`.
 
 ## Output
 
@@ -54,5 +54,6 @@ Return **only** this JSON. No prose.
 - ALWAYS run the sanity-fault check before the real gates; if no test fails, deps are misrouted — do not report results until that is fixed.
 - ALWAYS stop and return `suiteGreen: false` if the shard's tests don't pass before mutation.
 - ALWAYS prefer symlinking the root's installed deps over a fresh install; a fresh install can add minutes per shard.
+- ALWAYS confine mutation to the shard's changed line ranges; mutating whole files on a small diff multiplies runtime for no extra signal.
 - If no mutation tool is available, run red-green only and set `mutationTool: "none"`.
 - ALWAYS return valid JSON and nothing else.
