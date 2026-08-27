@@ -174,8 +174,13 @@ It registers in `.claude/settings.json`:
 ### Automatic Verification (Gauntlet)
 
 The same install adds `gauntlet.sh` — a `Stop` hook that runs the cheap, deterministic
-gates on your changed files every time Claude finishes a turn. Green is silent; red
-blocks the turn and hands the failure back to Claude to fix before you ever see it.
+gates on your changed files every time Claude finishes a turn. Green is silent; red returns
+`{"decision":"continue"}` so the turn doesn't end, handing the failure back to Claude to
+fix before you ever see it.
+
+Keep the gates fast for a reason beyond patience: a `command` hook that reaches its timeout
+(600s by default) is cancelled and its **output discarded**, so the turn ends as if the hook
+never ran. A stalled gate is a silent pass, not a block.
 
 Only fast gates live here (target: under ~30s). Mutation testing and deep review stay
 manual — they belong to `/test-review` and `/deep-review`, not to every turn.
@@ -197,12 +202,44 @@ It runs a skip ladder first, cheapest check first, and quits at the first "no":
 
 1. no changed files (planning turns, questions)
 2. no changed **code** files (docs/config only)
-3. this exact diff already passed — the hash of a green run is cached per session
-4. no test runner detected in the repo
+3. this exact diff already passed — the hash of a green run is cached per session and repo
+4. no gates detected for this repo
 
 Rule 3 is what makes repeated `/ship` runs free: the gates run once per distinct diff.
 
-The stack is auto-detected (vitest / jest / pytest, `tsc` / `mypy`). Override anything in
+Every run records why it ended in `/tmp/claude-gauntlet-<session>.why`, so a green run
+and a skipped one are told apart without re-running the hook. `GAUNTLET_DEBUG=1` prints
+the same line to stderr:
+
+```text
+gauntlet: green: gates passed
+gauntlet: skipped: no changed code files (docs/config only)
+gauntlet: green: gates passed, but the runner matched 0 test files — the changed code was never executed
+```
+
+That last one is the false green worth knowing about. A test runner given files it has no
+tests for exits 0 and looks exactly like a pass — in a monorepo whose vitest workspace
+excludes a package, **no** change in that package can ever be covered. The hook names it
+instead of reporting green. Set `GAUNTLET_REQUIRE_TESTS=1` to make it block instead.
+
+The stack is auto-detected: vitest / jest / pytest for tests, and for typechecking the
+repo's own `typecheck` script if it has one, else bare `tsc --noEmit` or `mypy`. The script
+is preferred because a workspace root `tsconfig.json` is often solution-style, where
+`tsc --noEmit` does not mean what the repo's `tsc -b` means.
+
+**Monorepos with more than one stack work.** Detection collects every gate it finds rather
+than stopping at the first, and each gate carries the file pattern it applies to — so a
+JS + Python repo gets four gates, and a turn that touched only `.py` files runs the Python
+two and skips the JS two entirely. Typechecks always run before tests, and the first red
+stops the rest.
+
+Setting `GAUNTLET_TEST` or `GAUNTLET_TYPECHECK` switches the repo to explicit mode:
+auto-detection is off and only what you set runs.
+
+**A missing tool is a skip, not a red.** A fresh clone with no `node_modules`, or a venv
+without pytest, would otherwise fail every gate and block every turn — so the hook reports
+`skipped: node_modules is missing — run your install first` and gets out of the way. Only
+a gate that actually ran and actually failed blocks. Override anything in
 a config file — two are read, in this order, and the project's wins key by key:
 
 ```text
@@ -215,6 +252,8 @@ GAUNTLET_OFF=1                       # disable entirely
 GAUNTLET_TYPECHECK='npm run check'   # "" to skip the gate
 GAUNTLET_TEST='npm test -- $FILES'   # $FILES = changed code files
 GAUNTLET_CODE_EXT='ts|tsx|py'        # what counts as code
+GAUNTLET_DEBUG=1                     # print the outcome to stderr every run
+GAUNTLET_REQUIRE_TESTS=1             # block when the runner matched 0 test files
 ```
 
 Set your house rules once in `~/.claude/gauntlet.conf`; only reach for the project file
