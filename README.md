@@ -227,11 +227,17 @@ repo's own `typecheck` script if it has one, else bare `tsc --noEmit` or `mypy`.
 is preferred because a workspace root `tsconfig.json` is often solution-style, where
 `tsc --noEmit` does not mean what the repo's `tsc -b` means.
 
-**Monorepos with more than one stack work.** Detection collects every gate it finds rather
-than stopping at the first, and each gate carries the file pattern it applies to — so a
-JS + Python repo gets four gates, and a turn that touched only `.py` files runs the Python
-two and skips the JS two entirely. Typechecks always run before tests, and the first red
-stops the rest.
+**Monorepos work, including the ones with nothing at the root.** Detection collects every
+gate it finds rather than stopping at the first, and each gate carries the file pattern it
+applies to — so a JS + Python repo gets four gates, and a turn that touched only `.py` files
+runs the Python two and skips the JS two entirely. Typechecks always run before tests, and
+the first red stops the rest.
+
+When the root has no manifest, detection looks two levels down for `package.json` /
+`pyproject.toml` / `pytest.ini` — the `web/` + `api/`, `apps/*`, `packages/*` layouts — and
+scopes each gate to that folder's files, running the command from inside it. Nested gates
+are only added for the kind the root did not already provide, so a repo that works today
+keeps working.
 
 Setting `GAUNTLET_TEST` or `GAUNTLET_TYPECHECK` switches the repo to explicit mode:
 auto-detection is off and only what you set runs.
@@ -298,6 +304,8 @@ commands/      Slash commands installed to .claude/commands/
 agents/        Subagent definitions — commands declare which they need via requires-agents
 scripts/       validate-skills.mjs — checks skill length caps and reference integrity
                gauntlet.sh — the Stop-hook verification gates, embedded by the CLI
+               gauntlet-selftest.sh — 15 behavioural tests for the hook (runs on pre-push)
+               gauntlet-survey.sh — what the hook would do in every repo under a directory
 cli/           The npm installer (npx @spardutti/claude-skills); version in cli/package.json
 .husky/        pre-push hook running the skill validator
 package.json   Private dev-tooling package (claude-skills-dev) — not the published one
@@ -311,6 +319,11 @@ Skills live in `skills/<name>/SKILL.md`. Authoring conventions are in [CLAUDE.md
 - `SKILL.md` ≤ 350 lines; reference files ≤ 500 and need a `## Contents` TOC past 100 lines.
 - References are one level deep — `SKILL.md` links them, they don't link each other.
 - `npm run validate-skills` enforces this; it also runs on `pre-push`.
+- Changing `scripts/gauntlet.sh`? Run `bash scripts/gauntlet-selftest.sh` (also on `pre-push`),
+  and run `bash scripts/gauntlet-survey.sh ~/projects` before releasing. Detection is where
+  this hook keeps breaking, because real repos are shaped in ways invented test repos aren't —
+  the survey is a dry run that reports what each of your repos would get without executing
+  anything. Read the rows that say `nothing`.
 
 To get the validator on **every turn** instead of only on push, drop this into
 this repo's `.claude/gauntlet.conf` — `.claude/` is gitignored, so each contributor adds it

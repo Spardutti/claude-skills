@@ -236,18 +236,21 @@ if [ -n "$GAUNTLET_OFF" ]; then quit "skipped: GAUNTLET_OFF is set"; fi
 # ---------------------------------------------------------------- skip rule 1
 CHANGED=$( { git diff --name-only HEAD 2>/dev/null; \\
              git ls-files --others --exclude-standard 2>/dev/null; } | sort -u )
-if [ -z "$CHANGED" ]; then quit "skipped: no changed files"; fi
+if [ -z "$CHANGED" ] && [ -z "\${GAUNTLET_DRYRUN:-}" ]; then quit "skipped: no changed files"; fi
 
 # ---------------------------------------------------------------- skip rule 2
 FILES_NL=$(printf '%s\\n' "$CHANGED" | grep -E "\\.($GAUNTLET_CODE_EXT)$" || true)
-if [ -z "$FILES_NL" ]; then quit "skipped: no changed code files (docs/config only)"; fi
+if [ -z "$FILES_NL" ] && [ -z "\${GAUNTLET_DRYRUN:-}" ]; then
+  quit "skipped: no changed code files (docs/config only)"
+fi
 
 # ---------------------------------------------------------------- skip rule 3
 # The repo path is part of the hash: one session can touch several repos, and two
 # of them can legitimately hold an identical diff.
 DIFF_HASH=$( { printf '%s\\n' "$PROJECT_DIR"; git diff HEAD 2>/dev/null; printf '%s\\n' "$CHANGED"; } \\
              | git hash-object --stdin 2>/dev/null )
-if [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$DIFF_HASH" ]; then
+if [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$DIFF_HASH" ] \\
+   && [ -z "\${GAUNTLET_DRYRUN:-}" ]; then
   quit "skipped: this diff already passed"
 fi
 
@@ -271,7 +274,50 @@ add_gate() {  # kind (typecheck|tests), file regex, command
   fi
 }
 
-JS_EXT='\\.(ts|tsx|js|jsx|mjs|cjs)$'
+JS_EXT='(ts|tsx|js|jsx|mjs|cjs)'
+
+# Builds the gates for one directory. "" is the repo root; anything else is a
+# nested project, and its gates match only files under that path. Commands run
+# from inside the directory, which is why the file list is passed as absolute
+# paths — a relative path would not survive the cd.
+add_dir_gates() {
+  d="$1"
+  if [ -n "$d" ]; then pre="^$d/.*\\\\." ; run="cd $d && " ; else pre='\\.' ; run="" ; fi
+  have_tc=""; have_test=""
+  [ -n "$d" ] && [ -n "\${ROOT_TC:-}" ] && have_tc="skip"
+  [ -n "$d" ] && [ -n "\${ROOT_TEST:-}" ] && have_test="skip"
+
+  if [ -f "$d\${d:+/}package.json" ]; then
+    pkg="$d\${d:+/}package.json"
+    if [ -z "$have_tc" ]; then
+      if grep -q '"typecheck"[[:space:]]*:' "$pkg"; then
+        add_gate typecheck "$pre($JS_EXT)\\$" "\${run}npm run --silent typecheck"
+      elif [ -f "$d\${d:+/}tsconfig.json" ]; then
+        add_gate typecheck "$pre(ts|tsx)\\$" "\${run}npx --no-install tsc --noEmit"
+      fi
+    fi
+    if [ -z "$have_test" ]; then
+      if grep -q '"vitest"' "$pkg"; then
+        add_gate tests "$pre($JS_EXT)\\$" "\${run}npx --no-install vitest related --run \\$FILES"
+      elif grep -q '"jest"' "$pkg"; then
+        add_gate tests "$pre($JS_EXT)\\$" "\${run}npx --no-install jest --findRelatedTests \\$FILES --passWithNoTests"
+      elif grep -q '"test"[[:space:]]*:' "$pkg"; then
+        add_gate tests "$pre($JS_EXT)\\$" "\${run}CI=1 npm run --silent test"
+      fi
+    fi
+  fi
+
+  if [ -f "$d\${d:+/}pyproject.toml" ] || [ -f "$d\${d:+/}pytest.ini" ] || [ -f "$d\${d:+/}setup.cfg" ]; then
+    if [ -z "$have_tc" ]; then
+      if [ -f "$d\${d:+/}mypy.ini" ] || grep -qs 'tool.mypy' "$d\${d:+/}pyproject.toml"; then
+        add_gate typecheck "\${pre}py\\$" "\${run}python -m mypy ."
+      fi
+    fi
+    if [ -z "$have_test" ]; then
+      add_gate tests "\${pre}py\\$" "\${run}python -m pytest -q"
+    fi
+  fi
+}
 
 detect() {
   # Explicit config wins outright: auto-detection is off for the whole repo.
@@ -285,37 +331,33 @@ detect() {
     return
   fi
 
-  # Without node_modules every npm/npx gate fails on a missing binary, which
-  # would block every turn in a fresh clone. That is a missing tool, not a red.
-  if [ -f package.json ] && [ ! -d node_modules ]; then
-    SKIP_NOTE="node_modules is missing — run your install first"
-  elif [ -f package.json ]; then
-    # Prefer the repo's own typecheck script. In a workspace repo the root
-    # tsconfig is often solution-style (references only), where bare
-    # \`tsc --noEmit\` does not mean what \`tsc -b\` means.
-    if grep -q '"typecheck"[[:space:]]*:' package.json; then
-      add_gate typecheck "$JS_EXT" 'npm run --silent typecheck'
-    elif [ -f tsconfig.json ]; then
-      add_gate typecheck '\\.(ts|tsx)$' 'npx --no-install tsc --noEmit'
-    fi
-    if grep -q '"vitest"' package.json; then
-      add_gate tests "$JS_EXT" 'npx --no-install vitest related --run $FILES'
-    elif grep -q '"jest"' package.json; then
-      add_gate tests "$JS_EXT" 'npx --no-install jest --findRelatedTests $FILES --passWithNoTests'
-    fi
-  fi
+  add_dir_gates ""
 
-  if [ -f pyproject.toml ] || [ -f pytest.ini ] || [ -f setup.cfg ]; then
-    if [ -f mypy.ini ] || grep -qs 'tool.mypy' pyproject.toml; then
-      add_gate typecheck '\\.py$' 'python -m mypy .'
-    fi
-    add_gate tests '\\.py$' 'python -m pytest -q'
-  fi
+  # Many repos keep no manifest at the root — the code lives in web/, api/,
+  # backend/, packages/*. Look two levels down, but only for the kind of gate the
+  # root did not already provide, so a repo that works today keeps working.
+  ROOT_TC="$TC_GATES"
+  ROOT_TEST="$TEST_GATES"
+  while IFS= read -r manifest; do
+    [ -z "$manifest" ] && continue
+    d=$(dirname "$manifest")
+    d=\${d#./}
+    [ "$d" = "." ] && continue
+    add_dir_gates "$d"
+  done <<< "$(find . -mindepth 2 -maxdepth 3 \\
+               \\( -name package.json -o -name pyproject.toml -o -name pytest.ini \\) \\
+               -not -path '*/node_modules/*' -not -path '*/.git/*' \\
+               -not -path '*/dist/*' -not -path '*/build/*' \\
+               -not -path '*/.venv/*' -not -path '*/venv/*' 2>/dev/null | sort)"
 }
 detect
 
 # Typechecks before tests — cheapest first, so the slow gate is usually unpaid.
 GATES="$TC_GATES$TEST_GATES"
+if [ -n "\${GAUNTLET_DRYRUN:-}" ]; then
+  if [ -z "$GATES" ]; then quit "would run: nothing — no gates detected"; fi
+  quit "would run: $(printf '%s' "$GATES" | cut -f1,3 | tr '\\t' ' ' | tr '\\n' '; ')"
+fi
 if [ -z "$GATES" ]; then
   if [ -n "$SKIP_NOTE" ]; then quit "skipped: $SKIP_NOTE"; fi
   quit "skipped: no gates detected for this repo"
@@ -338,7 +380,9 @@ while IFS=$'\\t' read -r GKIND GEXT GCMD; do
   [ -z "$GFILES" ] && continue
   # $FILES is substituted as a real argument list, not a space-joined string —
   # word splitting would tear "src/my folder/a.ts" into two bogus paths.
-  mapfile -t FILE_ARR <<< "$GFILES"
+  mapfile -t REL_ARR <<< "$GFILES"
+  FILE_ARR=()
+  for f in "\${REL_ARR[@]}"; do FILE_ARR+=("$PROJECT_DIR/$f"); done
   export FILES=$(printf '%s' "$GFILES" | tr '\\n' ' ')
   GCMD_RUN=\${GCMD//"$PAT_BRACE"/$FILES_REPL}
   GCMD_RUN=\${GCMD_RUN//"$PAT_PLAIN"/$FILES_REPL}
@@ -347,7 +391,7 @@ while IFS=$'\\t' read -r GKIND GEXT GCMD; do
   if [ $? -ne 0 ]; then
     # A gate whose tool is not installed is a missing gate, not a failing one.
     # Blocking on it would wall off every turn until the user installs something.
-    if printf '%s' "$GATE_OUT" | grep -qiE 'command not found|no module named|cannot find module|could not determine executable|canceled due to missing packages|is not recognized'; then
+    if printf '%s' "$GATE_OUT" | grep -qiE 'command not found|no module named|cannot find module|could not determine executable|canceled due to missing packages|missing script|is not recognized'; then
       SKIP_NOTE="the $GKIND tool is not installed"
       RAN="\${RAN%"$GKIND "}"
       continue
@@ -443,6 +487,9 @@ export async function detectStack(targetDir = process.cwd()) {
   if (pkg) {
     if (pkg.includes('"vitest"')) test = "vitest";
     else if (pkg.includes('"jest"')) test = "jest";
+    // A delegating monorepo root has no runner as a direct dependency, but its
+    // own `test` script still runs the right thing.
+    else if (/"test"\s*:/.test(pkg)) test = "npm test";
     if (/"typecheck"\s*:/.test(pkg)) typecheck = "npm run typecheck";
     else if (await has("tsconfig.json")) typecheck = "tsc";
   }
