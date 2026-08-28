@@ -9,6 +9,7 @@ import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
 import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../lib/prompt.mjs";
 import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
 import { setupHook, detectStack, writeGauntletConf } from "../lib/setup-hook.mjs";
+import { makeLocalSource, reportToolNeeds } from "../lib/local.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 import {
   readManifest, writeManifest, computeOrphans, computeRemovals, scanInstalled, removeArtifacts,
@@ -50,10 +51,24 @@ async function runSync(manifest, catalog) {
 
 async function main() {
   const isSync = process.argv.includes("--sync");
+
+  // --local[=path] reads the catalog from a working copy instead of GitHub, so an
+  // unreleased change can be installed and tried without publishing it first.
+  const localArg = process.argv.find((a) => a === "--local" || a.startsWith("--local="));
+  const localRoot = localArg ? (localArg.split("=")[1] || join(__dirname, "..", "..")) : null;
+
   console.log(`\n  ${chalk.bold.cyan("Claude Skills Installer")} ${chalk.dim(`v${pkg.version}`)}\n`);
 
-  console.log(chalk.dim("  Fetching available skills, commands, and agents...\n"));
-  const [skills, commands, agents] = await Promise.all([fetchSkills(), fetchCommands(), fetchAgents()]);
+  let fetchers = { fetchSkills, fetchCommands, fetchAgents };
+  if (localRoot) {
+    fetchers = makeLocalSource(localRoot);
+    console.log(`  ${chalk.yellow("LOCAL")} ${chalk.dim(`reading the catalog from ${localRoot}`)}\n`);
+  } else {
+    console.log(chalk.dim("  Fetching available skills, commands, and agents...\n"));
+  }
+  const [skills, commands, agents] = await Promise.all([
+    fetchers.fetchSkills(), fetchers.fetchCommands(), fetchers.fetchAgents(),
+  ]);
   const catalog = { skills, commands, agents };
   const manifest = await readManifest(CWD);
 
@@ -178,6 +193,27 @@ async function main() {
             console.log(`  Config written: ${written.replace(CWD + "/", "")}`);
           }
         }
+      }
+    }
+  }
+
+  // --- What the installed commands need that this project does not have ---
+  // /ship's mutation check is per project, so a monorepo needs a tool per project.
+  if (selectedCommands.some((c) => c.fileName === "ship.md")) {
+    const needs = await reportToolNeeds(CWD);
+    console.log();
+    if (needs.length === 0) {
+      console.log(`  ${chalk.dim("/ship's mutation check has a tool in every project here.")}`);
+    } else {
+      console.log(`  ${chalk.yellow("!")} ${chalk.bold("/ship needs a mutation tool per project")} ${chalk.dim("— without one it reports UNPROVEN, and never blocks.")}`);
+      if (!selectedSkills.some((s) => s.dirName === "testing-best-practices")) {
+        console.log(`    ${chalk.dim("Setting these up has traps — install the testing-best-practices skill for MUTATION-TESTING.md.")}`);
+      }
+      for (const n of needs) {
+        console.log(`    ${chalk.bold(n.label)} needs ${n.tool}`);
+        console.log(`      ${chalk.cyan(n.install)}`);
+        console.log(`      ${chalk.dim(n.config)}`);
+        for (const line of n.also ?? []) console.log(`      ${chalk.dim(line)}`);
       }
     }
   }

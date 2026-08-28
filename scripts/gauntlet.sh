@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # gauntlet.sh — Stop hook: fast deterministic gates on the changed diff.
 #
-# Runs when Claude finishes a turn. Silent when green. On a red gate it returns
-# {"decision":"continue"} so the turn does not end, handing the failure back to
-# Claude to fix before the user sees it.
+# Runs when Claude finishes a turn. Silent when green. On a red gate it exits 2:
+# the turn keeps going, the user is shown why, and Claude is handed the failure.
 #
 # Two things the hook contract makes non-negotiable:
 #   - stop_hook_active must short-circuit, or a red gate loops forever.
@@ -79,7 +78,10 @@ CHANGED=$( { git diff --name-only HEAD 2>/dev/null; \
 if [ -z "$CHANGED" ] && [ -z "${GAUNTLET_DRYRUN:-}" ]; then quit "skipped: no changed files"; fi
 
 # ---------------------------------------------------------------- skip rule 2
-FILES_NL=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_CODE_EXT)$" || true)
+# .stryker-tmp holds Stryker's sandbox — a full copy of the project. A crashed
+# run leaves it behind, and then every file in it looks like a changed file.
+FILES_NL=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_CODE_EXT)$" \
+           | grep -vE '(^|/)\.stryker-tmp/' || true)
 if [ -z "$FILES_NL" ] && [ -z "${GAUNTLET_DRYRUN:-}" ]; then
   quit "skipped: no changed code files (docs/config only)"
 fi
@@ -284,19 +286,11 @@ $FILES
 --- $FAILED output (last 60 lines) ---
 $TAIL"
 
-json_escape() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\n'/\\n}"
-  s="${s//$'\r'/\\r}"
-  s="${s//$'\t'/\\t}"
-  printf '"%s"' "$s"
-}
-
 printf '%s\n' "red: the $FAILED gate failed" > "$WHY" 2>/dev/null
-if [ -n "${GAUNTLET_DEBUG:-}" ]; then printf 'gauntlet: red: the %s gate failed\n' "$FAILED" >&2; fi
-# A Stop hook's decision is "continue" / "stop" / "escalate" — "block" is not a
-# valid value and would be ignored, letting the turn end on a red gate.
-printf '{"decision":"continue","reason":%s}\n' "$(json_escape "$MSG")"
-exit 0
+
+# Exit 2 is the only path where a red is visible to the user: its stderr is shown
+# to them as the reason the turn is continuing. Exit 0 with {"decision":"continue"}
+# also keeps the turn going, but the reason reaches Claude alone — so a failing
+# gate looked, from the outside, exactly like a gauntlet that does nothing.
+printf '%s\n' "$MSG" >&2
+exit 2

@@ -88,7 +88,7 @@ Cross-cutting craft — applies to any stack, any language.
 | `code-structure` 📦 | Single Responsibility (when to split) + Avoid Hasty Abstractions (when *not* to extract) — hard size limits, separation of concerns, the Rule of Three |
 | `debugging` | Root cause before patching — reproduce, trace the failure backward to its origin, one hypothesis at a time, the 3-attempts-then-question-the-design rule |
 | `typescript-best-practices` | TypeScript 7.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
-| `testing-best-practices` | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite |
+| `testing-best-practices` 📦 | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite; bundle covers mutation testing — Stryker and mutmut setup, diff-scoped runs, the traps, and working score thresholds |
 | `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
 
 ## Commands
@@ -97,7 +97,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 
 | Command | What it does |
 |---------|--------------|
-| `/ship` | Unified delivery pipeline — commit → PR → merge → release. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
+| `/ship` | Unified delivery pipeline — gate → commit → PR → merge → release. The gate is the one enforcement moment: it checks the diff's file lengths, audits it against the skills installed in the project, and mutation-tests the changed lines to prove the tests would catch a break — **fixing what it finds** rather than handing you a list. `--force` skips it. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
 | `/discover` | Find the right problem before deciding what to build — diverges first: names competing interpretations of what you said, stress-tests the framing with a blind critic subagent, then converges on a mental model. Run before `/preplan` |
 | `/preplan` | Resolve a fuzzy feature idea into concrete decisions — 6 fixed phases, one question at a time, ends with a decision log. Run before `/plan-feature` |
 | `/plan-feature` | Integration-first feature planning — 3 parallel subagents scan for reusable code, patterns, and touch points before producing a short plan |
@@ -126,6 +126,13 @@ Every install writes a manifest at `.claude/.claude-skills.json` recording what 
 npx @spardutti/claude-skills --sync
 ```
 
+`--local[=path]` reads the catalog from a working copy instead of GitHub, so an unreleased
+change can be installed and tried without publishing it first:
+
+```bash
+node ~/projects/claude-skills/cli/bin/cli.mjs --local
+```
+
 `--sync` refreshes every tracked item to the latest catalog and prunes stale ones in one shot — no menu. For a project that predates the manifest, the first normal run offers a one-time cleanup of `.claude/` content no longer in the catalog.
 
 ### Automatic Skill Evaluation
@@ -139,9 +146,10 @@ It installs four hooks and appends a rule to your `CLAUDE.md`. Three guard the
 - `skill-application-gate.sh` — a second `PreToolUse` gate requiring each loaded skill to be applied, not just read
 - `skill-gate-automark.sh` — a `PostToolUse` hook on `Skill` that clears the gate
 
-The fourth guards the **back** — nothing finishes until the code passes:
+The last two guard the **back** — nothing finishes or ships until the code passes:
 
 - `gauntlet.sh` — a `Stop` hook running the fast gates on your changed files (see [Automatic Verification](#automatic-verification-gauntlet))
+- `ship-gate-hook.sh` — a `PreToolUse` gate on `Bash` that refuses `git commit` and `git push` without a receipt from `ship-gate.sh`
 
 <details>
 <summary>How the gate works</summary>
@@ -174,9 +182,12 @@ It registers in `.claude/settings.json`:
 ### Automatic Verification (Gauntlet)
 
 The same install adds `gauntlet.sh` — a `Stop` hook that runs the cheap, deterministic
-gates on your changed files every time Claude finishes a turn. Green is silent; red returns
-`{"decision":"continue"}` so the turn doesn't end, handing the failure back to Claude to
-fix before you ever see it.
+gates on your changed files every time Claude finishes a turn. Green is silent; red exits 2,
+which keeps the turn from ending, shows you the failure, and hands it to Claude to fix.
+
+Exit 2 matters: `{"decision":"continue"}` also keeps the turn going, but its reason reaches
+Claude alone. A failing gate was then invisible from the outside — indistinguishable from a
+gauntlet that does nothing.
 
 Keep the gates fast for a reason beyond patience: a `command` hook that reaches its timeout
 (600s by default) is cancelled and its **output discarded**, so the turn ends as if the hook
@@ -206,6 +217,12 @@ It runs a skip ladder first, cheapest check first, and quits at the first "no":
 4. no gates detected for this repo
 
 Rule 3 is what makes repeated `/ship` runs free: the gates run once per distinct diff.
+
+To confirm it is alive when everything is green — green prints nothing, by design:
+
+```bash
+ls -t /tmp/claude-gauntlet-*.why | head -1 | xargs cat
+```
 
 Every run records why it ended in `/tmp/claude-gauntlet-<session>.why`, so a green run
 and a skipped one are told apart without re-running the hook. `GAUNTLET_DEBUG=1` prints
@@ -257,10 +274,19 @@ a config file — two are read, in this order, and the project's wins key by key
 GAUNTLET_OFF=1                       # disable entirely
 GAUNTLET_TYPECHECK='npm run check'   # "" to skip the gate
 GAUNTLET_TEST='npm test -- $FILES'   # $FILES = changed code files
-GAUNTLET_CODE_EXT='ts|tsx|py'        # what counts as code
+GAUNTLET_CODE_EXT='ts|tsx|py'        # what counts as a change worth checking
 GAUNTLET_DEBUG=1                     # print the outcome to stderr every run
 GAUNTLET_REQUIRE_TESTS=1             # block when the runner matched 0 test files
+
+# /ship's gate reads its own keys from the same file
+GAUNTLET_MAX_LINES=200               # per-file limit; 0 turns the check off
+GAUNTLET_SOURCE_EXT='ts|tsx|py'      # what counts as SOURCE — not the same question
+GAUNTLET_MUTATE='bash mutate.sh'     # replace per-project mutation detection
 ```
+
+`GAUNTLET_SOURCE_EXT` is separate from `GAUNTLET_CODE_EXT` on purpose. The Stop hook asks
+"did anything worth checking change", so a docs repo sets `CODE_EXT` to include `.md`. The
+line limit and mutation ask about source code, where that answer is wrong.
 
 Set your house rules once in `~/.claude/gauntlet.conf`; only reach for the project file
 where a repo does something unusual (or set `GAUNTLET_OFF=1` there to opt one out).
@@ -304,6 +330,8 @@ commands/      Slash commands installed to .claude/commands/
 agents/        Subagent definitions — commands declare which they need via requires-agents
 scripts/       validate-skills.mjs — checks skill length caps and reference integrity
                gauntlet.sh — the Stop-hook verification gates, embedded by the CLI
+               ship-gate.sh — /ship's file-length and mutation checks, behind an exit code
+               ship-gate-hook.sh — refuses git commit/push without a ship-gate receipt
                gauntlet-selftest.sh — 15 behavioural tests for the hook (runs on pre-push)
                gauntlet-survey.sh — what the hook would do in every repo under a directory
 cli/           The npm installer (npx @spardutti/claude-skills); version in cli/package.json

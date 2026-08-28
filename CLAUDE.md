@@ -70,6 +70,14 @@ directory (e.g. `skills/react/` → `COMPONENT-DESIGN.md`, `USE-EFFECT.md`, …)
 `SKILL.md` carries the always-loaded 80% case; references hold the deep-dive
 20% and load only when `SKILL.md` points to them.
 
+**Cover the tools actually in use. Split a reference file per tool when a third
+one arrives, not before.** A reference that documents several tools for the same
+job (mutation testing → Stryker, mutmut, PIT) grows about 60 lines per tool, and
+only when a new language is adopted — an event, not drift. Pre-writing a section
+for a tool nobody here uses is the real bloat. At the split, the stack-neutral
+concepts stay in the original file and each tool's setup and traps move out, so
+it happens once and the shared half stops growing.
+
 When adding or renaming a skill or command, update the README's tables to match.
 
 ## Skill authoring rule: 200-line limit

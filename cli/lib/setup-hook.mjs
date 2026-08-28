@@ -162,9 +162,8 @@ exit 0
 const GAUNTLET_SCRIPT = `#!/usr/bin/env bash
 # gauntlet.sh — Stop hook: fast deterministic gates on the changed diff.
 #
-# Runs when Claude finishes a turn. Silent when green. On a red gate it returns
-# {"decision":"continue"} so the turn does not end, handing the failure back to
-# Claude to fix before the user sees it.
+# Runs when Claude finishes a turn. Silent when green. On a red gate it exits 2:
+# the turn keeps going, the user is shown why, and Claude is handed the failure.
 #
 # Two things the hook contract makes non-negotiable:
 #   - stop_hook_active must short-circuit, or a red gate loops forever.
@@ -240,7 +239,10 @@ CHANGED=$( { git diff --name-only HEAD 2>/dev/null; \\
 if [ -z "$CHANGED" ] && [ -z "\${GAUNTLET_DRYRUN:-}" ]; then quit "skipped: no changed files"; fi
 
 # ---------------------------------------------------------------- skip rule 2
-FILES_NL=$(printf '%s\\n' "$CHANGED" | grep -E "\\.($GAUNTLET_CODE_EXT)$" || true)
+# .stryker-tmp holds Stryker's sandbox — a full copy of the project. A crashed
+# run leaves it behind, and then every file in it looks like a changed file.
+FILES_NL=$(printf '%s\\n' "$CHANGED" | grep -E "\\.($GAUNTLET_CODE_EXT)$" \\
+           | grep -vE '(^|/)\\.stryker-tmp/' || true)
 if [ -z "$FILES_NL" ] && [ -z "\${GAUNTLET_DRYRUN:-}" ]; then
   quit "skipped: no changed code files (docs/config only)"
 fi
@@ -445,6 +447,325 @@ $FILES
 --- $FAILED output (last 60 lines) ---
 $TAIL"
 
+printf '%s\\n' "red: the $FAILED gate failed" > "$WHY" 2>/dev/null
+
+# Exit 2 is the only path where a red is visible to the user: its stderr is shown
+# to them as the reason the turn is continuing. Exit 0 with {"decision":"continue"}
+# also keeps the turn going, but the reason reaches Claude alone — so a failing
+# gate looked, from the outside, exactly like a gauntlet that does nothing.
+printf '%s\\n' "$MSG" >&2
+exit 2
+`;
+
+// The deterministic half of /ship's quality gate: file length and mutation,
+// behind an exit code rather than in prose a model can talk past.
+// Canonical source: scripts/ship-gate.sh.
+const SHIP_GATE_SCRIPT = `#!/usr/bin/env bash
+# ship-gate.sh — the deterministic half of /ship's quality gate.
+#
+# File length and mutation are not judgement calls, so they do not live in prose
+# where a model can decide they are not worth it. They live here, behind an exit
+# code. /ship runs this and obeys the result; the skills audit stays in the
+# command, because that one genuinely needs a model.
+#
+#   bash .claude/hooks/ship-gate.sh [base-ref]
+#   bash .claude/hooks/ship-gate.sh --key      print the receipt key and stop
+#   bash .claude/hooks/ship-gate.sh --force    write a FORCED receipt, run nothing
+#
+# On completion it writes a RECEIPT at /tmp/claude-shipgate-<key>, and the
+# PreToolUse hook refuses \`git commit\` / \`git push\` without a matching one. The
+# point is that a gate has to be evidence rather than an instruction: a sentence
+# saying "run this first" is a sentence an agent can decide is not worth it, and
+# then report a pass it never earned. A receipt cannot be reported, only produced.
+#
+# The key is the content of everything about to ship, so it is the same before
+# and after \`git commit\` — and it changes the moment anything is edited, which is
+# what makes a fix re-gate itself instead of riding on the previous verdict.
+#
+# Exit codes:
+#   0  clean — nothing over the line limit, no surviving mutants
+#   1  findings that must be dealt with before shipping
+#   2  ran, but could not prove the tests (a mutation tool is missing) — report,
+#      don't block; the output names exactly what to install and where
+#
+# Config: the same .claude/gauntlet.conf as the Stop hook.
+#   GAUNTLET_MAX_LINES=200   the per-file limit; 0 turns the check off
+#   GAUNTLET_SOURCE_EXT=...  which extensions count as source. Deliberately NOT
+#                            GAUNTLET_CODE_EXT: the Stop hook's key answers a
+#                            different question, and a docs repo sets it to .md
+#   GAUNTLET_MUTATE="cmd"    one explicit mutation command for the whole repo,
+#                            replacing per-project detection. $MUTATE_FLAGS holds
+#                            the --mutate flags, $FILES the changed files.
+
+set -uo pipefail
+
+MODE=""
+case "\${1:-}" in --key) MODE=key; shift ;; --force) MODE=force; shift ;; esac
+
+PROJECT_DIR="\${CLAUDE_PROJECT_DIR:-$PWD}"
+cd "$PROJECT_DIR" 2>/dev/null || { echo "ship-gate: cannot read $PROJECT_DIR"; exit 1; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "ship-gate: not a git repo"; exit 1; }
+
+GAUNTLET_MAX_LINES=200
+GAUNTLET_MUTATE=""
+GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift"
+[ -n "\${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
+[ -f ".claude/gauntlet.conf" ] && . ".claude/gauntlet.conf"
+
+# ------------------------------------------------------------------- the scope
+BASE="\${1:-}"
+if [ -z "$BASE" ]; then
+  BASE=$(git merge-base HEAD develop 2>/dev/null \\
+         || git merge-base HEAD main 2>/dev/null \\
+         || git rev-list --max-parents=0 HEAD | head -1)
+fi
+
+CHANGED=$( { git diff "$BASE"...HEAD --name-only 2>/dev/null
+             git diff HEAD --name-only 2>/dev/null
+             git ls-files --others --exclude-standard 2>/dev/null; } | sort -u )
+
+# The repo path plus the names and contents of the changed files, in a fixed
+# order. The path is in there because the key is otherwise pure content: two
+# repos holding the same file would share a receipt, and one would be waved
+# through on the other's verdict. Deliberately not a diff: a file moves from "untracked" to "in the diff" at commit time, so a
+# diff-based key changes when the content did not, and the receipt would go stale
+# the moment it was committed. This is identical either side of a commit, and
+# changes the instant any of those files is edited.
+RECEIPT_KEY=$( { printf '%s\\n' "$PROJECT_DIR"
+                 printf '%s\\n' "$CHANGED" | while IFS= read -r f; do
+                   [ -n "$f" ] || continue
+                   printf '%s\\n' "$f"
+                   [ -f "$f" ] && cat "$f"
+                 done; } | git hash-object --stdin )
+RECEIPT="/tmp/claude-shipgate-$RECEIPT_KEY"
+
+if [ "$MODE" = key ]; then printf '%s\\n' "$RECEIPT_KEY"; exit 0; fi
+if [ "$MODE" = force ]; then
+  printf 'FORCED %s\\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
+  echo "ship-gate: FORCED — receipt written without running any check."
+  exit 0
+fi
+FILES=$(printf '%s\\n' "$CHANGED" | grep -E "\\.($GAUNTLET_SOURCE_EXT)$" \\
+        | grep -vE '(\\.|_)(test|spec)\\.[^.]+$|(^|/)tests?/|(^|/)\\.stryker-tmp/' | while read -r f; do
+          [ -f "$f" ] && printf '%s\\n' "$f"
+        done)
+
+if [ -z "$FILES" ]; then
+  echo "ship-gate: no changed code files — nothing to check"
+  printf 'PASS %s no-code-changes\\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
+  exit 0
+fi
+
+echo "ship-gate: $(printf '%s\\n' "$FILES" | wc -l) changed code file(s), base $(git rev-parse --short "$BASE")"
+echo
+STATUS=0
+
+# ------------------------------------------------- check 1: file length (hard)
+OVER=""
+LARGEST=0
+if [ "$GAUNTLET_MAX_LINES" -gt 0 ]; then
+  while IFS= read -r f; do
+    n=$(wc -l < "$f")
+    [ "$n" -gt "$LARGEST" ] && LARGEST=$n
+    [ "$n" -gt "$GAUNTLET_MAX_LINES" ] && OVER="$OVER  $f — $n lines (limit $GAUNTLET_MAX_LINES)
+"
+  done <<< "$FILES"
+fi
+
+if [ "$GAUNTLET_MAX_LINES" -le 0 ]; then
+  echo "FILE LENGTH — off (GAUNTLET_MAX_LINES=0)"
+elif [ -n "$OVER" ]; then
+  echo "FILE LENGTH — over the limit:"
+  printf '%s' "$OVER"
+  echo "  Splitting a file is a design decision. Do it deliberately, or ship with --force."
+  STATUS=1
+else
+  echo "FILE LENGTH — ok, largest is $LARGEST lines"
+fi
+
+# ---------------------------------------------------------- which project owns
+# A monorepo holds several projects, each with its own runner and its own
+# mutation tool. Walk up from each changed file to the nearest manifest.
+owner_of() {
+  d=$(dirname "$1")
+  while :; do
+    if [ -f "$d/package.json" ] || [ -f "$d/pyproject.toml" ] \\
+       || [ -f "$d/pytest.ini" ] || [ -f "$d/setup.cfg" ]; then
+      printf '%s\\n' "\${d#./}"; return
+    fi
+    [ "$d" = "." ] || [ "$d" = "/" ] && { printf '.\\n'; return; }
+    d=$(dirname "$d")
+  done
+}
+
+OWNERS=$(while IFS= read -r f; do owner_of "$f"; done <<< "$FILES" | sort -u)
+
+# --------------------------------------------- check 2: mutation, per project
+echo
+echo "MUTATION — $(printf '%s\\n' "$OWNERS" | wc -l) project(s) in this diff"
+MISSING=""
+
+for owner in $OWNERS; do
+  [ "$owner" = "." ] && label="<repo root>" || label="$owner/"
+  OWNED=$(while IFS= read -r f; do
+            [ "$(owner_of "$f")" = "$owner" ] && printf '%s\\n' "$f"
+          done <<< "$FILES")
+  [ -z "$OWNED" ] && continue
+
+  # --mutate flags, one per changed hunk. Ranges inside a file are already
+  # comma-separated, so they cannot share a comma-joined list across files.
+  FLAGS=""
+  while IFS= read -r f; do
+    hunks=$(git diff -U0 "$BASE" -- "$f" 2>/dev/null \\
+            | grep -oE '^@@ -[0-9,]+ \\+[0-9]+(,[0-9]+)?' | sed 's/.*+//' \\
+            | while IFS=, read -r s l; do l=\${l:-1}; [ "$l" -gt 0 ] && echo "$s-$((s+l-1))"; done)
+    [ -z "$hunks" ] && hunks="1-$(wc -l < "$f")"
+    rel=\${f#$owner/}
+    for r in $hunks; do FLAGS="$FLAGS --mutate '$rel:$r'"; done
+  done <<< "$OWNED"
+
+  base=""; RUN=""
+  if [ "$owner" != "." ]; then base="$owner/"; RUN="cd '$owner' && "; fi
+  if [ -n "$GAUNTLET_MUTATE" ]; then
+    CMD="$GAUNTLET_MUTATE"; TOOL="config"
+  elif [ -f "$base"package.json ] && grep -qs '@stryker-mutator/core' "$base"package.json; then
+    TOOL="stryker"
+    # From inside the owning package: npx resolves against ITS node_modules, and
+    # stryker.config.json lives there too. A monorepo root usually has neither.
+    CMD="\${RUN}npx --no-install stryker run --incremental --force $FLAGS"
+  elif [ -f "$base"package.json ]; then
+    MISSING="$MISSING  $label needs Stryker:
+      npm --prefix \${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner
+      then \${base}stryker.config.json:
+        {\\"testRunner\\":\\"vitest\\",\\"plugins\\":[\\"@stryker-mutator/vitest-runner\\"],\\"coverageAnalysis\\":\\"perTest\\"}
+"
+    continue
+  elif command -v mutmut >/dev/null 2>&1; then
+    TOOL="mutmut"
+    # mutmut takes its scope from [tool.mutmut] in pyproject, not from a flag:
+    # --paths-to-mutate was 2.x, and 3.x filters by fnmatch globs over mutant
+    # NAMES (app.balance.reserve.*). There is no per-line scoping at all.
+    CMD="\${RUN}mutmut run"
+  else
+    MISSING="$MISSING  $label needs mutmut:
+      pip install mutmut
+      then \${base}pyproject.toml:
+        [tool.mutmut]
+        source_paths = [\\"src/\\"]
+        pytest_add_cli_args_test_selection = [\\"tests/\\"]
+      (mutmut 3 renamed these — paths_to_mutate/tests_dir are 2.x and are ignored)
+"
+    continue
+  fi
+
+  OUT=$(eval "$CMD" 2>&1); RC=$?
+  # Match a finding, never a summary row. Stryker prints a \`# survived\` COLUMN
+  # HEADER every run and repeats the word in its table, so a bare grep reports
+  # survivors on a clean run — worse than not running at all. Stryker marks each
+  # real finding \`[Survived]\`; table and border lines are excluded outright.
+  case "$TOOL" in
+    stryker) PATTERN='\\[Survived\\]' ;;
+    *)       PATTERN='[Ss]urvived' ;;
+  esac
+  SURVIVED=$(printf '%s\\n' "$OUT" | grep -E "$PATTERN" \\
+             | grep -vE '^[[:space:]]*[#│|+-]|# *surviv' | head -20)
+  if [ -n "$SURVIVED" ]; then
+    echo "  $label $TOOL — surviving mutants; these lines can break and no test notices:"
+    printf '%s\\n' "$SURVIVED" | sed 's/^/      /'
+    STATUS=1
+  elif [ $RC -ne 0 ]; then
+    echo "  $label $TOOL — the run failed:"
+    printf '%s\\n' "$OUT" | tail -12 | sed 's/^/      /'
+    [ "$STATUS" = 0 ] && STATUS=2
+  else
+    echo "  $label $TOOL — ok, no surviving mutants in the changed lines"
+  fi
+done
+
+if [ -n "$MISSING" ]; then
+  echo "  UNPROVEN — no mutation tool for these, so their tests were never shown"
+  echo "  to catch a break. Install per project:"
+  printf '%s' "$MISSING"
+  [ "$STATUS" = 0 ] && STATUS=2
+fi
+
+# The receipt is written by this script and nothing else. A hand-rolled check
+# produces no receipt, which is the whole point: substituting a weaker check is
+# a choice that can be argued for, but it cannot be passed off as this one.
+echo
+case $STATUS in
+  0) echo "ship-gate: PASS"
+     printf 'PASS %s\\n' "$(date -u +%FT%TZ)" > "$RECEIPT" ;;
+  1) echo "ship-gate: FAIL — deal with the findings above, then run this again."
+     echo "           To ship anyway: bash .claude/hooks/ship-gate.sh --force"
+     rm -f "$RECEIPT" ;;
+  2) echo "ship-gate: UNPROVEN — nothing is wrong, but nothing was proven either"
+     printf 'UNPROVEN %s\\n' "$(date -u +%FT%TZ)" > "$RECEIPT" ;;
+esac
+exit $STATUS
+`;
+
+// PreToolUse on Bash: refuses git commit/push without a ship-gate receipt.
+// Canonical source: scripts/ship-gate-hook.sh.
+const SHIP_GATE_HOOK_SCRIPT = `#!/usr/bin/env bash
+# ship-gate-hook.sh — PreToolUse on Bash. Refuses \`git commit\` and \`git push\`
+# unless ship-gate.sh has left a receipt for exactly these changes.
+#
+# A gate written as an instruction is a gate an agent can decide is not worth the
+# time — and then report a pass it never earned, which is the part you cannot see
+# from the outside. This removes the claim entirely: either the receipt exists for
+# this exact content, or git does not run.
+#
+# The receipt key covers everything about to ship, so it survives \`git commit\`
+# and still matches at push time, and it changes the moment any file is edited —
+# a fix has to be re-gated instead of riding on the previous verdict.
+
+INPUT=$(cat)
+
+CMD=$(printf '%s' "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' \\
+      | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+
+# Only the two commands that publish work. Everything else passes untouched.
+case "$CMD" in
+  *"git commit"*|*"git push"*) ;;
+  *) exit 0 ;;
+esac
+
+PROJECT_DIR="\${CLAUDE_PROJECT_DIR:-$PWD}"
+cd "$PROJECT_DIR" 2>/dev/null || exit 0
+
+GATE="$PROJECT_DIR/.claude/hooks/ship-gate.sh"
+[ -x "$GATE" ] || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+# Ask the gate for the key rather than recomputing it here. Two implementations
+# of the same rule drift, and the drift is silent.
+KEY=$(bash "$GATE" --key 2>/dev/null)
+[ -z "$KEY" ] && exit 0
+
+RECEIPT="/tmp/claude-shipgate-$KEY"
+if [ -f "$RECEIPT" ]; then
+  exit 0
+fi
+
+MSG="BLOCKED: no ship-gate receipt for these changes.
+
+The quality gate has not run against the code you are about to publish, or the
+code changed since it last did. Run it:
+
+  bash .claude/hooks/ship-gate.sh
+
+It checks file length and mutation-tests the changed lines, and writes a receipt
+this hook can see. Fix what it reports and run it again — a fix invalidates the
+previous receipt on purpose.
+
+Do NOT hand-roll a substitute check: only ship-gate.sh writes a receipt, so a
+weaker check you designed yourself cannot be passed off as this one.
+
+To publish without the gate, say so out loud and run:
+
+  bash .claude/hooks/ship-gate.sh --force"
+
 json_escape() {
   local s="$1"
   s="\${s//\\\\/\\\\\\\\}"
@@ -455,11 +776,7 @@ json_escape() {
   printf '"%s"' "$s"
 }
 
-printf '%s\\n' "red: the $FAILED gate failed" > "$WHY" 2>/dev/null
-if [ -n "\${GAUNTLET_DEBUG:-}" ]; then printf 'gauntlet: red: the %s gate failed\\n' "$FAILED" >&2; fi
-# A Stop hook's decision is "continue" / "stop" / "escalate" — "block" is not a
-# valid value and would be ignored, letting the turn end on a red gate.
-printf '{"decision":"continue","reason":%s}\\n' "$(json_escape "$MSG")"
+printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\\n' "$(json_escape "$MSG")"
 exit 0
 `;
 
@@ -467,6 +784,8 @@ const GATE_FILENAME = "skill-gate.sh";
 const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
 const APPLICATION_GATE_FILENAME = "skill-application-gate.sh";
 const GAUNTLET_FILENAME = "gauntlet.sh";
+const SHIP_GATE_FILENAME = "ship-gate.sh";
+const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -517,6 +836,8 @@ export async function setupHook(targetDir = process.cwd()) {
   const autoMarkPath = join(hooksDir, AUTO_MARK_FILENAME);
   const applicationGatePath = join(hooksDir, APPLICATION_GATE_FILENAME);
   const gauntletPath = join(hooksDir, GAUNTLET_FILENAME);
+  const shipGatePath = join(hooksDir, SHIP_GATE_FILENAME);
+  const shipGateHookPath = join(hooksDir, SHIP_GATE_HOOK_FILENAME);
   const settingsPath = join(resolved, ".claude", "settings.json");
 
   await mkdir(hooksDir, { recursive: true });
@@ -528,6 +849,10 @@ export async function setupHook(targetDir = process.cwd()) {
   await chmod(applicationGatePath, 0o755);
   await writeFile(gauntletPath, GAUNTLET_SCRIPT, { mode: 0o755 });
   await chmod(gauntletPath, 0o755);
+  await writeFile(shipGatePath, SHIP_GATE_SCRIPT, { mode: 0o755 });
+  await chmod(shipGatePath, 0o755);
+  await writeFile(shipGateHookPath, SHIP_GATE_HOOK_SCRIPT, { mode: 0o755 });
+  await chmod(shipGateHookPath, 0o755);
 
   // Remove the legacy audit-runner hook file from prior installs (2.3.x).
   try {
@@ -588,6 +913,17 @@ export async function setupHook(targetDir = process.cwd()) {
   );
   if (!applicationAlreadyRegistered) settings.hooks.PreToolUse.push(applicationEntry);
 
+  // Register PreToolUse ship-gate receipt check on Bash.
+  const shipGateCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${SHIP_GATE_HOOK_FILENAME}`;
+  const shipGateEntry = {
+    matcher: "Bash",
+    hooks: [{ type: "command", command: shipGateCommand }],
+  };
+  const shipGateRegistered = settings.hooks.PreToolUse.some((entry) =>
+    entry.hooks?.some((h) => h.command?.endsWith(SHIP_GATE_HOOK_FILENAME))
+  );
+  if (!shipGateRegistered) settings.hooks.PreToolUse.push(shipGateEntry);
+
   // Register PostToolUse auto-mark on Skill.
   const autoMarkCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${AUTO_MARK_FILENAME}`;
   const autoMarkEntry = {
@@ -623,5 +959,7 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${APPLICATION_GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${GAUNTLET_FILENAME}`);
+  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
+  console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }

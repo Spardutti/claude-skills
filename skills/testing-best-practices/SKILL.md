@@ -1,10 +1,16 @@
 ---
 name: testing-best-practices
 category: Foundations
-description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage."
+description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage; bundle covers mutation testing (Stryker, mutmut) for proving the tests would catch a break."
 ---
 
 # Testing Best Practices
+
+## Quick Reference — When to Load What
+
+| Working on… | Read |
+|---|---|
+| Proving the tests would catch a break — Stryker, mutmut, surviving mutants, mutation score | MUTATION-TESTING.md |
 
 ## Testing Pyramid
 
@@ -197,6 +203,11 @@ test.each([
 8. **Follow the pyramid** — ~70% unit, ~20% integration, ~10% E2E
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
+11. **A green suite is not evidence** — tests written beside the code pass by construction; prove them with mutation testing (MUTATION-TESTING.md) before trusting them
+
+## Reference Files
+
+- **MUTATION-TESTING.md** — read when setting up or reading mutation testing. Covers what it catches that review cannot (an assertion importing the constant it asserts on), Stryker setup with `coverageAnalysis: "perTest"` and diff-scoped `--mutate` ranges, the `.stryker-tmp` sandbox that silently doubles the test count, mutmut 3's renamed config keys and mutant-name globs, why grepping for the word `survived` false-positives on Stryker's own summary header, the Ignore plugin for class-name noise, and working score thresholds.
 
 ## Anti-Rationalizations
 

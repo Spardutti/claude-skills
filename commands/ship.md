@@ -1,15 +1,17 @@
 ---
 name: ship
-description: "Unified git delivery pipeline — commit → PR → merge → release. Run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
+description: "Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
 category: Workflow
-argument-hint: "[pr | release]"
+allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task
+requires-agents: [gauntlet-skills, test-review-gates]
+argument-hint: "[pr | release] [--force to skip the gate]"
 ---
 
 # Ship — Commit → PR → Merge → Release
 
 `/ship` is a four-stage git delivery pipeline. It detects where your work currently is, runs from there, and either stops at a target stage or asks you at each boundary.
 
-Stages, in order: **commit → pr → merge → release**.
+Stages, in order: **commit → pr → merge → release**, with a **gate** in front of all of them.
 
 ## How /ship Decides What to Do
 
@@ -27,6 +29,7 @@ Rules that always hold:
 - **Never re-do a satisfied stage** — already committed? start at pr.
 - **Never skip a required stage** — `/ship release` with uncommitted work runs commit → pr → merge → release first.
 - A merge into the **main** branch always asks for confirmation, even when a target is set.
+- The **gate** (Step 0.5) runs once per invocation, before the first stage, unless `--force`.
 
 ## Step 0 — Prechecks and Start Detection
 
@@ -70,6 +73,69 @@ This order is exhaustive and the conditions do not overlap once evaluated top-do
 - If `$ARGUMENTS` is empty, run the start stage, then **ask before advancing** to each next stage.
 
 Each stage below re-verifies its own precondition and aborts if Step 0 routed it wrong.
+
+---
+
+## Step 0.5 — The Gate
+
+Runs **once**, before the first stage. `--force` in `$ARGUMENTS` skips it entirely — no
+argument, no questions. Skip it too when there is nothing to check.
+
+This is the one enforcement moment. It does not re-run the test suite: the `gauntlet.sh`
+Stop hook already ran types and tests on every turn. It checks the three things nothing
+else does, and **it fixes what it finds** rather than handing you a list.
+
+Two of the three live in `ship-gate.sh` behind an exit code, and one — the skills audit —
+lives here, because it is the only one that genuinely needs a model.
+
+**Scope** — everything about to ship, and nothing else: `git diff <base>...HEAD` plus
+`git diff HEAD` and untracked files. Collect the changed source files and their changed
+line ranges (`git diff -U0`, reading `@@ -a,b +c,d @@` as lines `c` to `c+d-1`). Every
+check below is scoped to those files and ranges. Never scan the whole repo.
+
+Print the scope, then run the checks cheapest first, stopping at the first that stops you.
+
+### 1 and 3 — file length and mutation: run the script, obey the exit code
+
+```bash
+bash .claude/hooks/ship-gate.sh
+```
+
+These two are arithmetic and a tool invocation. They are deliberately **not** described
+here as things to carry out, because a check written in prose is a check a model can
+decide is not worth it — and that is exactly what happened the first time this gate ran.
+
+So: run that command. Show its output verbatim. Obey its exit code.
+
+- **0** — clean, continue.
+- **1** — findings. A file over the limit stops you: splitting a file is a design
+  decision, not something to do silently mid-ship. Surviving mutants are a gap in the
+  tests, not in the code — write the test that closes each one (see below), then re-run
+  the script.
+- **2** — it ran but could not prove the tests, almost always because no mutation tool
+  is installed. Report that plainly and continue. Do not describe this as passing.
+
+**Never substitute your own implementation of these checks.** Not a hand-rolled mutation
+script, not a `wc -l` you ran yourself, not a judgement that the changed files look too
+simple to be worth mutating. If the script cannot run, say so and stop — a gate you
+route around is not a gate.
+
+You cannot report your way past this one, and you do not have to be trusted not to try:
+the script writes a **receipt** keyed to the exact content about to ship, and a PreToolUse
+hook refuses `git commit` and `git push` without a matching one. A check you designed
+yourself writes no receipt. Editing a file after the gate ran invalidates it, so a fix is
+re-gated rather than riding on the previous verdict. To publish without the gate, say so
+plainly and run `bash .claude/hooks/ship-gate.sh --force`.
+
+When a mutant survives, write the test that kills it, then verify the new test **fails
+when the implementation is removed**. A test that passes without the code asserts
+nothing and is worse than the gap it filled: throw it out and report the gap instead.
+Re-run the script rather than declaring it fixed. Stop after **two** attempts at a gap.
+
+### Result
+
+- **Everything fixed** → say what was fixed in one or two lines, then continue to the first stage. The fixes are part of the commit.
+- **Stopped** → show what stopped you and why, and do not proceed. Offer `--force`.
 
 ---
 
