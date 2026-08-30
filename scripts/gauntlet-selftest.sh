@@ -173,6 +173,32 @@ sg "test files are never mutated" "1 changed code file"
 seq 1 250 | sed 's/^/const x/' > big.ts
 sg "a file over the limit stops the ship" "over the limit" 1
 
+# The gate reported "I recognised nothing" and "there is nothing" identically,
+# both as a PASS with a receipt. A Godot repo changing only .gd files was waved
+# straight through work nothing had looked at.
+echo "ship-gate finds nothing"
+newrepo sg_unknown
+echo "# notes" > NOTES.md
+sg "a docs-only change is still a pass" "nothing to check" 0
+seq 1 250 | sed 's/^/var x/' > player.gd
+sg "gd is source, so a long one is caught" "over the limit" 1
+rm -f player.gd
+echo "const x = 1" > weird.zzz
+sg "an extension the gate cannot place is never a pass" "does not know: zzz" 2
+
+# git prints paths from the repo root; CLAUDE_PROJECT_DIR can name a subdirectory
+# of it. Testing those paths from the subdirectory found no files, so the gate
+# wrote a PASS over a committed diff it never read.
+echo "ship-gate under a subdirectory project dir"
+newrepo sg_sub
+mkdir -p project-x/src
+git checkout -qb feature
+seq 1 250 | sed 's/^/const x/' > project-x/src/big.ts
+git add -A; git commit -qm big
+export CLAUDE_PROJECT_DIR="$R/project-x"
+sg "a committed change is found from a subdirectory" "project-x/src/big.ts" 1
+export CLAUDE_PROJECT_DIR="$R"
+
 # mutmut lives in the project's venv, not on PATH, and `mutmut run` prints 🙁 and
 # exits 0 whatever it finds — parsing that reports clean with survivors sitting
 # there. `mutmut results` is the readable source.

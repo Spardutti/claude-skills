@@ -33,6 +33,8 @@
 #   GAUNTLET_SOURCE_EXT=...  which extensions count as source. Deliberately NOT
 #                            GAUNTLET_CODE_EXT: the Stop hook's key answers a
 #                            different question, and a docs repo sets it to .md
+#   GAUNTLET_IGNORE_EXT=...  extensions that need no gate at all. An extension in
+#                            neither list is reported UNPROVEN rather than passed
 #   GAUNTLET_MUTATE="cmd"    one explicit mutation command for the whole repo,
 #                            replacing per-project detection. $MUTATE_FLAGS holds
 #                            the --mutate flags, $FILES the changed files.
@@ -50,9 +52,23 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" 2>/dev/null || { echo "ship-gate: cannot read $PROJECT_DIR"; exit 1; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "ship-gate: not a git repo"; exit 1; }
 
+# `git diff --name-only` prints paths from the repo ROOT, but CLAUDE_PROJECT_DIR
+# can point at a subdirectory of it. Testing those paths from the subdirectory
+# found no files at all, so the gate said "nothing to check" and wrote a PASS
+# receipt over a diff it never looked at. Work from the root and the paths git
+# prints are the paths this script tests. The receipt key moves with it, and the
+# PreToolUse hook asks this script for the key rather than computing its own, so
+# the two cannot disagree.
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$ROOT" ]; then
+  cd "$ROOT" || { echo "ship-gate: cannot read $ROOT"; exit 1; }
+  PROJECT_DIR="$ROOT"
+fi
+
 GAUNTLET_MAX_LINES=200
 GAUNTLET_MUTATE=""
-GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift"
+GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
+GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|json|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"
 [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
 [ -f ".claude/gauntlet.conf" ] && . ".claude/gauntlet.conf"
 
@@ -95,6 +111,24 @@ FILES=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
         done)
 
 if [ -z "$FILES" ]; then
+  # "I recognised nothing" is not "there is nothing", and the gate used to report
+  # both as a PASS. A Godot repo changed only .gd files, which no extension in
+  # the list named, so zero source files were found and a PASS receipt was
+  # written over work nothing had checked. An extension this gate cannot place is
+  # UNPROVEN: it does not block, but it never claims a pass either.
+  UNKNOWN=$(printf '%s\n' "$CHANGED" | grep -E '\.[A-Za-z0-9]+$' \
+            | grep -viE "\.($GAUNTLET_SOURCE_EXT)$" \
+            | grep -viE "\.($GAUNTLET_IGNORE_EXT)$" \
+            | sed 's/.*\.//' | sort -u | tr '\n' ' ')
+  if [ -n "$UNKNOWN" ]; then
+    echo "ship-gate: UNPROVEN — nothing here was checked. These changed files are"
+    echo "  in a language this gate does not know: $UNKNOWN"
+    echo "  If they are source, add the extension in .claude/gauntlet.conf:"
+    echo "    GAUNTLET_SOURCE_EXT=\"\$GAUNTLET_SOURCE_EXT|${UNKNOWN%% *}\""
+    echo "  If they are not, add it to GAUNTLET_IGNORE_EXT the same way."
+    printf 'UNPROVEN %s unknown-extensions\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
+    exit 2
+  fi
   echo "ship-gate: no changed code files — nothing to check"
   printf 'PASS %s no-code-changes\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
   exit 0
