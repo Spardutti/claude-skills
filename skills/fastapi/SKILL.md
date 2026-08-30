@@ -2,12 +2,12 @@
 name: fastapi
 category: Backend
 description: "MUST USE when creating or editing FastAPI routes, async path operations, dependency injection, app lifespan/startup, middleware, or API configuration; or when working on Pydantic models and validators, SQLAlchemy/Alembic database migrations, or Celery background tasks and queues. Enforces async correctness, Annotated dependencies, yield-dependency cleanup, service layers, response models, and structured error handling."
-tracks: fastapi@0.136 (pypi)
+tracks: fastapi@0.141 (pypi), pydantic@2.13 (pypi), sqlalchemy@2.0 (pypi)
 ---
 
 # FastAPI — Endpoints, Dependencies, Async
 
-Modern FastAPI application patterns: routing, async correctness, dependency injection, app lifecycle, and error handling. Baseline is FastAPI 0.136 + Pydantic 2.13 + Python 3.12 (3.10 is the floor). FastAPI is still 0.x — pin the exact version in production.
+Modern FastAPI application patterns: routing, async correctness, dependency injection, app lifecycle, and error handling. Baseline is FastAPI 0.141 + Pydantic 2.13 + SQLAlchemy 2.0 + Python 3.12 (3.10 is the floor). FastAPI is still 0.x — a minor can break you, so pin the exact version in production.
 
 ## Quick Reference — When to Load What
 
@@ -335,6 +335,7 @@ Use `ASGITransport` + `AsyncClient` for `async def` routes (the sync `TestClient
 11. **`pydantic-settings` + `lru_cache`** for config; `SecretStr` for secrets — never hardcode.
 12. **Explicit CORS origins** — never `"*"` with `allow_credentials=True`.
 13. **Test with `app.dependency_overrides`** — swap DB/auth deps, `ASGITransport` for async routes, clear overrides in teardown.
+14. **Never iterate `router.routes`** — since 0.137 it is a tree of nested routers, not a flat list of `APIRoute`, and FastAPI calls it an internal detail. Use the OpenAPI schema to enumerate endpoints.
 
 ## Reference Files
 
