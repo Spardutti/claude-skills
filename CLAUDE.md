@@ -37,7 +37,11 @@ loaded" (tighter descriptions, bundling related skills, smarter gating).
 
 - Bump `cli/package.json` version on every shipped change.
 - Semver: new skills or hook/CLI features = minor bump; fixes to existing skills, hook, or CLI = patch bump.
-- Publish flow: bump version → commit → push to `main` → `npm publish ./cli --access public` → **GitHub release**.
+- Publish flow: bump version → **`bash scripts/preflight.sh`** → commit → push to `main` → `npm publish ./cli --access public` → **GitHub release**.
+- **Preflight is not optional and its output is the evidence.** Paste the failures, not a summary, and do not publish while it is red. Every hook bug that reached a published version got there because the happy path was tried on a freshly invented repo and nothing else was, so preflight checks the things that actually broke: the self-tests, that the hook scripts embedded in the CLI still match `scripts/`, that detection still works against real repositories (`gauntlet-survey.sh`), and that the version is genuinely ahead of the registry.
+- **A behaviour change ships with a test in `scripts/gauntlet-selftest.sh` that fails without it.** Not a manual check, not a paragraph in the release notes. If it cannot be tested, say so out loud in the commit rather than quietly shipping it.
+- **Test the upgrade, never only the install.** `setupHook` runs against projects that already have an older `settings.json`, and a hook registered under an old matcher stays on the old matcher unless the installer corrects it. Fresh-install tests pass right through that.
+- **Two implementations of one rule will drift, silently.** The CLI once carried its own copy of the hook's stack detection and reported "no test runner" for repos the hook handled fine. Call the one implementation instead — `ship-gate.sh --key`, `gauntlet.sh --dryrun` — rather than reimplementing it in JS.
 - The GitHub release is part of shipping, not optional: `gh release create v<version> --target main`, tagged `v<version>` to match `cli/package.json`. Notes are grouped by change kind (`## New` / `## Freshness` / `## Removed` / `## Docs` — only the sections that apply), one bullet per skill/command/agent saying what it does, closing with the install line. Match the previous release's shape (`gh release view` the last tag).
 
 ## Structure

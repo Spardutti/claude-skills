@@ -346,6 +346,7 @@ scripts/       validate-skills.mjs — checks skill length caps and reference in
                ship-gate-hook.sh — refuses git commit/push without a ship-gate receipt
                gauntlet-selftest.sh — 15 behavioural tests for the hook (runs on pre-push)
                gauntlet-survey.sh — what the hook would do in every repo under a directory
+               preflight.sh — everything that must pass before a release
 cli/           The npm installer (npx @spardutti/claude-skills); version in cli/package.json
 .husky/        pre-push hook running the skill validator
 package.json   Private dev-tooling package (claude-skills-dev) — not the published one
@@ -359,6 +360,9 @@ Skills live in `skills/<name>/SKILL.md`. Authoring conventions are in [CLAUDE.md
 - `SKILL.md` ≤ 350 lines; reference files ≤ 500 and need a `## Contents` TOC past 100 lines.
 - References are one level deep — `SKILL.md` links them, they don't link each other.
 - `npm run validate-skills` enforces this; it also runs on `pre-push`.
+- Before any release, run `bash scripts/preflight.sh` — validator, self-tests, a check that the
+  hook scripts embedded in the CLI still match `scripts/`, detection against every repo under
+  `~/projects`, and that the version is ahead of the registry. Do not publish while it is red.
 - Changing `scripts/gauntlet.sh`? Run `bash scripts/gauntlet-selftest.sh` (also on `pre-push`),
   and run `bash scripts/gauntlet-survey.sh ~/projects` before releasing. Detection is where
   this hook keeps breaking, because real repos are shaped in ways invented test repos aren't —

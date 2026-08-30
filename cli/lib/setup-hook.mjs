@@ -941,6 +941,18 @@ export async function writeGauntletConf(targetDir, testCommand) {
   return confPath;
 }
 
+// Register the entry, or CORRECT the one already there. Skipping when a hook of
+// this name exists leaves an existing install pinned to whatever matcher it was
+// first written with — which is how the skill gates kept watching only
+// Write|Edit|MultiEdit after they learned to cover Bash.
+function upsert(list, filename, entry) {
+  const existing = list.find((e) => e.hooks?.some((h) => h.command?.endsWith(filename)));
+  if (!existing) return list.push(entry);
+  if (entry.matcher === undefined) delete existing.matcher;
+  else existing.matcher = entry.matcher;
+  existing.hooks = entry.hooks;
+}
+
 export async function setupHook(targetDir = process.cwd()) {
   const resolved = resolve(targetDir);
   const hooksDir = join(resolved, ".claude", "hooks");
@@ -1006,10 +1018,7 @@ export async function setupHook(targetDir = process.cwd()) {
   };
 
   if (Array.isArray(settings.hooks.PreToolUse)) {
-    const exists = settings.hooks.PreToolUse.some((entry) =>
-      entry.hooks?.some((h) => h.command?.endsWith(GATE_FILENAME))
-    );
-    if (!exists) settings.hooks.PreToolUse.push(gateEntry);
+    upsert(settings.hooks.PreToolUse, GATE_FILENAME, gateEntry);
   } else {
     settings.hooks.PreToolUse = [gateEntry];
   }
@@ -1020,10 +1029,7 @@ export async function setupHook(targetDir = process.cwd()) {
     matcher: "Write|Edit|MultiEdit|Bash",
     hooks: [{ type: "command", command: applicationCommand }],
   };
-  const applicationAlreadyRegistered = settings.hooks.PreToolUse.some((entry) =>
-    entry.hooks?.some((h) => h.command?.endsWith(APPLICATION_GATE_FILENAME))
-  );
-  if (!applicationAlreadyRegistered) settings.hooks.PreToolUse.push(applicationEntry);
+  upsert(settings.hooks.PreToolUse, APPLICATION_GATE_FILENAME, applicationEntry);
 
   // Register PreToolUse ship-gate receipt check on Bash.
   const shipGateCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${SHIP_GATE_HOOK_FILENAME}`;
@@ -1031,10 +1037,7 @@ export async function setupHook(targetDir = process.cwd()) {
     matcher: "Bash",
     hooks: [{ type: "command", command: shipGateCommand }],
   };
-  const shipGateRegistered = settings.hooks.PreToolUse.some((entry) =>
-    entry.hooks?.some((h) => h.command?.endsWith(SHIP_GATE_HOOK_FILENAME))
-  );
-  if (!shipGateRegistered) settings.hooks.PreToolUse.push(shipGateEntry);
+  upsert(settings.hooks.PreToolUse, SHIP_GATE_HOOK_FILENAME, shipGateEntry);
 
   // Register PostToolUse auto-mark on Skill.
   const autoMarkCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${AUTO_MARK_FILENAME}`;
@@ -1044,10 +1047,7 @@ export async function setupHook(targetDir = process.cwd()) {
   };
 
   if (Array.isArray(settings.hooks.PostToolUse)) {
-    const exists = settings.hooks.PostToolUse.some((entry) =>
-      entry.hooks?.some((h) => h.command?.endsWith(AUTO_MARK_FILENAME))
-    );
-    if (!exists) settings.hooks.PostToolUse.push(autoMarkEntry);
+    upsert(settings.hooks.PostToolUse, AUTO_MARK_FILENAME, autoMarkEntry);
   } else {
     settings.hooks.PostToolUse = [autoMarkEntry];
   }
@@ -1057,10 +1057,7 @@ export async function setupHook(targetDir = process.cwd()) {
   const gauntletEntry = { hooks: [{ type: "command", command: gauntletCommand }] };
 
   if (Array.isArray(settings.hooks.Stop)) {
-    const exists = settings.hooks.Stop.some((entry) =>
-      entry.hooks?.some((h) => h.command?.endsWith(GAUNTLET_FILENAME))
-    );
-    if (!exists) settings.hooks.Stop.push(gauntletEntry);
+    upsert(settings.hooks.Stop, GAUNTLET_FILENAME, gauntletEntry);
   } else {
     settings.hooks.Stop = [gauntletEntry];
   }

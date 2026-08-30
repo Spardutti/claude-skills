@@ -269,6 +269,43 @@ gatef "config files stay gated" deny "tsconfig.json"
 gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
 gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"
 
+# ------------------------------------------------------------ upgrade, not just install
+# Every hook bug that reached a release survived because it was only ever tested
+# as a FRESH install. A project that already had an older version kept whatever
+# settings.json it was first written with — which is how the skill gates went on
+# watching Write|Edit|MultiEdit after they learned to cover Bash.
+echo "upgrading an existing install"
+newrepo upg
+mkdir -p .claude/skills/demo .claude/hooks
+printf -- '---\nname: demo\n---\n## Rules\n- x\n' > .claude/skills/demo/SKILL.md
+cat > .claude/settings.json <<'OLD'
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Write|Edit|MultiEdit",
+        "hooks": [{ "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh" }] }
+    ]
+  }
+}
+OLD
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+
+check_json() {  # check_json <label> <node expression returning true>
+  N=$((N+1))
+  if node -e "const s=require('$PWD/.claude/settings.json'); process.exit(($2)?0:1)" 2>/dev/null; then
+    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s\n       settings.json: %s\n' "$1" "$(cat "$PWD/.claude/settings.json" | tr -d '\n ')"
+  fi
+}
+
+check_json "a stale matcher is corrected, not left alone" \
+  "s.hooks.PreToolUse.find(e=>e.hooks[0].command.endsWith('skill-gate.sh')).matcher==='Write|Edit|MultiEdit|Bash'"
+check_json "the hook is not registered twice" \
+  "s.hooks.PreToolUse.filter(e=>e.hooks[0].command.endsWith('skill-gate.sh')).length===1"
+check_json "hooks missing from the old file are added" \
+  "s.hooks.Stop && s.hooks.Stop.some(e=>e.hooks[0].command.endsWith('gauntlet.sh'))"
+
 cd /
 rm -rf "$TMP"
 echo
