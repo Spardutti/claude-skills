@@ -253,6 +253,22 @@ gate "a read-only command is not gated" allow Bash "git status --short"
 gate "a redirect to /dev/null is not a write" allow Bash "npm test 2>/dev/null"
 gate "the command that clears the gate is never gated" allow Bash "touch /tmp/claude-skill-gate-gt$RUN"
 
+# Skills are about code. A repo full of PLAN_*.md hit this gate on every write.
+gatef() {  # gatef <label> <deny|allow> <file_path>
+  N=$((N+1))
+  rm -f /tmp/claude-skill-gate-gt$RUN
+  out=$(printf '%s' "{\"session_id\":\"gt$RUN\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$3\"}}" | bash "$SKG")
+  got=allow; case "$out" in *deny*) got=deny ;; esac
+  if [ "$got" = "$2" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got %s\n' "$1" "$2" "$got"; fi
+}
+
+gatef "writing a plan document is not gated" allow "PLAN_notas.md"
+gatef "writing a source file is gated" deny "src/lib/expenses.ts"
+gatef "config files stay gated" deny "tsconfig.json"
+gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
+gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"
+
 cd /
 rm -rf "$TMP"
 echo

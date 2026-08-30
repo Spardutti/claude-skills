@@ -39,7 +39,22 @@ fi
 # source files, not one prompt — and some harnesses actively tell the model to
 # prefer Bash for edits. So Bash is gated too, but only for commands that can
 # write, and only until the gate is cleared once for the session.
+
+# Skills are about code. Blocking a plan document to ask how the React rules
+# apply is pure noise, and a repo full of PLAN_*.md hits it on every write.
+# Config files stay gated — skills do have rules about tsconfig and compose.
+PROSE_EXT='md|mdx|txt|rst|adoc|png|jpg|jpeg|gif|svg|webp|ico'
+CODE_EXT='ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|sql|sh|json|ya?ml|toml'
+
 TOOL=$(printf '%s' "$INPUT" | grep -o '"tool_name":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
+
+if [ "$TOOL" != "Bash" ]; then
+  # The structured tools name their target outright.
+  TARGET=$(printf '%s' "$INPUT" | grep -o '"file_path":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+  case "$TARGET" in
+    *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
+  esac
+fi
 if [ "$TOOL" = "Bash" ]; then
   CMD=$(printf '%s' "$INPUT" | grep -o '"command":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
 
@@ -49,6 +64,12 @@ if [ "$TOOL" = "Bash" ]; then
   esac
 
   # /dev/null redirects are not file writes; drop them before looking for one.
+
+  # A command that names a prose file and no code file is writing prose.
+  if printf '%s' "$CMD" | grep -qiE "\.($PROSE_EXT)([^A-Za-z0-9]|$)" \
+     && ! printf '%s' "$CMD" | grep -qiE "\.($CODE_EXT)([^A-Za-z0-9]|$)"; then
+    exit 0
+  fi
   STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
   WRITES=""
   case "$STRIPPED" in
@@ -121,12 +142,33 @@ fi
 
 # Same reason as the loading gate: Bash can write files, and a heredoc into an
 # interpreter shows no redirect at all.
+
+# Skills are about code. Blocking a plan document to ask how the React rules
+# apply is pure noise, and a repo full of PLAN_*.md hits it on every write.
+# Config files stay gated — skills do have rules about tsconfig and compose.
+PROSE_EXT='md|mdx|txt|rst|adoc|png|jpg|jpeg|gif|svg|webp|ico'
+CODE_EXT='ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|sql|sh|json|ya?ml|toml'
+
 TOOL=$(printf '%s' "$INPUT" | grep -o '"tool_name":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
+
+if [ "$TOOL" != "Bash" ]; then
+  # The structured tools name their target outright.
+  TARGET=$(printf '%s' "$INPUT" | grep -o '"file_path":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+  case "$TARGET" in
+    *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
+  esac
+fi
 if [ "$TOOL" = "Bash" ]; then
   CMD=$(printf '%s' "$INPUT" | grep -o '"command":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
   case "$CMD" in
     *claude-skill-gate-*|*claude-skill-acked-*|*claude-skill-loaded-*) exit 0 ;;
   esac
+
+  # A command that names a prose file and no code file is writing prose.
+  if printf '%s' "$CMD" | grep -qiE "\.($PROSE_EXT)([^A-Za-z0-9]|$)" \
+     && ! printf '%s' "$CMD" | grep -qiE "\.($CODE_EXT)([^A-Za-z0-9]|$)"; then
+    exit 0
+  fi
   STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
   WRITES=""
   case "$STRIPPED" in
@@ -182,8 +224,11 @@ MSG="BLOCKED: loaded skills not yet applied to your work: $NAMES
 
 Before this Write/Edit, you must:
 
-1. For each skill listed above, state the specific rules that apply to the file you're about to write.
-2. State how your next write respects each rule.
+1. For each skill listed above, say whether it applies to the file you're about to
+   write. If it does not — a Python skill and a TypeScript file, say — write
+   "does not apply" and move on. Do not invent a connection.
+2. For the ones that do apply: state the specific rules that bear on this file, and
+   how your next write respects each.
 3. Then ack all of them in a single Bash tool call:
      $ACK_CMD
 

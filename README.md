@@ -151,6 +151,11 @@ one prompt — and some harnesses actively tell the model to prefer Bash for edi
 commands that can write are gated (a redirect, `tee`, `sed -i`, `cp`/`mv`, or an
 interpreter given inline code or a heredoc); `git status` and a redirect to `/dev/null`
 pass untouched, and the command that clears the gate is never gated against itself.
+
+Neither gate fires on **prose** — `.md`, `.mdx`, `.txt`, `.rst`, `.adoc`, images. Skills
+are about code, and a repo full of `PLAN_*.md` otherwise hits the gate on every write.
+Config files (`.json`, `.yml`, `.toml`) stay gated, because skills do have rules about
+`tsconfig`, `package.json`, and Compose.
 - `skill-gate-automark.sh` — a `PostToolUse` hook on `Skill` that clears the gate
 
 The last two guard the **back** — nothing finishes or ships until the code passes:
