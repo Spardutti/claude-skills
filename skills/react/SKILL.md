@@ -2,6 +2,7 @@
 name: react
 category: Frontend
 description: "MUST USE when writing or editing React components, hooks, state management, effects, performance, loading/empty states, Zustand stores, or styling. Covers React 19.2 (use, Actions, useActionState, useOptimistic, useFormStatus, ref as prop, Context provider, Activity), the Rules of Hooks, React Compiler v1.0 memoization, component splitting and custom hooks, composition over boolean props, useEffect avoidance, re-render performance, list keys, loading skeletons and empty states, Zustand client-state stores, and Tailwind v4 design tokens."
+tracks: react@19.2, react-hook-form@7.87, @hookform/resolvers@5.9
 ---
 
 # React — Components, Hooks, State, Styling

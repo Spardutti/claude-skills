@@ -2,6 +2,7 @@
 name: typescript-best-practices
 category: Foundations
 description: "MUST USE when writing or editing TypeScript types, interfaces, generics, type guards, error handling patterns, or tsconfig configuration. Enforces TypeScript 7.x strict-mode best practices and type safety patterns."
+tracks: typescript@7.x
 ---
 
 # TypeScript Best Practices (TypeScript 7.x)

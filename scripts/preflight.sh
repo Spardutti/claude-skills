@@ -61,7 +61,12 @@ else
   printf '  skipped — no ~/projects to survey\n'
 fi
 
-step "5. Version"
+step "5. Version claims against the registries"
+# A skill that names a version goes stale silently — two react claims were a few
+# minors behind and nothing noticed until someone checked by hand.
+if node scripts/check-freshness.mjs; then ok "no skill is a major behind"; else bad "a skill teaches a superseded major"; fi
+
+step "6. Version"
 V=$(node -p "require('$ROOT/cli/package.json').version")
 PUB=$(npm view @spardutti/claude-skills version --prefer-online 2>/dev/null || echo "?")
 printf '  local %s · published %s\n' "$V" "$PUB"

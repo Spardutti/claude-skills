@@ -348,6 +348,7 @@ scripts/       validate-skills.mjs — checks skill length caps and reference in
                gauntlet-selftest.sh — 15 behavioural tests for the hook (runs on pre-push)
                gauntlet-survey.sh — what the hook would do in every repo under a directory
                preflight.sh — everything that must pass before a release
+               check-freshness.mjs — compares each skill's `tracks:` versions to the registries
 cli/           The npm installer (npx @spardutti/claude-skills); version in cli/package.json
 .husky/        pre-push hook running the skill validator
 package.json   Private dev-tooling package (claude-skills-dev) — not the published one

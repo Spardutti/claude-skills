@@ -2,6 +2,7 @@
 name: tanstack-query
 category: Frontend
 description: "MUST USE when writing any @tanstack/react-query code (TanStack Query, formerly React Query), including useQuery, useMutation, useInfiniteQuery, useSuspenseQuery, useQueries, QueryClient setup, designing query keys or key factories, invalidating or prefetching cache, doing optimistic or pessimistic mutations, configuring select/error handling/retry/refetchType, or migrating from v4 to v5. Enforces v5 single-object signatures, the pending/isLoading rename, gcTime over cacheTime, serializable query keys, queryFn throwing on error, pessimistic-first mutation strategy, the cancelQueries → snapshot → setQueryData → rollback → invalidate template, refetchType: 'none' for broad invalidation, and the @lukemorales/query-key-factory merge pattern."
+tracks: @tanstack/react-query@5.x
 ---
 
 # TanStack Query — Cache, Queries, Mutations

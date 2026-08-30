@@ -2,6 +2,7 @@
 name: express
 category: Backend
 description: "MUST USE when writing or reviewing Express routes, middleware, or error handling. Express 5 — automatic async error forwarding, the four-argument error handler, named wildcards, validation at the boundary, thin routes, and the security baseline every production app needs. Bundle covers tRPC v11 on Express."
+tracks: express@5.2, @trpc/server@11.18
 ---
 
 # Express

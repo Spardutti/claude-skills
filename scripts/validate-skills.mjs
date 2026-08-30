@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SKILLS_DIR = "skills";
+// Resolved from this file, not the caller's cwd — preflight and the git hooks
+// invoke it from wherever they happen to be.
+const SKILLS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "skills");
 const MD_REF_RE = /\b([A-Za-z][A-Za-z0-9_-]*\.md)\b/g;
 
 // Length caps (see CLAUDE.md "Skill File Guidelines").

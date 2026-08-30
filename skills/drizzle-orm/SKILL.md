@@ -2,6 +2,7 @@
 name: drizzle-orm
 category: Backend
 description: "MUST USE when writing or reviewing Drizzle ORM schemas, migrations, relational queries, or drizzle-kit configuration. Enforces identity columns over serial, proper relation definitions, migration safety, type inference, and query patterns."
+tracks: drizzle-orm@0.45
 ---
 
 # Drizzle ORM Best Practices
