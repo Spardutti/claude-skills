@@ -192,6 +192,26 @@ chmod +x apps/api/.venv/bin/mutmut
 echo "x=1" > apps/api/app/slugs.py
 sg "mutmut in the venv is found and its survivors reported" "x_slugify__mutmut_3: survived" 1
 
+# mutmut replays cached verdicts for any function whose source did not change,
+# so a test-only commit gets last run's survivors back. This mutmut answers
+# straight out of the cache: if the gate does not clear it, the stale survivor
+# is reported as a finding on a tree whose tests kill it.
+newrepo sg_py_stale
+mkdir -p apps/api/.venv/bin apps/api/app apps/api/mutants
+printf '[project]\nname="api"\n[tool.mutmut]\nsource_paths=["app/"]\n' > apps/api/pyproject.toml
+touch apps/api/uv.lock
+cat > apps/api/.venv/bin/mutmut <<'M'
+#!/bin/sh
+case "$1" in
+  run)     mkdir -p mutants; exit 0 ;;
+  results) [ -f mutants/cached ] && cat mutants/cached; exit 0 ;;
+esac
+M
+chmod +x apps/api/.venv/bin/mutmut
+echo "app.old.x__mutmut_1: survived" > apps/api/mutants/cached
+echo "x=1" > apps/api/app/slugs.py
+sg "a stale mutant cache is cleared before the run" "no surviving mutants" 0
+
 # The receipt is the part a model cannot talk its way past: there is no claim to
 # make, only a file that exists for this exact content or does not.
 echo "ship-gate receipt"

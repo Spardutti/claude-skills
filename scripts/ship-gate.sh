@@ -200,8 +200,15 @@ for owner in $OWNERS; do
     # worse than reporting nothing. `mutmut results` is the readable source:
     # it prints "<mutant name>: survived" per survivor.
     M="$(py_mutmut "$base")"
-    # One cd for both: the second command runs in the same shell, already there.
-    CMD="${RUN}$M run >/dev/null 2>&1; $M results"
+    # mutmut caches verdicts in ./mutants and only invalidates one when the
+    # SOURCE of that function changes. Adding a test does not, so it replays the
+    # old "survived" and calls mutants the new tests kill still alive — measured
+    # at 20 of them on one commit. `results` then prints that whole cache, so
+    # survivors turn up for files nowhere near the diff. Deleting the dir first
+    # makes both describe the tree being shipped; `mutmut run` rewrites it
+    # anyway, and a cold run is ~35s for ~1000 mutants.
+    # One cd for all three: they run in the same shell, already there.
+    CMD="${RUN}rm -rf mutants; $M run >/dev/null 2>&1; $M results"
   else
     MISSING="$MISSING  $label needs mutmut:
       uv add --dev mutmut     # or: poetry add --group dev mutmut, pip install mutmut
