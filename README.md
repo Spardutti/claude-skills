@@ -51,7 +51,7 @@ The CLI will:
 
 ## Skill Catalog
 
-**13 skills**, grouped the same way the installer presents them.
+**14 skills**, grouped the same way the installer presents them.
 
 > [!NOTE]
 > Skills marked **📦 Bundle** ship a concise always-loaded entry point plus reference files Claude reads only when a task needs them — comprehensive coverage at a low context cost.
@@ -69,6 +69,7 @@ The CLI will:
 | Skill | What it covers |
 |-------|----------------|
 | `fastapi` 📦 | FastAPI — async correctness, `Annotated` dependency injection, `lifespan`, response models, testing with dependency overrides; bundle covers Pydantic, Alembic, Celery, and list endpoints (pagination/filtering/search/sorting) |
+| `express` 📦 | Express 5 — automatic async error forwarding, the four-argument error handler, named wildcards, `req.query` as a getter, validation at the boundary, thin routes, the helmet/CORS/rate-limit baseline; bundle covers tRPC v11 on Express |
 | `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
 | `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, migration safety, type inference |
 | `docker-best-practices` | Multi-stage builds, layer caching, security hardening, Compose Watch, health checks |
