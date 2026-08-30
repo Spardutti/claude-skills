@@ -810,7 +810,16 @@ for owner in $OWNERS; do
     TOOL="stryker"
     # From inside the owning package: npx resolves against ITS node_modules, and
     # stryker.config.json lives there too. A monorepo root usually has neither.
-    CMD="\${RUN}npx --no-install stryker run --incremental --force $FLAGS"
+    #
+    # Deliberately NOT --incremental. --force does rerun every mutant in scope,
+    # so the diff itself was always judged fresh — but incremental mode still
+    # merges reports/stryker-incremental.json into the REPORT for everything
+    # out of scope, and this gate greps the whole report. Survivors recorded
+    # months ago came back as findings against a diff that never touched them:
+    # 8 of them on one commit, all long since killed. --mutate already scopes
+    # the run to the changed hunks, so incremental buys nothing here and costs
+    # a cache that goes stale exactly the way mutmut's did.
+    CMD="\${RUN}npx --no-install stryker run $FLAGS"
   elif [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix \${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner

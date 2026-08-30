@@ -186,6 +186,23 @@ rm -f player.gd
 echo "const x = 1" > weird.zzz
 sg "an extension the gate cannot place is never a pass" "does not know: zzz" 2
 
+# Stryker's incremental file is mutmut's ./mutants cache wearing a different
+# hat: --force reruns everything in scope, but the report still carries cached
+# rows for everything OUT of scope, and this gate greps the whole report. The
+# stub answers only when it is asked for incremental mode, so this test fails
+# the moment the flag comes back.
+echo "ship-gate stryker cache"
+newrepo sg_stryker
+printf '{"devDependencies":{"@stryker-mutator/core":"8"}}\n' > package.json
+cat > bin/npx <<'X'
+#!/bin/sh
+case "$*" in *--incremental*) echo "[Survived] a mutant replayed from the cache" ;; esac
+exit 0
+X
+chmod +x bin/npx
+echo "const a=1" > a.ts
+sg "stryker is not run in incremental mode" "no surviving mutants" 0
+
 # routeTree.gen.ts is regenerated on every route change and cannot be split, and
 # a shadcn component is not ours to split either. The limit fired on both, every
 # time, which teaches --force — and a gate that is always forced is not a gate.
