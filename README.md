@@ -164,6 +164,10 @@ The last two guard the **back** — nothing finishes or ships until the code pas
 - `gauntlet.sh` — a `Stop` hook running the fast gates on your changed files (see [Automatic Verification](#automatic-verification-gauntlet))
 - `ship-gate-hook.sh` — a `PreToolUse` gate on `Bash` that refuses `git commit` and `git push` without a receipt from `ship-gate.sh`
 
+One more hook stays out of the way entirely:
+
+- `version-check.sh` — a `SessionStart` hook that mentions a newer catalog at most once a day. It never touches the network in the foreground: it reads a cache the previous session refreshed in the background, so it costs a file read. Silent when there is no cache, no network, or nothing new. `CLAUDE_SKILLS_NO_VERSION_CHECK=1` turns it off.
+
 <details>
 <summary>How the gate works</summary>
 
@@ -345,7 +349,8 @@ scripts/       validate-skills.mjs — checks skill length caps and reference in
                gauntlet.sh — the Stop-hook verification gates, embedded by the CLI
                ship-gate.sh — /ship's file-length and mutation checks, behind an exit code
                ship-gate-hook.sh — refuses git commit/push without a ship-gate receipt
-               gauntlet-selftest.sh — 15 behavioural tests for the hook (runs on pre-push)
+               version-check.sh — SessionStart nudge when a newer catalog is published
+               gauntlet-selftest.sh — behavioural tests for the hooks (runs on pre-push)
                gauntlet-survey.sh — what the hook would do in every repo under a directory
                preflight.sh — everything that must pass before a release
                check-freshness.mjs — compares each skill's `tracks:` versions to the registries

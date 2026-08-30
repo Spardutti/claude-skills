@@ -418,6 +418,55 @@ check_json "the hook is not registered twice" \
   "s.hooks.PreToolUse.filter(e=>e.hooks[0].command.endsWith('skill-gate.sh')).length===1"
 check_json "hooks missing from the old file are added" \
   "s.hooks.Stop && s.hooks.Stop.some(e=>e.hooks[0].command.endsWith('gauntlet.sh'))"
+check_json "an upgrade gains the SessionStart version check" \
+  "s.hooks.SessionStart && s.hooks.SessionStart.some(e=>e.hooks[0].command.endsWith('version-check.sh'))"
+
+# A version nudge that costs a network round trip at session start is a version
+# nudge that hangs the session on a bad connection. This one only ever reads a
+# cache, and says nothing at all until it has one.
+echo "version check"
+VC="$HERE/version-check.sh"
+vc() {  # vc <label> <expected substring, or empty for no output> [setup...]
+  N=$((N+1))
+  out=$(bash "$VC" 2>&1)
+  ok=1
+  if [ -z "$2" ]; then
+    [ -n "$out" ] && ok=0
+  else
+    case "$out" in *"$2"*) ;; *) ok=0 ;; esac
+  fi
+  if [ $ok = 1 ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s\n       want ~ %s\n       got: %s\n' "$1" "${2:-<nothing>}" "$out"
+  fi
+}
+
+newrepo vc1
+export HOME="$TMP/vchome"; mkdir -p "$HOME/.claude"
+vc "no manifest, so nothing is said" ""
+
+printf '{"catalogVersion":"2.0.0","skills":[]}\n' > .claude/.claude-skills.json
+vc "no cache yet, so nothing is said" ""
+
+echo "2.1.0" > "$HOME/.claude/.claude-skills-version"
+vc "a newer published version is reported" "2.0.0 installed, 2.1.0 published"
+vc "and not reported twice the same day" ""
+
+rm -f "$HOME/.claude/.claude-skills-version-told"
+echo "2.0.0" > "$HOME/.claude/.claude-skills-version"
+vc "the same version is not an update" ""
+
+echo "1.9.0" > "$HOME/.claude/.claude-skills-version"
+vc "a cache behind the install is not an update" ""
+
+echo "2.10.0" > "$HOME/.claude/.claude-skills-version"
+vc "versions compare numerically, not as text" "2.0.0 installed, 2.10.0 published"
+
+rm -f "$HOME/.claude/.claude-skills-version-told"
+CLAUDE_SKILLS_NO_VERSION_CHECK=1 bash "$VC" > "$TMP/vc.out" 2>&1
+N=$((N+1))
+if [ ! -s "$TMP/vc.out" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "the opt-out silences it"
+else FAIL=$((FAIL+1)); printf '  FAIL %s\n' "the opt-out silences it"; fi
+export HOME="$TMP/home"
 
 cd /
 rm -rf "$TMP"

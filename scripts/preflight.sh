@@ -36,7 +36,7 @@ node -e "
     await m.setupHook('$TMP');
   });
 " >/dev/null 2>&1
-for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh; do
+for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh version-check.sh; do
   if [ ! -f "$TMP/.claude/hooks/$f" ]; then
     bad "$f was not installed at all"
   elif cmp -s "$TMP/.claude/hooks/$f" "scripts/$f"; then
