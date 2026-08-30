@@ -186,6 +186,27 @@ rm -f player.gd
 echo "const x = 1" > weird.zzz
 sg "an extension the gate cannot place is never a pass" "does not know: zzz" 2
 
+# routeTree.gen.ts is regenerated on every route change and cannot be split, and
+# a shadcn component is not ours to split either. The limit fired on both, every
+# time, which teaches --force — and a gate that is always forced is not a gate.
+echo "ship-gate ignore list"
+newrepo sg_ignore
+mkdir -p src/components/ui api/migrations
+seq 1 250 | sed 's/^/const x/' > src/routeTree.gen.ts
+seq 1 250 | sed 's/^/const y/' > src/components/ui/sidebar.tsx
+seq 1 250 | sed 's/^/z = /' > api/migrations/0001_init.py
+sg "generated and vendored files are not gated" "nothing to check" 0
+sg "the skip is named, never silent" "  src/routeTree.gen.ts" 0
+sg "a vendored component matches at any depth" "  src/components/ui/sidebar.tsx" 0
+sg "a migration matches at any depth" "  api/migrations/0001_init.py" 0
+seq 1 250 | sed 's/^/const w/' > src/app.ts
+sg "a real file beside them is still caught" "src/app.ts — 250 lines" 1
+cat > .claude/gauntlet.conf <<'C'
+GAUNTLET_IGNORE_FILES=""
+C
+sg "an empty list gates everything again" "src/routeTree.gen.ts — 250 lines" 1
+rm -f .claude/gauntlet.conf
+
 # git prints paths from the repo root; CLAUDE_PROJECT_DIR can name a subdirectory
 # of it. Testing those paths from the subdirectory found no files, so the gate
 # wrote a PASS over a committed diff it never read.

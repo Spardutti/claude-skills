@@ -299,7 +299,16 @@ GAUNTLET_REQUIRE_TESTS=1             # block when the runner matched 0 test file
 GAUNTLET_MAX_LINES=200               # per-file limit; 0 turns the check off
 GAUNTLET_SOURCE_EXT='ts|tsx|py'      # what counts as SOURCE — not the same question
 GAUNTLET_MUTATE='bash mutate.sh'     # replace per-project mutation detection
+GAUNTLET_IGNORE_FILES='*.gen.ts'     # globs that are never gated — see below
 ```
+
+`GAUNTLET_IGNORE_FILES` holds files nobody wrote, so the line limit and mutation both
+skip them. It defaults to `*.gen.ts *.gen.tsx *.generated.* */migrations/*.py
+*/alembic/versions/*.py */components/ui/*.tsx` — a TanStack `routeTree.gen.ts`, a Django
+or Alembic migration, and a vendored shadcn component are all over 200 lines, none of
+them can be split, and gating them only teaches `--force`. Every skipped file is named in
+the output. Patterns match against `/<path>`, so `*/components/ui/*.tsx` covers the repo
+root and `apps/web/src` alike. Set it to `""` to gate everything.
 
 `GAUNTLET_SOURCE_EXT` is separate from `GAUNTLET_CODE_EXT` on purpose. The Stop hook asks
 "did anything worth checking change", so a docs repo sets `CODE_EXT` to include `.md`. The

@@ -35,6 +35,10 @@
 #                            different question, and a docs repo sets it to .md
 #   GAUNTLET_IGNORE_EXT=...  extensions that need no gate at all. An extension in
 #                            neither list is reported UNPROVEN rather than passed
+#   GAUNTLET_IGNORE_FILES=.. space-separated globs, matched against /<path>, for
+#                            files nobody wrote: generated code and vendored
+#                            components. They are named in the output, never
+#                            dropped silently. Set it to "" to gate everything
 #   GAUNTLET_MUTATE="cmd"    one explicit mutation command for the whole repo,
 #                            replacing per-project detection. $MUTATE_FLAGS holds
 #                            the --mutate flags, $FILES the changed files.
@@ -69,6 +73,7 @@ GAUNTLET_MAX_LINES=200
 GAUNTLET_MUTATE=""
 GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
 GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|json|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"
+GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alembic/versions/*.py */components/ui/*.tsx"
 [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
 [ -f ".claude/gauntlet.conf" ] && . ".claude/gauntlet.conf"
 
@@ -105,10 +110,38 @@ if [ "$MODE" = force ]; then
   echo "ship-gate: FORCED — receipt written without running any check."
   exit 0
 fi
-FILES=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
+SOURCED=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
         | grep -vE '(\.|_)(test|spec)\.[^.]+$|(^|/)tests?/|(^|/)\.stryker-tmp/' | while read -r f; do
           [ -f "$f" ] && printf '%s\n' "$f"
         done)
+
+# A generated file cannot be split and a vendored one is not ours to split, so
+# the length check fires on every route regeneration and teaches people to
+# --force. A gate that is always forced is not a gate. These are held out of
+# both checks — and printed, because a silent skip is the same lie as a fake
+# PASS. The leading / is what lets one pattern match components/ui at the repo
+# root and apps/web/src/components/ui alike.
+# set -f matters: an unquoted list is glob-expanded before it is split, so
+# */components/ui/*.tsx turned itself into the very path it was meant to match
+# and then matched nothing.
+is_ignored() {
+  set -f
+  for pat in $GAUNTLET_IGNORE_FILES; do
+    case "/$1" in $pat) set +f; return 0 ;; esac
+  done
+  set +f
+  return 1
+}
+FILES=$(printf '%s\n' "$SOURCED" | while IFS= read -r f; do
+          [ -n "$f" ] && ! is_ignored "$f" && printf '%s\n' "$f"
+        done)
+IGNORED=$(printf '%s\n' "$SOURCED" | while IFS= read -r f; do
+            [ -n "$f" ] && is_ignored "$f" && printf '%s\n' "$f"
+          done)
+if [ -n "$IGNORED" ]; then
+  echo "ship-gate: not gated, matched GAUNTLET_IGNORE_FILES:"
+  printf '%s\n' "$IGNORED" | sed 's/^/  /'
+fi
 
 if [ -z "$FILES" ]; then
   # "I recognised nothing" is not "there is nothing", and the gate used to report
