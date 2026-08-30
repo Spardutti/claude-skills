@@ -586,6 +586,17 @@ fi
 # ---------------------------------------------------------- which project owns
 # A monorepo holds several projects, each with its own runner and its own
 # mutation tool. Walk up from each changed file to the nearest manifest.
+# mutmut is installed into the project's environment, not onto PATH. Ask the
+# project how to run its own tools before falling back to a bare binary.
+py_mutmut() {
+  d="$1"
+  # Returned relative to the PROJECT, because the command runs from inside it.
+  if [ -x "$d.venv/bin/mutmut" ]; then printf './.venv/bin/mutmut\\n'; return; fi
+  if [ -f "$d""uv.lock" ] && command -v uv >/dev/null 2>&1; then printf 'uv run mutmut\\n'; return; fi
+  if [ -f "$d""poetry.lock" ] && command -v poetry >/dev/null 2>&1; then printf 'poetry run mutmut\\n'; return; fi
+  command -v mutmut >/dev/null 2>&1 && printf 'mutmut\\n'
+}
+
 owner_of() {
   d=$(dirname "$1")
   while :; do
@@ -640,15 +651,22 @@ for owner in $OWNERS; do
         {\\"testRunner\\":\\"vitest\\",\\"plugins\\":[\\"@stryker-mutator/vitest-runner\\"],\\"coverageAnalysis\\":\\"perTest\\"}
 "
     continue
-  elif command -v mutmut >/dev/null 2>&1; then
+  elif [ -n "$(py_mutmut "$base")" ]; then
     TOOL="mutmut"
     # mutmut takes its scope from [tool.mutmut] in pyproject, not from a flag:
     # --paths-to-mutate was 2.x, and 3.x filters by fnmatch globs over mutant
     # NAMES (app.balance.reserve.*). There is no per-line scoping at all.
-    CMD="\${RUN}mutmut run"
+    #
+    # \`mutmut run\` prints 🙁 for a survivor and exits 0 either way — parsing it
+    # reports clean with survivors sitting there, which is a false green and
+    # worse than reporting nothing. \`mutmut results\` is the readable source:
+    # it prints "<mutant name>: survived" per survivor.
+    M="$(py_mutmut "$base")"
+    # One cd for both: the second command runs in the same shell, already there.
+    CMD="\${RUN}$M run >/dev/null 2>&1; $M results"
   else
     MISSING="$MISSING  $label needs mutmut:
-      pip install mutmut
+      uv add --dev mutmut     # or: poetry add --group dev mutmut, pip install mutmut
       then \${base}pyproject.toml:
         [tool.mutmut]
         source_paths = [\\"src/\\"]

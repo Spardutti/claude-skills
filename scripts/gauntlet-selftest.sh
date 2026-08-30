@@ -173,6 +173,25 @@ sg "test files are never mutated" "1 changed code file"
 seq 1 250 | sed 's/^/const x/' > big.ts
 sg "a file over the limit stops the ship" "over the limit" 1
 
+# mutmut lives in the project's venv, not on PATH, and `mutmut run` prints 🙁 and
+# exits 0 whatever it finds — parsing that reports clean with survivors sitting
+# there. `mutmut results` is the readable source.
+echo "ship-gate mutmut"
+newrepo sg_py
+mkdir -p apps/api/.venv/bin apps/api/app
+printf '[project]\nname="api"\n[tool.mutmut]\nsource_paths=["app/"]\n' > apps/api/pyproject.toml
+touch apps/api/uv.lock
+cat > apps/api/.venv/bin/mutmut <<'M'
+#!/bin/sh
+case "$1" in
+  run)     echo "🙁🙁🙁"; exit 0 ;;
+  results) echo "app.slugs.x_slugify__mutmut_3: survived"; exit 0 ;;
+esac
+M
+chmod +x apps/api/.venv/bin/mutmut
+echo "x=1" > apps/api/app/slugs.py
+sg "mutmut in the venv is found and its survivors reported" "x_slugify__mutmut_3: survived" 1
+
 # The receipt is the part a model cannot talk its way past: there is no claim to
 # make, only a file that exists for this exact content or does not.
 echo "ship-gate receipt"

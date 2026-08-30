@@ -132,6 +132,31 @@ nothing and fails the assert.
 If the tests need a service (a database reachable only as `db`), mutmut has to
 run wherever the tests normally run — inside the container, not on the host.
 
+mutmut runs from a `mutants/` copy of the project, so anything the tests read
+from disk has to be copied with it:
+
+```toml
+[tool.mutmut]
+also_copy = ["openapi.json"]
+```
+
+**`mutmut run` exits 0 whether or not anything survived, and prints `🙁` rather
+than a word.** Scripting against its exit code or grepping its output reports
+clean with survivors sitting there:
+
+```bash
+# BAD — always looks clean
+mutmut run && echo "tests are proven"
+
+# GOOD — results is the readable source
+mutmut run >/dev/null 2>&1
+mutmut results          # <mutant name>: survived, one per line
+```
+
+It is also installed into the project environment, not onto `PATH`. Reach it the
+way the project does — `uv run mutmut`, `poetry run mutmut`, or
+`./.venv/bin/mutmut` — or a script calling bare `mutmut` finds nothing.
+
 ## Reading the Output
 
 Stryker prints a summary table on **every** run whose header contains a
@@ -221,6 +246,8 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always spread `configDefaults.exclude` when adding `.stryker-tmp`, and gitignore it.
 - Always install the tool the way the project manages dependencies (uv, poetry, npm workspace).
 - Always match `[Survived]` for Stryker findings — the summary header contains the word `survived` on a clean run.
+- Always read mutmut's verdict from `mutmut results`; `mutmut run` exits 0 either way and prints no word to grep.
+- Always invoke mutmut through the project's environment (`uv run`, `poetry run`, `./.venv/bin/`) — it is not on PATH.
 - Always use `source_paths` / `pytest_add_cli_args_test_selection` for mutmut 3; `paths_to_mutate` and `tests_dir` are silently ignored.
 - Always ignore a mutant by where it sits (Ignore plugin, disable comment), never by disabling a whole mutator globally.
 - Never mutate test files — that only asks whether the tests test the tests.
