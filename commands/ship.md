@@ -115,6 +115,14 @@ So: run that command. Show its output verbatim. Obey its exit code.
 - **2** — it ran but could not prove the tests, almost always because no mutation tool
   is installed. Report that plainly and continue. Do not describe this as passing.
 
+Python is the one place the gate cannot scope itself to your diff: mutmut has no
+per-line scoping, so it reports the whole repo's survivors. A `.mutmut-baseline` file
+holds the ones already accepted, and only a name outside it fails. The first run writes
+that file and exits 2 — commit it and run the gate again. **Never run `--baseline` to
+make a finding go away.** It accepts a survivor as permanent debt, so it is for a mutant
+that genuinely cannot be killed — an equivalent mutant, where the change alters nothing
+observable. Say which mutant and why, in the commit, or write the test instead.
+
 **Never substitute your own implementation of these checks.** Not a hand-rolled mutation
 script, not a `wc -l` you ran yourself, not a judgement that the changed files look too
 simple to be worth mutating. If the script cannot run, say so and stop — a gate you

@@ -565,6 +565,8 @@ const SHIP_GATE_SCRIPT = `#!/usr/bin/env bash
 #   bash .claude/hooks/ship-gate.sh [base-ref]
 #   bash .claude/hooks/ship-gate.sh --key      print the receipt key and stop
 #   bash .claude/hooks/ship-gate.sh --force    write a FORCED receipt, run nothing
+#   bash .claude/hooks/ship-gate.sh --baseline record today's mutmut survivors as
+#                                              accepted debt, write no receipt
 #
 # On completion it writes a RECEIPT at /tmp/claude-shipgate-<key>, and the
 # PreToolUse hook refuses \`git commit\` / \`git push\` without a matching one. The
@@ -594,7 +596,11 @@ const SHIP_GATE_SCRIPT = `#!/usr/bin/env bash
 set -uo pipefail
 
 MODE=""
-case "\${1:-}" in --key) MODE=key; shift ;; --force) MODE=force; shift ;; esac
+case "\${1:-}" in
+  --key)      MODE=key; shift ;;
+  --force)    MODE=force; shift ;;
+  --baseline) MODE=baseline; shift ;;
+esac
 
 PROJECT_DIR="\${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" 2>/dev/null || { echo "ship-gate: cannot read $PROJECT_DIR"; exit 1; }
@@ -788,16 +794,59 @@ for owner in $OWNERS; do
   esac
   SURVIVED=$(printf '%s\\n' "$OUT" | grep -E "$PATTERN" \\
              | grep -vE '^[[:space:]]*[#│|+-]|# *surviv' | head -20)
+  FIXED=0
+  NOTE=""
+
+  # Stryker takes --mutate per changed hunk, so it already answers "did YOUR
+  # change get tested". mutmut cannot be asked that — 3.x dropped 1.x's
+  # --use-patch-file and never replaced it — so it mutates all of source_paths
+  # and reports the repo's entire backlog. Held to the same bar, the Python half
+  # answers "is this repo perfect" instead, which it never is, so it could never
+  # go green. The baseline supplies the missing half: survivors recorded once
+  # are accepted debt, and only a name that is not in it fails the gate.
+  #
+  # A mutant name carries an index within its own function, not a line number,
+  # so editing elsewhere in the file does not rename it — and editing the
+  # function itself DOES, which correctly re-charges its survivors to that edit.
+  if [ "$TOOL" = mutmut ]; then
+    BL="$base.mutmut-baseline"
+    NOWF=$(mktemp)
+    printf '%s\\n' "$OUT" \\
+      | sed -n 's/^[[:space:]]*\\([^[:space:]]*\\): survived$/\\1/p' | sort -u > "$NOWF"
+    if [ "$MODE" = baseline ]; then
+      cp "$NOWF" "$BL"
+      NOTE="  $label mutmut — baseline set: $(wc -l < "$BL") survivor(s) accepted. Commit $BL."
+      SURVIVED=""
+    elif [ -f "$BL" ]; then
+      # -Fxv against an empty baseline reports every survivor, which is right:
+      # an empty baseline means nothing has been accepted.
+      SURVIVED=$(grep -Fxv -f "$BL" "$NOWF" | head -20)
+      FIXED=$(grep -Fxvc -f "$NOWF" "$BL")
+    else
+      cp "$NOWF" "$BL"
+      NOTE="  $label mutmut — no baseline, so nothing could be compared. Recorded
+      $(wc -l < "$BL") existing survivor(s) in $BL — commit it, then run the
+      gate again. From here only NEW survivors fail; --baseline accepts more."
+      SURVIVED=""
+      [ "$STATUS" = 0 ] && STATUS=2
+    fi
+    rm -f "$NOWF"
+  fi
+
   if [ -n "$SURVIVED" ]; then
     echo "  $label $TOOL — surviving mutants; these lines can break and no test notices:"
     printf '%s\\n' "$SURVIVED" | sed 's/^/      /'
+    [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
     STATUS=1
   elif [ $RC -ne 0 ]; then
     echo "  $label $TOOL — the run failed:"
     printf '%s\\n' "$OUT" | tail -12 | sed 's/^/      /'
     [ "$STATUS" = 0 ] && STATUS=2
+  elif [ -n "$NOTE" ]; then
+    printf '%s\\n' "$NOTE"
   else
     echo "  $label $TOOL — ok, no surviving mutants in the changed lines"
+    [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
   fi
 done
 
@@ -806,6 +855,12 @@ if [ -n "$MISSING" ]; then
   echo "  to catch a break. Install per project:"
   printf '%s' "$MISSING"
   [ "$STATUS" = 0 ] && STATUS=2
+fi
+
+if [ "$MODE" = baseline ]; then
+  echo
+  echo "ship-gate: baselines updated. No receipt written — run the gate for real."
+  exit 0
 fi
 
 # The receipt is written by this script and nothing else. A hand-rolled check

@@ -190,7 +190,9 @@ esac
 M
 chmod +x apps/api/.venv/bin/mutmut
 echo "x=1" > apps/api/app/slugs.py
-sg "mutmut in the venv is found and its survivors reported" "x_slugify__mutmut_3: survived" 1
+# An empty baseline accepts nothing, so every survivor is charged.
+: > apps/api/.mutmut-baseline
+sg "mutmut in the venv is found and its survivors reported" "app.slugs.x_slugify__mutmut_3" 1
 
 # mutmut replays cached verdicts for any function whose source did not change,
 # so a test-only commit gets last run's survivors back. This mutmut answers
@@ -210,7 +212,38 @@ M
 chmod +x apps/api/.venv/bin/mutmut
 echo "app.old.x__mutmut_1: survived" > apps/api/mutants/cached
 echo "x=1" > apps/api/app/slugs.py
+: > apps/api/.mutmut-baseline
 sg "a stale mutant cache is cleared before the run" "no surviving mutants" 0
+
+# mutmut reports the whole repo's survivors, not the diff's, so without a
+# baseline the Python half of the gate can never go green. Recorded survivors
+# are accepted debt; only a name that is not in the baseline is a finding.
+newrepo sg_py_base
+mkdir -p apps/api/.venv/bin apps/api/app
+printf '[project]\nname="api"\n[tool.mutmut]\nsource_paths=["app/"]\n' > apps/api/pyproject.toml
+touch apps/api/uv.lock
+cat > apps/api/.venv/bin/mutmut <<'M'
+#!/bin/sh
+case "$1" in
+  run)     exit 0 ;;
+  results) cat ../../survivors; exit 0 ;;
+esac
+M
+chmod +x apps/api/.venv/bin/mutmut
+printf 'app.old.x_a__mutmut_1: survived\napp.old.x_b__mutmut_2: survived\n' > survivors
+echo "x=1" > apps/api/app/slugs.py
+sg "with no baseline the repo's debt is recorded, not charged" "existing survivor(s)" 2
+sg "a baselined survivor is not a finding" "no surviving mutants" 0
+
+printf 'app.old.x_a__mutmut_1: survived\napp.old.x_b__mutmut_2: survived\napp.new.x_c__mutmut_1: survived\n' > survivors
+sg "a survivor outside the baseline fails" "app.new.x_c__mutmut_1" 1
+
+printf 'app.old.x_a__mutmut_1: survived\n' > survivors
+sg "killing a baselined survivor is reported, not required" "1 baselined survivor(s) now killed" 0
+
+printf 'app.old.x_a__mutmut_1: survived\napp.new.x_c__mutmut_1: survived\n' > survivors
+bash "$SG" --baseline >/dev/null 2>&1
+sg "--baseline accepts the new survivor" "no surviving mutants" 0
 
 # The receipt is the part a model cannot talk its way past: there is no claim to
 # make, only a file that exists for this exact content or does not.
