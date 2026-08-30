@@ -1,0 +1,56 @@
+# Trusted Publishing. npm verifies this workflow's OIDC token directly, so there
+# is no NPM_TOKEN in the repository to leak, rotate, or hand to a compromised
+# dependency — and no 2FA prompt to sit through. npm is deprecating the
+# 2FA-bypass tokens that were the alternative: they lose publish rights entirely
+# around January 2027.
+#
+# One-time setup on npmjs.com, under the package's Settings → Trusted Publisher:
+#   Organization or user: Spardutti
+#   Repository:           claude-skills
+#   Workflow filename:    publish.yml
+#   Allowed actions:      npm publish
+#
+# The tag is the trigger, so what shipped and what is tagged are the same thing
+# by construction. Run scripts/preflight.sh locally first — it surveys real
+# repositories on the machine and cannot run here.
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # this is the whole mechanism — npm verifies this token
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      # OIDC publishing needs npm 11.5.1 or later; the runner's bundled npm lags.
+      - run: npm install -g npm@latest
+
+      # A published version is immutable. A tag that disagrees with the manifest
+      # ships a version the release cannot point at, so fail before, not after.
+      - name: The tag and cli/package.json must agree
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./cli/package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag v$TAG does not match cli/package.json $PKG"
+            exit 1
+          fi
+
+      # The same gates the pre-push hook runs. Publishing is the one place where
+      # being wrong cannot be taken back, so they run again here.
+      - run: node scripts/validate-skills.mjs
+      - run: bash scripts/gauntlet-selftest.sh
+
+      - run: npm publish ./cli --access public
