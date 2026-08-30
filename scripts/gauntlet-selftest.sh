@@ -227,6 +227,32 @@ hook "a FAIL leaves no receipt" deny "git commit -m x"
 bash .claude/hooks/ship-gate.sh --force >/dev/null 2>&1
 hook "--force writes a receipt without running" allow "git commit -m x"
 
+# ------------------------------------------------------------ the skill gates
+# Write|Edit|MultiEdit is not the only way to change a file. A session edited
+# twelve source files through `python3 - <<'PY'` in Bash and neither gate fired.
+echo "skill gate covers Bash"
+newrepo sg_bash
+mkdir -p .claude/skills/demo
+printf -- '---\nname: demo\n---\n## Rules\n- x\n' > .claude/skills/demo/SKILL.md
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+SKG=".claude/hooks/skill-gate.sh"
+
+gate() {  # gate <label> <deny|allow> <tool> <command>
+  N=$((N+1))
+  rm -f /tmp/claude-skill-gate-gt$RUN
+  out=$(printf '%s' "{\"session_id\":\"gt$RUN\",\"tool_name\":\"$3\",\"tool_input\":{\"command\":\"$4\"}}" | bash "$SKG")
+  got=allow; case "$out" in *deny*) got=deny ;; esac
+  if [ "$got" = "$2" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got %s\n' "$1" "$2" "$got"; fi
+}
+
+gate "a heredoc into python is gated" deny Bash "python3 - <<'PY'"
+gate "a redirect into a file is gated" deny Bash "cat > src/foo.ts"
+gate "sed -i is gated" deny Bash "sed -i 's/a/b/' x.ts"
+gate "a read-only command is not gated" allow Bash "git status --short"
+gate "a redirect to /dev/null is not a write" allow Bash "npm test 2>/dev/null"
+gate "the command that clears the gate is never gated" allow Bash "touch /tmp/claude-skill-gate-gt$RUN"
+
 cd /
 rm -rf "$TMP"
 echo

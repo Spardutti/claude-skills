@@ -142,8 +142,15 @@ After installing skills, the CLI offers to set up a hook that **guarantees** Cla
 It installs four hooks and appends a rule to your `CLAUDE.md`. Three guard the
 **front** — nothing is written until your skills are considered:
 
-- `skill-gate.sh` — a `PreToolUse` gate on `Write|Edit|MultiEdit`
+- `skill-gate.sh` — a `PreToolUse` gate on `Write|Edit|MultiEdit|Bash`
 - `skill-application-gate.sh` — a second `PreToolUse` gate requiring each loaded skill to be applied, not just read
+
+Both cover **Bash**, not only the file-writing tools. A session that edits through
+`python3 - <<'PY'` in Bash walked past the old matcher entirely — twelve source files, not
+one prompt — and some harnesses actively tell the model to prefer Bash for edits. Only
+commands that can write are gated (a redirect, `tee`, `sed -i`, `cp`/`mv`, or an
+interpreter given inline code or a heredoc); `git status` and a redirect to `/dev/null`
+pass untouched, and the command that clears the gate is never gated against itself.
 - `skill-gate-automark.sh` — a `PostToolUse` hook on `Skill` that clears the gate
 
 The last two guard the **back** — nothing finishes or ships until the code passes:
@@ -164,9 +171,9 @@ It registers in `.claude/settings.json`:
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Write|Edit|MultiEdit", "hooks": [
+      { "matcher": "Write|Edit|MultiEdit|Bash", "hooks": [
         { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate.sh" } ] },
-      { "matcher": "Write|Edit|MultiEdit", "hooks": [
+      { "matcher": "Write|Edit|MultiEdit|Bash", "hooks": [
         { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-application-gate.sh" } ] }
     ],
     "PostToolUse": [

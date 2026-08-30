@@ -34,6 +34,35 @@ if [ -f "$MARKER" ]; then
   exit 0
 fi
 
+# Write|Edit|MultiEdit is not the only way to change a file. A session that edits
+# through \`python3 - <<'PY'\` in Bash walked past this gate entirely — twelve
+# source files, not one prompt — and some harnesses actively tell the model to
+# prefer Bash for edits. So Bash is gated too, but only for commands that can
+# write, and only until the gate is cleared once for the session.
+TOOL=$(printf '%s' "$INPUT" | grep -o '"tool_name":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
+if [ "$TOOL" = "Bash" ]; then
+  CMD=$(printf '%s' "$INPUT" | grep -o '"command":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+
+  # Never gate the command that clears the gate, or this deadlocks.
+  case "$CMD" in
+    *claude-skill-gate-*|*claude-skill-acked-*|*claude-skill-loaded-*) exit 0 ;;
+  esac
+
+  # /dev/null redirects are not file writes; drop them before looking for one.
+  STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
+  WRITES=""
+  case "$STRIPPED" in
+    *">"*|*"tee "*|*"sed -i"*|*"cp "*|*"mv "*|*"truncate "*|*"dd "*) WRITES=1 ;;
+  esac
+  # An interpreter given inline code or a heredoc can write anything, and the
+  # shell shows no redirect at all — this is the shape that got past the gate.
+  case "$CMD" in
+    *"<<"*|*python*" -c"*|*node*" -e"*|*perl*" -e"*|*ruby*" -e"*) WRITES=1 ;;
+  esac
+  [ -z "$WRITES" ] && exit 0
+fi
+
+
 cat <<EOF
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: skill evaluation required before file edits in this session.\\n\\nStep 1 — evaluate every available skill as ACTIVATE or SKIP with a one-line reason.\\n\\nStep 2 — you MUST take EXACTLY ONE of these tool actions to clear the gate. Listing skills in text is NOT enough; retrying the edit without doing one of these will be denied again:\\n  (a) If any skill is ACTIVATE → call Skill(name) for it. This auto-clears the gate.\\n  (b) If ALL skills are SKIP → run this Bash tool call: touch /tmp/claude-skill-gate-$SESSION_ID\\n\\nStep 3 — only after Step 2 completes, retry the file edit."}}
 EOF
@@ -89,6 +118,26 @@ fi
 if [ ! -f "/tmp/claude-skill-gate-$SESSION_ID" ]; then
   exit 0
 fi
+
+# Same reason as the loading gate: Bash can write files, and a heredoc into an
+# interpreter shows no redirect at all.
+TOOL=$(printf '%s' "$INPUT" | grep -o '"tool_name":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
+if [ "$TOOL" = "Bash" ]; then
+  CMD=$(printf '%s' "$INPUT" | grep -o '"command":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+  case "$CMD" in
+    *claude-skill-gate-*|*claude-skill-acked-*|*claude-skill-loaded-*) exit 0 ;;
+  esac
+  STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
+  WRITES=""
+  case "$STRIPPED" in
+    *">"*|*"tee "*|*"sed -i"*|*"cp "*|*"mv "*|*"truncate "*|*"dd "*) WRITES=1 ;;
+  esac
+  case "$CMD" in
+    *"<<"*|*python*" -c"*|*node*" -e"*|*perl*" -e"*|*ruby*" -e"*) WRITES=1 ;;
+  esac
+  [ -z "$WRITES" ] && exit 0
+fi
+
 
 # Collect every loaded-but-unacked skill so a single ack clears them all.
 UNACKED=""
@@ -907,7 +956,7 @@ export async function setupHook(targetDir = process.cwd()) {
   // Register PreToolUse gate.
   const gateCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${GATE_FILENAME}`;
   const gateEntry = {
-    matcher: "Write|Edit|MultiEdit",
+    matcher: "Write|Edit|MultiEdit|Bash",
     hooks: [{ type: "command", command: gateCommand }],
   };
 
@@ -923,7 +972,7 @@ export async function setupHook(targetDir = process.cwd()) {
   // Register PreToolUse application gate (after the loading gate).
   const applicationCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${APPLICATION_GATE_FILENAME}`;
   const applicationEntry = {
-    matcher: "Write|Edit|MultiEdit",
+    matcher: "Write|Edit|MultiEdit|Bash",
     hooks: [{ type: "command", command: applicationCommand }],
   };
   const applicationAlreadyRegistered = settings.hooks.PreToolUse.some((entry) =>

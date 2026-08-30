@@ -225,6 +225,17 @@ For a one-off, the comment escape hatch beats a global rule:
 
 Block form is `// Stryker disable <Mutator>` … `// Stryker restore <Mutator>`.
 
+## An Incremental Typecheck Can Lie
+
+`tsc -b` reuses `.tsbuildinfo`, so a second run can report a green the first run earned
+and the code no longer does. An agent ran `npm run typecheck`, got exit 0, and said
+"typecheck clean"; the same command from the gate returned two real `TS2532` errors on
+the same files. The gate was right.
+
+Treat a green from an incremental build as evidence only when it is the run that actually
+compiled. In a gate, prefer a fresh build — or at least do not trust a pass that follows
+one you already ran.
+
 ## Scores and Thresholds
 
 70–85% on meaningful code is the working range. Past that you are mostly fighting
