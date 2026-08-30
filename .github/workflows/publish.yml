@@ -48,6 +48,12 @@ jobs:
             exit 1
           fi
 
+      # The self-tests drive the real installer, which imports chalk. A developer
+      # machine always has cli/node_modules sitting there, so preflight passes
+      # locally on a tree where CI cannot even load the module — 4 tests failed
+      # here for that reason alone, and nothing about the change was wrong.
+      - run: npm ci --prefix cli
+
       # The same gates the pre-push hook runs. Publishing is the one place where
       # being wrong cannot be taken back, so they run again here.
       - run: node scripts/validate-skills.mjs
