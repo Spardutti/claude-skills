@@ -269,6 +269,40 @@ gatef "config files stay gated" deny "tsconfig.json"
 gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
 gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"
 
+# --------------------------------------------- a skill that GAINS a reference file
+# A bundle grows: react gained FORMS.md and SHADCN.md. A project that installed
+# the skill before those existed has to receive them, or it keeps a SKILL.md
+# routing to files that are not there.
+echo "upgrading a skill that gained reference files"
+newrepo skillupg
+mkdir -p .claude/skills/react
+printf -- '---\nname: react\n---\n# old copy, no references\n' > .claude/skills/react/SKILL.md
+node -e "
+  const src = '$HERE/..';
+  Promise.all([import(src + '/cli/lib/local.mjs'), import(src + '/cli/lib/install.mjs')])
+    .then(async ([local, install]) => {
+      const skills = await local.makeLocalSource(src).fetchSkills();
+      const react = skills.find((s) => s.dirName === 'react');
+      await install.installSkills([react], '$PWD');
+    });
+" >/dev/null 2>&1
+
+have() {  # have <label> <path>
+  N=$((N+1))
+  if [ -s "$2" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s — %s missing or empty\n' "$1" "$2"; fi
+}
+
+have "a newly added reference file arrives" .claude/skills/react/FORMS.md
+have "a second one does too"                .claude/skills/react/SHADCN.md
+have "the existing references are still there" .claude/skills/react/COMPONENT-DESIGN.md
+N=$((N+1))
+if grep -q 'FORMS.md' .claude/skills/react/SKILL.md; then
+  PASS=$((PASS+1)); echo "  ok   SKILL.md was replaced, not left stale"
+else
+  FAIL=$((FAIL+1)); echo "  FAIL SKILL.md still the old copy — it does not route to FORMS.md"
+fi
+
 # ------------------------------------------------------------ upgrade, not just install
 # Every hook bug that reached a release survived because it was only ever tested
 # as a FRESH install. A project that already had an older version kept whatever

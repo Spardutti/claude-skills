@@ -18,6 +18,8 @@ Modern React component, state, effect, and styling patterns. Baseline is React 1
 | Loading skeletons, empty states, Suspense + error boundary pairing | LOADING-STATES.md |
 | Client state stores — Zustand, selectors, middleware, slices | ZUSTAND.md |
 | Styling — colors, spacing, design tokens, no arbitrary values | TAILWIND-TOKENS.md |
+| Forms — React Hook Form, Zod, field errors, submission state | FORMS.md |
+| shadcn components — Base UI vs Radix, cva variants, `cn()`, where files go | SHADCN.md |
 
 ## Critical Gotchas (Always-Inline)
 
@@ -76,9 +78,21 @@ const filtered = items.filter(i => i.active);
 
 If a value can be computed from props or other state, it is not state. See USE-EFFECT.md.
 
-### 5. Forms Use Actions — `useActionState`, Not Manual Flags
+### 5. Never Hand-Roll Submission State — RHF by Default, Actions for the Simple Case
 
-`useActionState` tracks pending state and errors so you don't hand-roll `isSubmitting`.
+The rule is that `isSubmitting` and per-field errors are never `useState`. Two
+things satisfy it, and which one is not a preference:
+
+**React Hook Form + `zodResolver` is the default.** shadcn's `<Form>` *is* React
+Hook Form, so any form using it is already RHF. See FORMS.md.
+
+```tsx
+const form = useForm({ resolver: zodResolver(Schema), defaultValues: { username: "" } });
+// form.formState.isSubmitting — never a useState flag
+```
+
+**`useActionState` for a form with one submit, one error, and no per-field
+feedback** — a search box, a confirm button. No dependency, uncontrolled inputs.
 
 ```tsx
 const [error, submitAction, isPending] = useActionState(
@@ -97,6 +111,8 @@ return (
   </form>
 );
 ```
+
+Never both on one form — `handleSubmit` and `<form action>` both own submission.
 
 ### 6. `useFormStatus` Reads Form State Without Prop Drilling
 
@@ -304,4 +320,6 @@ For deeper guidance, load the file matching what you're working on:
 - **PERFORMANCE.md** — read when chasing re-renders or memoization. Covers React Compiler v1.0 (delete manual memo; the three narrow exceptions; ESLint enforcement), keys and `startTransition`, `useDeferredValue` with its React 19 initial-value arg, `<Activity mode>` for pre-render and keep-alive, and resource preloading (`preload` / `preinit` / `prefetchDNS` / `preconnect`).
 - **LOADING-STATES.md** — read when a component fetches data or shows async UI. Covers the loading / error / empty trio every data component must handle, skeleton screens vs spinners (and avoiding layout shift), building a reusable token-styled `Skeleton` primitive, `<Suspense>` + error-boundary pairing and boundary placement, empty-state design, and accessibility (`aria-busy`, `aria-live` / `role="status"`, focus management).
 - **ZUSTAND.md** — read when client/UI state outgrows `useState` and Context. Covers typed curried store creation, atomic selectors and `useShallow` to prevent re-renders, exporting custom hooks over the raw store, event-driven actions, `persist` / `immer` / `devtools` middleware and composition order, the slices pattern, transient updates, and the rule that server state belongs in a query library, not a store.
+- **FORMS.md** — read when building or reviewing a form. Covers React Hook Form with `zodResolver` and shadcn's `<Form>`, why a transforming schema needs `useForm<z.input<S>, unknown, z.output<S>>` instead of `z.infer`, `defaultValues` and the controlled/uncontrolled flip, reading `formState` instead of hand-rolled flags, putting server rejections on the field with `setError`, the Zod 3 → 4 differences, and the narrow case where `useActionState` is the better call.
+- **SHADCN.md** — read when adding or editing a shadcn component. Covers Base UI as the default since July 2026 and how to tell which primitive a file uses, migrating one component at a time, why you edit `components/ui/*` instead of wrapping it, `cva` variants with `VariantProps` rather than boolean props, `cn()` and why `tailwind-merge` matters for overrides, `data-slot` for reaching into a child, the `Field` family for form layout, and what belongs in `components/ui/` versus `components/`.
 - **TAILWIND-TOKENS.md** — read when styling — picking colors, spacing, radius, or typography. Covers Tailwind v4 CSS-first `@theme` config and namespaces, semantic color tokens (never raw `red-500`), `@theme inline`, the `--color-*: initial` namespace reset for hard palette lockdown, the semantic spacing scale, the ban on arbitrary values (`p-[13px]`, `text-[#3a3a3a]`) and the narrow exceptions, plus ESLint enforcement tooling.
