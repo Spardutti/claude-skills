@@ -3,6 +3,10 @@
 // publishing it first.
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const exec = promisify(execFile);
 
 function parseFrontmatter(content, fallbackName) {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
@@ -23,6 +27,28 @@ function parseFrontmatter(content, fallbackName) {
 
 async function listDir(dir) {
   try { return await readdir(dir, { withFileTypes: true }); } catch { return []; }
+}
+
+// Build output is not a project. Next.js writes a package.json into .next/,
+// .next/dev/ and .next/standalone/, so a scan that skipped only a hardcoded
+// list reported three phantom projects on a plain Next app — and then filtered
+// the real repo root out as "a root that delegates to a workspace". A second
+// list of build dirs drifts from .gitignore the moment a framework adds one, so
+// ask git the way ship-gate.sh already does. --directory collapses a fully
+// ignored tree to its own name, which is what keeps this output small.
+async function gitIgnoredDirs(projectDir) {
+  try {
+    const { stdout } = await exec(
+      "git",
+      ["-C", projectDir, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"],
+      { maxBuffer: 10 * 1024 * 1024 },
+    );
+    return new Set(
+      stdout.split("\n").filter((l) => l.endsWith("/")).map((l) => l.slice(0, -1)),
+    );
+  } catch {
+    return new Set();
+  }
 }
 
 export function makeLocalSource(root) {
@@ -113,6 +139,8 @@ export async function reportToolNeeds(projectDir) {
   // needs a tool. A root that delegates is not the place to install, even once
   // the workspace it delegates to is already set up.
   const nested = { Stryker: false, mutmut: false };
+  // Empty outside a git repo, so the hardcoded list below still carries those.
+  const ignored = await gitIgnoredDirs(projectDir);
 
   async function scan(rel, depth) {
     if (depth > 2) return;
@@ -159,7 +187,9 @@ export async function reportToolNeeds(projectDir) {
     for (const e of entries) {
       if (!e.isDirectory()) continue;
       if (["node_modules", ".git", "dist", "build", ".venv", "venv", ".claude"].includes(e.name)) continue;
-      await scan(rel ? `${rel}/${e.name}` : e.name, depth + 1);
+      const child = rel ? `${rel}/${e.name}` : e.name;
+      if (ignored.has(child)) continue;
+      await scan(child, depth + 1);
     }
   }
 

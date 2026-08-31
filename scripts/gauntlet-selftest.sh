@@ -506,6 +506,40 @@ if [ ! -s "$TMP/vc.out" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "the opt-
 else FAIL=$((FAIL+1)); printf '  FAIL %s\n' "the opt-out silences it"; fi
 export HOME="$TMP/home"
 
+# ------------------------------------------- build output is not a project
+# Next.js writes a package.json into .next/, .next/dev/ and .next/standalone/.
+# The tool-needs scan skipped only a hardcoded list of build dirs, so it walked
+# into all three and told the user to install Stryker in each — and then dropped
+# the real repo root, because those phantoms made it look like a root that
+# delegates to a workspace. It asks git what is ignored now.
+echo "tool needs, against build output"
+newrepo toolneeds
+printf '{"name":"app"}\n' > package.json
+printf '.next/\n' > .gitignore
+mkdir -p .next/standalone .next/dev
+printf '{"name":"next"}\n' > .next/package.json
+printf '{"name":"sa"}\n'   > .next/standalone/package.json
+printf '{"name":"dev"}\n'  > .next/dev/package.json
+node -e "
+  import('$HERE/../cli/lib/local.mjs').then(async (local) => {
+    const needs = await local.reportToolNeeds('$PWD');
+    console.log(needs.map((n) => n.label).join(' '));
+  });
+" > "$TMP/needs.out" 2>&1
+needs=$(cat "$TMP/needs.out")
+
+N=$((N+1))
+case "$needs" in
+  *.next*) FAIL=$((FAIL+1)); printf '  FAIL %s\n       got %s\n' "gitignored build output is not a project" "$needs" ;;
+  *)       PASS=$((PASS+1)); printf '  ok   %s\n' "gitignored build output is not a project" ;;
+esac
+
+N=$((N+1))
+case "$needs" in
+  *"<repo root>"*) PASS=$((PASS+1)); printf '  ok   %s\n' "the real root is still reported" ;;
+  *)               FAIL=$((FAIL+1)); printf '  FAIL %s\n       got %s\n' "the real root is still reported" "$needs" ;;
+esac
+
 cd /
 rm -rf "$TMP"
 echo
