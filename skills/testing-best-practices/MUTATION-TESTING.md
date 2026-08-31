@@ -57,20 +57,26 @@ npm i -D @stryker-mutator/core @stryker-mutator/vitest-runner
 which test covers which line and runs only those per mutant, instead of the whole
 suite every time.
 
-Scope it to what changed, one flag per range:
+Scope it to what changed with **one** comma-joined `--mutate`, repeating the
+file name on every range:
 
 ```bash
-npx stryker run --incremental --force \
-  --mutate 'src/a.ts:12-30' --mutate 'src/a.ts:58-61'
+# BAD — the second flag overrides the first; only src/b.ts is mutated
+npx stryker run --mutate 'src/a.ts:12-30' --mutate 'src/b.ts:58-61'
+
+# GOOD — one value, every range carries its own file name
+npx stryker run --mutate 'src/a.ts:12-30,src/a.ts:44-51,src/b.ts:58-61'
 ```
 
-Ranges are `file:startLine[:startCol]-endLine[:endCol]`, and a range **cannot**
-be combined with a glob in the same entry. `--force` is required alongside a
-custom `--mutate`, or incremental mode reuses the cached verdict for those lines.
+Stryker's CLI coerces `--mutate` with `(val) => val.split(",")`, a function that
+never reads the previous value, so a repeated flag **replaces** it rather than
+appending. Nothing warns. The run reports a healthy score for the one file it
+looked at, and if that file happens to have no tests it exits on `No tests were
+executed` instead.
 
-Never comma-join ranges across files: a file's own ranges are already
-comma-separated (`a.ts:3-3,7-7`), so the two levels collide and Stryker reads
-`7-7` as a filename.
+Ranges are `file:startLine[:startCol]-endLine[:endCol]`, and a range **cannot**
+be combined with a glob in the same entry. Repeat the file name for a second
+range in the same file — `a.ts:3-3,7-7` makes Stryker read `7-7` as a filename.
 
 ## The Sandbox Trap
 
@@ -265,6 +271,8 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 ## Rules
 
 - Always run mutation scoped to the changed lines, never the whole repo.
+- Always pass one comma-joined `--mutate`; a repeated flag overrides, it does not append.
+- Always repeat the file name on every range inside that value.
 - Always set `coverageAnalysis: "perTest"` — without it every mutant runs the whole suite.
 - Always spread `configDefaults.exclude` when adding `.stryker-tmp`, and gitignore it.
 - Always install the tool the way the project manages dependencies (uv, poetry, npm workspace).

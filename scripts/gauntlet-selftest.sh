@@ -203,6 +203,28 @@ chmod +x bin/npx
 echo "const a=1" > a.ts
 sg "stryker is not run in incremental mode" "no surviving mutants" 0
 
+# Stryker's CLI coerces --mutate with `(val) => val.split(",")`, which ignores
+# the previous value, so a repeated flag overrides rather than appends. The gate
+# passed one flag per changed range and therefore mutated only the LAST file,
+# every run, while reporting the whole diff as proven. The stub answers with a
+# survivor unless it sees a single --mutate naming both changed files.
+echo "ship-gate stryker mutate scope"
+newrepo sg_mutate
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+cat > bin/npx <<'X'
+#!/bin/sh
+case "$*" in
+  *--mutate*--mutate*) echo "[Survived] repeated --mutate — only the last file is mutated" ;;
+  *a.ts*b.ts*)         ;;
+  *)                   echo "[Survived] not every changed file reached --mutate" ;;
+esac
+exit 0
+X
+chmod +x bin/npx
+echo "const a=1" > a.ts
+echo "const b=2" > b.ts
+sg "every changed file reaches stryker in one --mutate" "no surviving mutants" 0
+
 # routeTree.gen.ts is regenerated on every route change and cannot be split, and
 # a shadcn component is not ours to split either. The limit fired on both, every
 # time, which teaches --force — and a gate that is always forced is not a gate.

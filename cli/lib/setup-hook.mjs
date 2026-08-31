@@ -790,8 +790,14 @@ for owner in $OWNERS; do
           done <<< "$FILES")
   [ -z "$OWNED" ] && continue
 
-  # --mutate flags, one per changed hunk. Ranges inside a file are already
-  # comma-separated, so they cannot share a comma-joined list across files.
+  # ONE comma-joined --mutate value, never a flag per range. Stryker's CLI
+  # parses --mutate with \`(val) => val.split(",")\`, a coercion that ignores the
+  # previous value, so a repeated flag OVERRIDES instead of appending and only
+  # the last one survives. Measured on two files: the repeated form found 1 of
+  # 1808 files and 28 mutants, the joined form 2 files and 51. Every run since
+  # this gate shipped mutated exactly one file and called the rest proven — and
+  # when that one file had no tests, Stryker exited on "No tests were executed"
+  # and the gate reported UNPROVEN, which writes a receipt and blocks nothing.
   FLAGS=""
   while IFS= read -r f; do
     hunks=$(git diff -U0 "$BASE" -- "$f" 2>/dev/null \\
@@ -799,7 +805,7 @@ for owner in $OWNERS; do
             | while IFS=, read -r s l; do l=\${l:-1}; [ "$l" -gt 0 ] && echo "$s-$((s+l-1))"; done)
     [ -z "$hunks" ] && hunks="1-$(wc -l < "$f")"
     rel=\${f#$owner/}
-    for r in $hunks; do FLAGS="$FLAGS --mutate '$rel:$r'"; done
+    for r in $hunks; do FLAGS="$FLAGS,$rel:$r"; done
   done <<< "$OWNED"
 
   base=""; RUN=""
@@ -819,7 +825,7 @@ for owner in $OWNERS; do
     # 8 of them on one commit, all long since killed. --mutate already scopes
     # the run to the changed hunks, so incremental buys nothing here and costs
     # a cache that goes stale exactly the way mutmut's did.
-    CMD="\${RUN}npx --no-install stryker run $FLAGS"
+    CMD="\${RUN}npx --no-install stryker run --mutate '\${FLAGS#,}'"
   elif [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix \${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner
