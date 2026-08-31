@@ -325,6 +325,12 @@ sg "generated and vendored files are not gated" "nothing to check" 0
 sg "the skip is named, never silent" "  src/routeTree.gen.ts" 0
 sg "a vendored component matches at any depth" "  src/components/ui/sidebar.tsx" 0
 sg "a migration matches at any depth" "  api/migrations/0001_init.py" 0
+# A config has no tests and never will, so once an uncovered line became a
+# finding, every diff touching one reported findings nobody could close.
+seq 1 250 | sed 's/^/const c/' > vitest.config.ts
+seq 1 250 | sed 's/^/const n/' > src/next.config.mjs
+sg "a config file is not gated" "  vitest.config.ts" 0
+sg "a config matches at any depth and any extension" "  src/next.config.mjs" 0
 seq 1 250 | sed 's/^/const w/' > src/app.ts
 sg "a real file beside them is still caught" "src/app.ts — 250 lines" 1
 cat > .claude/gauntlet.conf <<'C'
