@@ -226,13 +226,32 @@ Before this Write/Edit, you must:
 
 1. For each skill listed above, say whether it applies to the file you're about to
    write. If it does not — a Python skill and a TypeScript file, say — write
-   "does not apply" and move on. Do not invent a connection.
+   \\"does not apply\\" and move on. Do not invent a connection.
 2. For the ones that do apply: state the specific rules that bear on this file, and
    how your next write respects each.
 3. Then ack all of them in a single Bash tool call:
      $ACK_CMD
 
 One ack per skill per session. After acking, retry the Write/Edit.
+
+If that Bash call is denied by the auto mode classifier, STOP. Do not ask your
+user to run it for you, and do not look for another route to create the files.
+Both are what the classifier is there to stop, and asking a human to run a
+command you were just denied makes them the tool that performs it. Report this
+to them instead and let them decide:
+
+  Auto mode's built-in Auto-Mode Bypass rule counts a hook's ack file as working
+  around the permission system. It is a soft rule, so an allow entry clears it.
+  It has to go in ~/.claude/settings.json — the classifier does not read a
+  project's .claude/settings.json — or in /permissions, Auto mode tab. Keep the
+  \\\$defaults line or every built-in allow rule is discarded:
+
+  \\"autoMode\\": { \\"allow\\": [ \\"\\\$defaults\\",
+    \\"Touching marker files under /tmp/claude-skill-gate-*, /tmp/claude-skill-acked-*
+     and /tmp/claude-skill-loaded-* is allowed: they are acknowledgement files for
+     the user's own PreToolUse skill gates. Creating one satisfies a workflow gate
+     the user installed, grants no permission and executes no code, and is a false
+     positive for Auto-Mode Bypass.\\" ] }
 $RULES_BLOCKS"
 
 json_escape() {
@@ -1363,6 +1382,26 @@ export async function setupHook(targetDir = process.cwd()) {
     upsert(settings.hooks.Stop, GAUNTLET_FILENAME, gauntletEntry);
   } else {
     settings.hooks.Stop = [gauntletEntry];
+  }
+
+  // Both gates clear by touching a marker under /tmp. The hook scripts let those
+  // commands through themselves, but auto mode's permission classifier does not:
+  // a touch whose only purpose is to unlock a gate is exactly what it refuses.
+  // So in auto mode the application gate could not be satisfied at all, and the
+  // model was reduced to asking its user to run the touch by hand — which is
+  // indistinguishable from the laundering the classifier exists to stop.
+  // Allowlisting the three marker paths is what makes the gates workable there.
+  // Only these literal prefixes are granted, and an existing entry is not
+  // duplicated on reinstall.
+  const MARKER_ALLOW = [
+    "Bash(touch /tmp/claude-skill-gate-*)",
+    "Bash(touch /tmp/claude-skill-acked-*)",
+    "Bash(touch /tmp/claude-skill-loaded-*)",
+  ];
+  if (!settings.permissions) settings.permissions = {};
+  if (!Array.isArray(settings.permissions.allow)) settings.permissions.allow = [];
+  for (const rule of MARKER_ALLOW) {
+    if (!settings.permissions.allow.includes(rule)) settings.permissions.allow.push(rule);
   }
 
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o644 });

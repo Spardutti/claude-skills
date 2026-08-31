@@ -460,6 +460,46 @@ bash .claude/hooks/ship-gate.sh --force >/dev/null 2>&1
 hook "--force writes a receipt without running" allow "git commit -m x"
 
 # ------------------------------------------------------------ the skill gates
+# The application gate's BLOCKED text is one double-quoted bash string, so an
+# unescaped " inside it closes the string early: the remainder runs as shell
+# commands and the reason reaches the model EMPTY. That shipped in 2.16.1 and
+# stood for five releases. Every denial since told the model nothing — not the
+# rules, not even the ack command it was being asked to run — and the sessions
+# that hit it were left guessing at what the gate wanted. Nothing caught it
+# because no test had ever read the reason the hook actually emits.
+echo "skill application gate message"
+newrepo sag
+mkdir -p .claude/skills/demo
+printf -- '---\nname: demo\n---\n## Rules\n- always x\n' > .claude/skills/demo/SKILL.md
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+SID="sag$RUN"
+touch "/tmp/claude-skill-gate-$SID" "/tmp/claude-skill-loaded-$SID-demo"
+SAG_OUT=$(printf '{"session_id":"%s","tool_name":"Write","tool_input":{"file_path":"%s/a.ts"}}' "$SID" "$PWD" \
+          | bash .claude/hooks/skill-application-gate.sh 2>"$TMP/sag.err")
+rm -f "/tmp/claude-skill-gate-$SID" "/tmp/claude-skill-loaded-$SID-demo"
+
+sag() {  # sag <label> <node expression over r, the reason string>
+  N=$((N+1))
+  if printf '%s' "$SAG_OUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const r=JSON.parse(d).hookSpecificOutput.permissionDecisionReason;process.exit(($2)?0:1)})" 2>/dev/null; then
+    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s\n       hook emitted: %s\n' "$1" "$SAG_OUT"
+  fi
+}
+
+sag "the denial reason is not empty"   "r.length > 0"
+sag "it names the ack command"         "r.includes('touch /tmp/claude-skill-acked-$SID-demo')"
+sag "it carries the skill's rules"     "r.includes('always x')"
+sag "a quoted phrase survives"         "r.includes('\"does not apply\"')"
+sag "and the auto mode guidance"       "r.includes('Auto-Mode Bypass')"
+
+N=$((N+1))
+if [ ! -s "$TMP/sag.err" ]; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "the hook writes nothing to stderr"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL the hook writes to stderr:\n%s\n' "$(cat "$TMP/sag.err")"
+fi
+
 # Write|Edit|MultiEdit is not the only way to change a file. A session edited
 # twelve source files through `python3 - <<'PY'` in Bash and neither gate fired.
 echo "skill gate covers Bash"
@@ -573,6 +613,20 @@ check_json "hooks missing from the old file are added" \
   "s.hooks.Stop && s.hooks.Stop.some(e=>e.hooks[0].command.endsWith('gauntlet.sh'))"
 check_json "an upgrade gains the SessionStart version check" \
   "s.hooks.SessionStart && s.hooks.SessionStart.some(e=>e.hooks[0].command.endsWith('version-check.sh'))"
+
+# Both gates clear by touching a marker under /tmp, and auto mode's classifier
+# refuses a touch whose only purpose is to unlock a gate — so the application
+# gate could not be satisfied there at all, and the model ended up asking its
+# user to run the touch by hand. The old settings.json here has no permissions
+# key at all, which is what every install before this looked like.
+check_json "an upgrade gains the marker allowlist" \
+  "s.permissions && s.permissions.allow.includes('Bash(touch /tmp/claude-skill-acked-*)')"
+check_json "all three markers are allowed" \
+  "['gate','acked','loaded'].every(k=>s.permissions.allow.includes('Bash(touch /tmp/claude-skill-'+k+'-*)'))"
+
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+check_json "reinstalling does not duplicate the rules" \
+  "s.permissions.allow.filter(r=>r==='Bash(touch /tmp/claude-skill-acked-*)').length===1"
 
 # A version nudge that costs a network round trip at session start is a version
 # nudge that hangs the session on a bad connection. This one only ever reads a
