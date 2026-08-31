@@ -194,7 +194,8 @@ Ignore by **where the mutant sits**, not by what kind it is. Stryker's Ignore
 plugin takes a Babel `NodePath`; `path.find` tests the node and its ancestors:
 
 ```js
-// GOOD — stryker-classname-ignorer.js
+// GOOD — stryker-classname-ignorer.mjs — .mjs, not .js: an app without
+// "type": "module" in its package.json cannot load ESM from a .js file.
 import { PluginKind, declareValuePlugin } from "@stryker-mutator/api/plugin";
 
 export const strykerPlugins = [
@@ -210,12 +211,23 @@ export const strykerPlugins = [
 ```
 
 ```json
-{ "plugins": ["@stryker-mutator/vitest-runner", "./stryker-classname-ignorer.js"],
+{ "plugins": ["@stryker-mutator/vitest-runner", "./stryker-classname-ignorer.mjs"],
   "ignorers": ["tailwind-classnames"] }
 ```
 
 `shouldIgnore` returns a reason string to ignore, `undefined` to keep. Ignored
 mutants are reported as `ignored` and do not affect the score.
+
+**On pnpm, install `@stryker-mutator/api` yourself.** The ignorer imports it,
+but nothing depends on it directly — npm hoists it into the flat `node_modules`
+so the import resolves by accident, and pnpm's isolated store does not. The run
+does not fail: it prints one `WARN PluginLoader` line, loads no ignorer, and
+reports every class-name mutant as survived, exactly as if the plugin were
+never written.
+
+```
+pnpm add -D @stryker-mutator/api
+```
 
 For a one-off, the comment escape hatch beats a global rule:
 
@@ -261,6 +273,7 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always invoke mutmut through the project's environment (`uv run`, `poetry run`, `./.venv/bin/`) — it is not on PATH.
 - Always use `source_paths` / `pytest_add_cli_args_test_selection` for mutmut 3; `paths_to_mutate` and `tests_dir` are silently ignored.
 - Always ignore a mutant by where it sits (Ignore plugin, disable comment), never by disabling a whole mutator globally.
+- Always add `@stryker-mutator/api` as a direct dependency on pnpm, or the Ignore plugin silently does not load.
 - Never mutate test files — that only asks whether the tests test the tests.
 - Never treat a surviving mutant as a fact about the code; it is a fact about the tests.
 - Never chase 100%: equivalent mutants make the last stretch unkillable.
