@@ -579,7 +579,7 @@ const SHIP_GATE_SCRIPT = `#!/usr/bin/env bash
 # what makes a fix re-gate itself instead of riding on the previous verdict.
 #
 # Exit codes:
-#   0  clean — nothing over the line limit, no surviving mutants
+#   0  clean — nothing over the line limit, nothing survived, nothing uncovered
 #   1  findings that must be dealt with before shipping
 #   2  ran, but could not prove the tests (a mutation tool is missing) — report,
 #      don't block; the output names exactly what to install and where
@@ -799,13 +799,24 @@ for owner in $OWNERS; do
   # when that one file had no tests, Stryker exited on "No tests were executed"
   # and the gate reported UNPROVEN, which writes a receipt and blocks nothing.
   FLAGS=""
+  GLOBBED=","
   while IFS= read -r f; do
     hunks=$(git diff -U0 "$BASE" -- "$f" 2>/dev/null \\
             | grep -oE '^@@ -[0-9,]+ \\+[0-9]+(,[0-9]+)?' | sed 's/.*+//' \\
             | while IFS=, read -r s l; do l=\${l:-1}; [ "$l" -gt 0 ] && echo "$s-$((s+l-1))"; done)
     [ -z "$hunks" ] && hunks="1-$(wc -l < "$f")"
     rel=\${f#$owner/}
-    for r in $hunks; do FLAGS="$FLAGS,$rel:$r"; done
+    # A Next.js route folder — [id], [[...slug]] — is a glob expression to
+    # Stryker, which refuses "Cannot combine a glob expression with a mutation
+    # range" and fails the entire run, not just that file. Escaping the brackets
+    # stops the path resolving at all. Replacing each with ? keeps it matching
+    # that one file and drops the range, so the file is mutated whole: a
+    # superset of the diff, slower than a range but never less than what changed.
+    case "$rel" in
+      *[][*?{}]*) FLAGS="$FLAGS,$(printf '%s' "$rel" | sed 's/[][*?{}]/?/g')"
+                  GLOBBED="$GLOBBED$rel," ;;
+      *) for r in $hunks; do FLAGS="$FLAGS,$rel:$r"; done ;;
+    esac
   done <<< "$OWNED"
 
   base=""; RUN=""
@@ -870,12 +881,39 @@ for owner in $OWNERS; do
   # HEADER every run and repeats the word in its table, so a bare grep reports
   # survivors on a clean run — worse than not running at all. Stryker marks each
   # real finding \`[Survived]\`; table and border lines are excluded outright.
-  case "$TOOL" in
-    stryker) PATTERN='\\[Survived\\]' ;;
-    *)       PATTERN='[Ss]urvived' ;;
-  esac
-  SURVIVED=$(printf '%s\\n' "$OUT" | grep -E "$PATTERN" \\
-             | grep -vE '^[[:space:]]*[#│|+-]|# *surviv' | head -20)
+  # NoCoverage is printed exactly like Survived and means something worse: not
+  # "a test missed this mutation" but "no test executes this line at all". The
+  # gate matched only [Survived], so a diff whose files have no tests came back
+  # PASS — 306 uncovered mutants reported as proven on one commit. It is judged
+  # only for files that went in WITH a range: a glob-shaped path is mutated
+  # whole, so its untouched lines would report uncovered forever, and a finding
+  # nobody can close is what teaches people to --force.
+  #
+  # The status line carries no file name; the line under it does, as
+  # file:line:column. They are paired here rather than grepped separately.
+  if [ "$TOOL" = stryker ]; then
+    ALL=$(printf '%s\\n' "$OUT" | awk -v globbed="$GLOBBED" '
+      /^\\[Survived\\]/   { pend = $0; kind = "s"; next }
+      /^\\[NoCoverage\\]/ { pend = $0; kind = "n"; next }
+      pend != "" {
+        file = $0; sub(/:[0-9]+:[0-9]+$/, "", file)
+        if (kind == "s" || index(globbed, "," file ",") == 0) print pend "  " $0
+        pend = ""
+      }
+      # A survivor with no location under it is still a survivor, never dropped.
+      END { if (pend != "" && kind == "s") print pend }
+    ')
+  else
+    ALL=$(printf '%s\\n' "$OUT" | grep -E '[Ss]urvived' \\
+          | grep -vE '^[[:space:]]*[#│|+-]|# *surviv')
+  fi
+  # The detail list is capped so one bad file cannot bury the output. The cap
+  # used to be the whole story, and it hid the WORST file: 20 findings from one
+  # file filled it, and a second file with 54 uncovered mutants never appeared
+  # at all. A gate whose biggest finding is invisible gets under-fixed. Every
+  # file with findings is now named below the cut, worst first.
+  FOUND=$(printf '%s\\n' "$ALL" | grep -c .)
+  SURVIVED=$(printf '%s\\n' "$ALL" | head -20)
   FIXED=0
   NOTE=""
 
@@ -916,8 +954,17 @@ for owner in $OWNERS; do
   fi
 
   if [ -n "$SURVIVED" ]; then
-    echo "  $label $TOOL — surviving mutants; these lines can break and no test notices:"
+    echo "  $label $TOOL — these lines can break and no test notices:"
     printf '%s\\n' "$SURVIVED" | sed 's/^/      /'
+    if [ "$FOUND" -gt 20 ]; then
+      echo "      ... $((FOUND - 20)) more not shown. Every file with findings:"
+      if [ "$TOOL" = stryker ]; then
+        printf '%s\\n' "$ALL" \\
+          | awk '{ f = $NF; sub(/:[0-9]+:[0-9]+$/, "", f); n[f]++ }
+                 END { for (k in n) printf "%8d  %s\\n", n[k], k }' \\
+          | sort -rn | sed 's/^/      /'
+      fi
+    fi
     [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
     STATUS=1
   elif [ $RC -ne 0 ]; then
@@ -927,7 +974,7 @@ for owner in $OWNERS; do
   elif [ -n "$NOTE" ]; then
     printf '%s\\n' "$NOTE"
   else
-    echo "  $label $TOOL — ok, no surviving mutants in the changed lines"
+    echo "  $label $TOOL — ok, nothing survived and nothing was uncovered"
     [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
   fi
 done

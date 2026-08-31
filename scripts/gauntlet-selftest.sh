@@ -159,7 +159,7 @@ echo "const a=1" > a.ts
 cat > .claude/gauntlet.conf <<'C'
 GAUNTLET_MUTATE='printf "%s\n" "File | % score | # killed | # survived |" "All files | 100.00 | 12 | 0 |"'
 C
-sg "a clean run's summary header is not a finding" "no surviving mutants" 0
+sg "a clean run's summary header is not a finding" "nothing survived" 0
 
 cat > .claude/gauntlet.conf <<'C'
 GAUNTLET_MUTATE='printf "%s\n" "File | # survived |" "[Survived] StringLiteral" "src/a.ts:12:9"'
@@ -201,7 +201,7 @@ exit 0
 X
 chmod +x bin/npx
 echo "const a=1" > a.ts
-sg "stryker is not run in incremental mode" "no surviving mutants" 0
+sg "stryker is not run in incremental mode" "nothing survived" 0
 
 # Assert the ARGV, not the verdict. Every ship-gate bug so far hid from a test
 # that only asked whether the gate said green: the stub is written from the same
@@ -233,6 +233,84 @@ arg[stryker]
 arg[run]
 arg[--mutate]
 arg[a.ts:1-1,b.ts:1-1]"
+
+# Stryker validates every --mutate entry with Minimatch and refuses a range on
+# anything glob-shaped: "Cannot combine a glob expression with a mutation range".
+# A Next.js route folder is exactly that, so one [id] directory in the diff
+# failed the whole run — every other file included. The path goes in with each
+# bracket swapped for ? and no range: still one file, mutated whole.
+echo "ship-gate stryker argv, glob-shaped paths"
+newrepo sg_argv_glob
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+printf '#!/bin/sh\nfor a in "$@"; do echo "arg[$a]" >> %s; done\n' "$LOG" > bin/npx
+chmod +x bin/npx
+echo "const a=1" > a.ts
+mkdir -p 'app/[[...slug]]'
+echo "const p=1" > 'app/[[...slug]]/page.ts'
+argv "a route folder loses its range, not the whole run" \
+"arg[--no-install]
+arg[stryker]
+arg[run]
+arg[--mutate]
+arg[a.ts:1-1,app/??...slug??/page.ts]"
+
+# NoCoverage means no test executes the line at all, which is strictly worse than
+# a survivor, and the gate used to call it a PASS: one commit shipped with 306
+# uncovered mutants reported as proven. The stub prints the status line and the
+# file:line:column line under it, the way Stryker's clear-text reporter does.
+echo "ship-gate stryker no coverage"
+newrepo sg_nocov
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+cat > bin/npx <<'X'
+#!/bin/sh
+echo "[NoCoverage] BooleanLiteral"
+echo "a.ts:1:11"
+exit 0
+X
+chmod +x bin/npx
+echo "const a=1" > a.ts
+sg "a changed line no test runs is a finding" "[NoCoverage] BooleanLiteral" 1
+
+# A glob-shaped path goes in without a range, so the whole file is mutated and
+# lines nobody touched report uncovered. Charging those to this diff would be a
+# finding that can never be closed, which is what teaches --force.
+newrepo sg_nocov_glob
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+cat > bin/npx <<'X'
+#!/bin/sh
+echo "[NoCoverage] BooleanLiteral"
+echo "app/[id]/page.ts:9:11"
+exit 0
+X
+chmod +x bin/npx
+mkdir -p 'app/[id]'
+echo "const p=1" > 'app/[id]/page.ts'
+sg "a whole-file glob path is not judged for coverage" "nothing survived" 0
+
+# The detail list is capped at 20 so one bad file cannot bury the output, and the
+# cap used to be the whole story: 22 findings from a.ts filled it and b.ts never
+# appeared. On a real diff that hid the WORST file, 54 uncovered mutants, behind
+# a file with fewer. Every file with findings must be named below the cut.
+echo "ship-gate findings cap"
+newrepo sg_cap
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+cat > bin/npx <<'X'
+#!/bin/sh
+i=1
+while [ $i -le 22 ]; do
+  echo "[NoCoverage] BooleanLiteral"
+  echo "a.ts:$i:1"
+  i=$((i+1))
+done
+echo "[NoCoverage] BooleanLiteral"
+echo "b.ts:1:1"
+exit 0
+X
+chmod +x bin/npx
+echo "const a=1" > a.ts
+echo "const b=2" > b.ts
+sg "a file past the cap is still named" "1  b.ts" 1
+sg "and the count of what was hidden is stated" "3 more not shown" 1
 
 # routeTree.gen.ts is regenerated on every route change and cannot be split, and
 # a shadcn component is not ours to split either. The limit fired on both, every
@@ -308,7 +386,7 @@ chmod +x apps/api/.venv/bin/mutmut
 echo "app.old.x__mutmut_1: survived" > apps/api/mutants/cached
 echo "x=1" > apps/api/app/slugs.py
 : > apps/api/.mutmut-baseline
-sg "a stale mutant cache is cleared before the run" "no surviving mutants" 0
+sg "a stale mutant cache is cleared before the run" "nothing survived" 0
 
 # mutmut reports the whole repo's survivors, not the diff's, so without a
 # baseline the Python half of the gate can never go green. Recorded survivors
@@ -328,7 +406,7 @@ chmod +x apps/api/.venv/bin/mutmut
 printf 'app.old.x_a__mutmut_1: survived\napp.old.x_b__mutmut_2: survived\n' > survivors
 echo "x=1" > apps/api/app/slugs.py
 sg "with no baseline the repo's debt is recorded, not charged" "existing survivor(s)" 2
-sg "a baselined survivor is not a finding" "no surviving mutants" 0
+sg "a baselined survivor is not a finding" "nothing survived" 0
 
 printf 'app.old.x_a__mutmut_1: survived\napp.old.x_b__mutmut_2: survived\napp.new.x_c__mutmut_1: survived\n' > survivors
 sg "a survivor outside the baseline fails" "app.new.x_c__mutmut_1" 1
@@ -338,7 +416,7 @@ sg "killing a baselined survivor is reported, not required" "1 baselined survivo
 
 printf 'app.old.x_a__mutmut_1: survived\napp.new.x_c__mutmut_1: survived\n' > survivors
 bash "$SG" --baseline >/dev/null 2>&1
-sg "--baseline accepts the new survivor" "no surviving mutants" 0
+sg "--baseline accepts the new survivor" "nothing survived" 0
 
 # The receipt is the part a model cannot talk its way past: there is no claim to
 # make, only a file that exists for this exact content or does not.
