@@ -1,6 +1,7 @@
 import { mkdir, writeFile, readFile, chmod, unlink } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { spawn } from "node:child_process";
+import { homedir } from "node:os";
 
 // PreToolUse gate on Write|Edit|MultiEdit. Blocks the tool call unless
 // a per-session marker file exists at /tmp/claude-skill-gate-<SESSION_ID>.
@@ -52,6 +53,9 @@ if [ "$TOOL" != "Bash" ]; then
   # The structured tools name their target outright.
   TARGET=$(printf '%s' "$INPUT" | grep -o '"file_path":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
   case "$TARGET" in
+    # The settings file that configures the escape hatch cannot sit behind the
+    # gate, or a denied ack has no way to be un-denied.
+    */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
     *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
   esac
 fi
@@ -61,6 +65,7 @@ if [ "$TOOL" = "Bash" ]; then
   # Never gate the command that clears the gate, or this deadlocks.
   case "$CMD" in
     *claude-skill-gate-*|*claude-skill-acked-*|*claude-skill-loaded-*) exit 0 ;;
+    *.claude/settings.json*|*.claude/settings.local.json*) exit 0 ;;
   esac
 
   # /dev/null redirects are not file writes; drop them before looking for one.
@@ -155,6 +160,9 @@ if [ "$TOOL" != "Bash" ]; then
   # The structured tools name their target outright.
   TARGET=$(printf '%s' "$INPUT" | grep -o '"file_path":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
   case "$TARGET" in
+    # The settings file that configures the escape hatch cannot sit behind the
+    # gate, or a denied ack has no way to be un-denied.
+    */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
     *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
   esac
 fi
@@ -162,6 +170,7 @@ if [ "$TOOL" = "Bash" ]; then
   CMD=$(printf '%s' "$INPUT" | grep -o '"command":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
   case "$CMD" in
     *claude-skill-gate-*|*claude-skill-acked-*|*claude-skill-loaded-*) exit 0 ;;
+    *.claude/settings.json*|*.claude/settings.local.json*) exit 0 ;;
   esac
 
   # A command that names a prose file and no code file is writing prose.
@@ -235,15 +244,20 @@ Before this Write/Edit, you must:
 One ack per skill per session. After acking, retry the Write/Edit.
 
 If that Bash call is denied by the auto mode classifier, STOP. Do not ask your
-user to run it for you, and do not look for another route to create the files.
-Both are what the classifier is there to stop, and asking a human to run a
-command you were just denied makes them the tool that performs it. Report this
-to them instead and let them decide:
+user to run it for you, do not look for another route to create the files, and
+do not try to add the allow rule yourself — an agent editing permission settings
+is denied by the same classifier, so that attempt fails too and costs a round
+trip that ends in the same place. All three are what the classifier is there to
+stop, and asking a human to run a command you were just denied makes them the
+tool that performs it. Report this to them instead and let them decide:
 
   Auto mode's built-in Auto-Mode Bypass rule counts a hook's ack file as working
   around the permission system. It is a soft rule, so an allow entry clears it.
-  It has to go in ~/.claude/settings.json — the classifier does not read a
-  project's .claude/settings.json — or in /permissions, Auto mode tab. Keep the
+  The user has to add it — you cannot. The shortest route is for them to re-run
+  npx @spardutti/claude-skills and accept the auto mode prompt, which writes it.
+  Otherwise /permissions, Auto mode tab. Editing the file by hand works too, and
+  it has to be ~/.claude/settings.json — the classifier does not read a
+  project's .claude/settings.json. Keep the
   \\\$defaults line or every built-in allow rule is discarded:
 
   \\"autoMode\\": { \\"allow\\": [ \\"\\\$defaults\\",
@@ -1035,7 +1049,7 @@ exit $STATUS
 // PreToolUse on Bash: refuses git commit/push without a ship-gate receipt.
 // Canonical source: scripts/ship-gate-hook.sh.
 const SHIP_GATE_HOOK_SCRIPT = `#!/usr/bin/env bash
-# ship-gate-hook.sh — PreToolUse on Bash. Refuses \`git commit\` and \`git push\`
+# ship-gate-hook.sh — PreToolUse on Bash. Refuses the commands that publish work
 # unless ship-gate.sh has left a receipt for exactly these changes.
 #
 # A gate written as an instruction is a gate an agent can decide is not worth the
@@ -1046,20 +1060,37 @@ const SHIP_GATE_HOOK_SCRIPT = `#!/usr/bin/env bash
 # The receipt key covers everything about to ship, so it survives \`git commit\`
 # and still matches at push time, and it changes the moment any file is edited —
 # a fix has to be re-gated instead of riding on the previous verdict.
+#
+# It gated \`git commit\` and \`git push\` until 2.23.0, and that was the wrong
+# moment. The gate's scope is merge-base..HEAD — the whole branch, because the
+# whole branch is what a PR ships — so a branch touching 46 files re-mutated all
+# 46 on every commit. Fifteen minutes, twenty times, for one branch. Neither a
+# commit nor a push to a feature branch publishes anything, so neither is gated
+# now: the cost is paid once, at the point work actually ships.
 
 INPUT=$(cat)
 
 CMD=$(printf '%s' "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' \\
       | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
 
-# Only the two commands that publish work. Everything else passes untouched.
-case "$CMD" in
-  *"git commit"*|*"git push"*) ;;
-  *) exit 0 ;;
-esac
-
 PROJECT_DIR="\${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
+
+# Opening or merging a PR publishes. So does pushing while standing on a
+# protected branch — that is a direct ship with no PR in front of it. The branch
+# is read from git rather than parsed out of the command, because \`git push\` with
+# no arguments names no branch at all.
+case "$CMD" in
+  *"gh pr create"*|*"gh pr merge"*) ;;
+  *"git push"*)
+    BRANCH=$(git branch --show-current 2>/dev/null)
+    case "$BRANCH" in
+      main|master|develop|development|dev) ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *) exit 0 ;;
+esac
 
 GATE="$PROJECT_DIR/.claude/hooks/ship-gate.sh"
 [ -x "$GATE" ] || exit 0
@@ -1413,4 +1444,82 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
   console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
+}
+
+// The project-level permissions.allow written above does not clear auto mode.
+// The classifier reads autoMode.allow, and only from the user's own
+// ~/.claude/settings.json — it deliberately ignores a project's settings so a
+// cloned repo cannot loosen it. So the gate's ack was denied, and the remedy the
+// deny message named could not be applied by the agent either: the classifier
+// refuses an agent editing permission settings by any route. That left a
+// deadlock nothing in the session could break. The installer can, because npx
+// runs as the user, not as an agent — but only ever behind an explicit prompt,
+// since this is the user's global file.
+export const AUTO_MODE_RULE =
+  "Touching marker files under /tmp/claude-skill-gate-*, /tmp/claude-skill-acked-* " +
+  "and /tmp/claude-skill-loaded-* is allowed: they are acknowledgement files for the " +
+  "user's own PreToolUse skill gates. Creating one satisfies a workflow gate the user " +
+  "installed, grants no permission and executes no code, and is a false positive for " +
+  "Auto-Mode Bypass.";
+
+// Any entry naming a marker path is ours, whatever wording it shipped with. An
+// upgrade must correct that entry rather than add a second one beside it —
+// a fresh-install test would never see the difference.
+const AUTO_MODE_RULE_MARK = "/tmp/claude-skill-acked-";
+
+function globalSettingsPath(homeDir) {
+  return join(homeDir ?? homedir(), ".claude", "settings.json");
+}
+
+async function readGlobalSettings(homeDir) {
+  try {
+    return JSON.parse(await readFile(globalSettingsPath(homeDir), "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+// "current" — the rule is present and matches. "stale" — an older wording is
+// there. "missing" — nothing of ours. "unreadable" — the file exists but does
+// not parse, so we must not rewrite it.
+export async function autoModeRuleStatus(homeDir) {
+  let raw;
+  try {
+    raw = await readFile(globalSettingsPath(homeDir), "utf-8");
+  } catch {
+    return "missing";
+  }
+  let settings;
+  try {
+    settings = JSON.parse(raw);
+  } catch {
+    return "unreadable";
+  }
+  const allow = settings?.autoMode?.allow;
+  if (!Array.isArray(allow)) return "missing";
+  if (allow.includes(AUTO_MODE_RULE)) return "current";
+  if (allow.some((r) => typeof r === "string" && r.includes(AUTO_MODE_RULE_MARK))) return "stale";
+  return "missing";
+}
+
+// Writes the rule into ~/.claude/settings.json, keeping "$defaults" first —
+// dropping it discards every built-in allow. Everything else in the file is
+// preserved. Refuses an unparseable file rather than replacing it.
+export async function writeAutoModeRule(homeDir) {
+  if ((await autoModeRuleStatus(homeDir)) === "unreadable") {
+    throw new Error(`${globalSettingsPath(homeDir)} is not valid JSON — fix it, then re-run.`);
+  }
+  const settings = (await readGlobalSettings(homeDir)) ?? {};
+  if (!settings.autoMode || typeof settings.autoMode !== "object") settings.autoMode = {};
+  const existing = Array.isArray(settings.autoMode.allow) ? settings.autoMode.allow : [];
+
+  const kept = existing.filter(
+    (r) => r !== "$defaults" && !(typeof r === "string" && r.includes(AUTO_MODE_RULE_MARK)),
+  );
+  settings.autoMode.allow = ["$defaults", ...kept, AUTO_MODE_RULE];
+
+  const path = globalSettingsPath(homeDir);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
+  return path;
 }

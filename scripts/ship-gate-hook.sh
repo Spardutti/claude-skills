@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ship-gate-hook.sh — PreToolUse on Bash. Refuses `git commit` and `git push`
+# ship-gate-hook.sh — PreToolUse on Bash. Refuses the commands that publish work
 # unless ship-gate.sh has left a receipt for exactly these changes.
 #
 # A gate written as an instruction is a gate an agent can decide is not worth the
@@ -10,20 +10,37 @@
 # The receipt key covers everything about to ship, so it survives `git commit`
 # and still matches at push time, and it changes the moment any file is edited —
 # a fix has to be re-gated instead of riding on the previous verdict.
+#
+# It gated `git commit` and `git push` until 2.23.0, and that was the wrong
+# moment. The gate's scope is merge-base..HEAD — the whole branch, because the
+# whole branch is what a PR ships — so a branch touching 46 files re-mutated all
+# 46 on every commit. Fifteen minutes, twenty times, for one branch. Neither a
+# commit nor a push to a feature branch publishes anything, so neither is gated
+# now: the cost is paid once, at the point work actually ships.
 
 INPUT=$(cat)
 
 CMD=$(printf '%s' "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' \
       | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
 
-# Only the two commands that publish work. Everything else passes untouched.
-case "$CMD" in
-  *"git commit"*|*"git push"*) ;;
-  *) exit 0 ;;
-esac
-
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
+
+# Opening or merging a PR publishes. So does pushing while standing on a
+# protected branch — that is a direct ship with no PR in front of it. The branch
+# is read from git rather than parsed out of the command, because `git push` with
+# no arguments names no branch at all.
+case "$CMD" in
+  *"gh pr create"*|*"gh pr merge"*) ;;
+  *"git push"*)
+    BRANCH=$(git branch --show-current 2>/dev/null)
+    case "$BRANCH" in
+      main|master|develop|development|dev) ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *) exit 0 ;;
+esac
 
 GATE="$PROJECT_DIR/.claude/hooks/ship-gate.sh"
 [ -x "$GATE" ] || exit 0

@@ -443,21 +443,38 @@ hook() {  # hook <label> <deny|allow> <command>
   else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got %s\n' "$1" "$2" "$got"; fi
 }
 
-hook "commit is blocked with no receipt" deny "git commit -m x"
+hook "opening a PR is blocked with no receipt" deny "gh pr create --fill"
+hook "merging a PR is blocked with no receipt" deny "gh pr merge 3 --squash"
 hook "an unrelated command is untouched" allow "ls -la"
+# A commit publishes nothing, and gating it is what made this expensive: the
+# gate's scope is the whole branch, so a 46-file branch re-mutated all 46 files
+# on every commit — fifteen minutes, twenty times, for one branch.
+hook "a commit is never gated" allow "git commit -m x"
 bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
-hook "commit is allowed after the gate passes" allow "git commit -m x"
+hook "the PR is allowed after the gate passes" allow "gh pr create --fill"
 echo "const b=2" >> a.ts
-hook "editing again invalidates the receipt" deny "git commit -m x"
+hook "editing again invalidates the receipt" deny "gh pr create --fill"
 bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
 git add -A >/dev/null 2>&1; git commit -qm work >/dev/null 2>&1
-hook "the receipt survives the commit, so push passes" allow "git push origin HEAD"
+hook "the receipt survives the commit" allow "gh pr create --fill"
+
+# A push to a feature branch ships nothing. A push while standing on a protected
+# branch is a direct ship with no PR in front of it, so that one is gated. The
+# branch comes from git, not from the command — `git push` names no branch.
+BASEBR=$(git branch --show-current)
+git checkout -qb feature/gate-scope 2>/dev/null
+echo "const d=4" >> a.ts
+hook "a push from a feature branch is not gated" allow "git push origin HEAD"
+git checkout -q "$BASEBR" 2>/dev/null
+hook "a push from the protected branch is gated" deny "git push origin HEAD"
+git checkout -q feature/gate-scope 2>/dev/null
+
 printf "GAUNTLET_MUTATE='echo \"[Survived] x\"'\n" > .claude/gauntlet.conf
 echo "const c=3" >> a.ts
 bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
-hook "a FAIL leaves no receipt" deny "git commit -m x"
+hook "a FAIL leaves no receipt" deny "gh pr create --fill"
 bash .claude/hooks/ship-gate.sh --force >/dev/null 2>&1
-hook "--force writes a receipt without running" allow "git commit -m x"
+hook "--force writes a receipt without running" allow "gh pr create --fill"
 
 # ------------------------------------------------------------ the skill gates
 # The application gate's BLOCKED text is one double-quoted bash string, so an
@@ -492,12 +509,118 @@ sag "it names the ack command"         "r.includes('touch /tmp/claude-skill-acke
 sag "it carries the skill's rules"     "r.includes('always x')"
 sag "a quoted phrase survives"         "r.includes('\"does not apply\"')"
 sag "and the auto mode guidance"       "r.includes('Auto-Mode Bypass')"
+# Exempting settings.json from the gate was not enough: the classifier denies an
+# agent editing permission settings by any route. A peer session burned a round
+# trip proving it. The message must say the user has to make the change.
+sag "it says the user must add the rule"  "r.includes('The user has to add it')"
+sag "and not to attempt it itself"        "r.includes('an agent editing permission settings')"
+sag "and names the /permissions route"    "r.includes('/permissions, Auto mode tab')"
 
 N=$((N+1))
 if [ ! -s "$TMP/sag.err" ]; then
   PASS=$((PASS+1)); printf '  ok   %s\n' "the hook writes nothing to stderr"
 else
   FAIL=$((FAIL+1)); printf '  FAIL the hook writes to stderr:\n%s\n' "$(cat "$TMP/sag.err")"
+fi
+
+# .json is in CODE_EXT, so both gates blocked ~/.claude/settings.json — the one
+# file that holds the autoMode allow rule the deny message tells the model to
+# add. With the ack touch denied by the classifier and the settings edit denied
+# by the gate, each fix needed the other first and the session deadlocked with
+# no move the model could make.
+echo "skill gates exempt the settings file"
+newrepo sg_settings
+mkdir -p .claude/skills/demo
+printf -- '---\nname: demo\n---\n## Rules\n- x\n' > .claude/skills/demo/SKILL.md
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+SSID="sgs$RUN"
+
+esc() {  # esc <label> <allow|deny> <hook file> <tool_name+tool_input json>
+  N=$((N+1))
+  out=$(printf '{"session_id":"%s",%s}' "$SSID" "$4" | bash ".claude/hooks/$3")
+  if [ "$2" = "allow" ] && [ -z "$out" ]; then
+    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  elif [ "$2" = "deny" ] && [ -n "$out" ]; then
+    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s\n       hook emitted: %s\n' "$1" "$out"
+  fi
+}
+
+# Loading gate: marker absent, so it is actively gating.
+esc "loading gate lets the settings edit through" allow skill-gate.sh \
+  '"tool_name":"Edit","tool_input":{"file_path":"/home/u/.claude/settings.json"}'
+esc "loading gate still stops a source edit" deny skill-gate.sh \
+  '"tool_name":"Edit","tool_input":{"file_path":"/home/u/src/a.ts"}'
+
+# Application gate: loading satisfied, skill loaded, nothing acked.
+touch "/tmp/claude-skill-gate-$SSID" "/tmp/claude-skill-loaded-$SSID-demo"
+esc "application gate lets the settings edit through" allow skill-application-gate.sh \
+  '"tool_name":"Edit","tool_input":{"file_path":"/home/u/.claude/settings.json"}'
+esc "and settings.local.json too" allow skill-application-gate.sh \
+  '"tool_name":"Edit","tool_input":{"file_path":"/home/u/.claude/settings.local.json"}'
+esc "and a heredoc writing the settings file" allow skill-application-gate.sh \
+  '"tool_name":"Bash","tool_input":{"command":"cat > /home/u/.claude/settings.json <<EOF"}'
+esc "application gate still stops a source edit" deny skill-application-gate.sh \
+  '"tool_name":"Edit","tool_input":{"file_path":"/home/u/src/a.ts"}'
+rm -f "/tmp/claude-skill-gate-$SSID" "/tmp/claude-skill-loaded-$SSID-demo"
+
+# The project-level permissions.allow the installer writes never cleared auto
+# mode: the classifier reads autoMode.allow, and only from the user's own
+# ~/.claude/settings.json. So the gate was unsatisfiable there, and the session
+# could not fix it either — an agent editing permission settings is denied by
+# the same classifier. Only the installer runs as the user.
+echo "auto mode allow rule"
+newrepo automode
+AMH="$PWD/home"
+AMS="$AMH/.claude/settings.json"
+mkdir -p "$AMH/.claude"
+
+amrun() { node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.writeAutoModeRule('$AMH')).catch(e=>{console.error(e.message);process.exit(1)})"; }
+
+am() {  # am <label> <node expression over s, the parsed global settings>
+  N=$((N+1))
+  if node -e "const s=JSON.parse(require('fs').readFileSync('$AMS','utf8'));process.exit(($2)?0:1)" 2>/dev/null; then
+    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s\n       settings: %s\n' "$1" "$(cat "$AMS" 2>&1)"
+  fi
+}
+
+MARK="r.includes('/tmp/claude-skill-acked-')"
+
+# No settings file at all.
+amrun >/dev/null 2>&1
+am "the rule is written from nothing"  "s.autoMode.allow.some(r=>$MARK)"
+am "and \$defaults comes first"         "s.autoMode.allow[0]==='\$defaults'"
+
+# Re-running is the upgrade path, and it must not stack entries.
+amrun >/dev/null 2>&1
+am "a second run adds no duplicate"     "s.autoMode.allow.filter(r=>$MARK).length===1"
+am "and leaves one \$defaults"           "s.autoMode.allow.filter(r=>r==='\$defaults').length===1"
+
+# A real settings file has the user's own content in it.
+printf '{"env":{"FOO":"bar"},"autoMode":{"allow":["$defaults","my own rule"]}}' > "$AMS"
+amrun >/dev/null 2>&1
+am "an unrelated setting survives"      "s.env.FOO==='bar'"
+am "the user's own allow rule survives" "s.autoMode.allow.includes('my own rule')"
+
+# An older wording must be corrected in place, not left beside the new one.
+# A fresh-install test never sees this.
+printf '{"autoMode":{"allow":["$defaults","old text about /tmp/claude-skill-acked- files"]}}' > "$AMS"
+amrun >/dev/null 2>&1
+am "a stale rule is replaced, not doubled" "s.autoMode.allow.filter(r=>$MARK).length===1"
+am "and the stale wording is gone"         "!s.autoMode.allow.some(r=>r.includes('old text about'))"
+
+# Never rewrite a file we cannot parse.
+printf 'not json {{{' > "$AMS"
+N=$((N+1))
+if amrun >/dev/null 2>&1; then
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "an unparseable settings file is overwritten"
+elif [ "$(cat "$AMS")" = "not json {{{" ]; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "an unparseable settings file is refused, not rewritten"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n       became: %s\n' "an unparseable settings file was altered" "$(cat "$AMS")"
 fi
 
 # Write|Edit|MultiEdit is not the only way to change a file. A session edited
@@ -825,6 +948,67 @@ if grep -q 'testRunner: "vitest"' stryker.config.json; then
 else
   FAIL=$((FAIL+1)); printf '  FAIL the unparseable config was overwritten\n'
 fi
+
+# One table of 11 headings and 16 term rows produced 57 unkillable survivors and
+# a fifteen-minute gate. The only test that kills 'Pizzas' -> 'Stryker was here!'
+# asserts the table against a copy of the table. So string mutants inside a
+# module-level data table are ignored — by where they sit, like the className
+# rule, not by disabling the StringLiteral mutator everywhere.
+echo "stryker data-table ignorer"
+
+idt() {  # idt <label> <expected 1|0> <js defining `leaf`>
+  N=$((N+1))
+  if node -e "import('$HERE/../cli/lib/scaffold-stryker.mjs').then(m=>{const P=(k,node,parent)=>({isFunction:()=>k.includes('fn'),isVariableDeclarator:()=>k.includes('vd'),isStringLiteral:()=>k.includes('str'),node:node||{},parentPath:parent||null});$3;process.exit(m.inDataTable(leaf)===($2===1)?0:1)})" 2>/dev/null; then
+    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$1"
+  fi
+}
+
+idt "a string in a module-level array is data" 1 \
+  "const d=P(['vd'],{init:{type:'ArrayExpression'}});const leaf=P(['str'],{},d)"
+idt "a string in a module-level object is data" 1 \
+  "const d=P(['vd'],{init:{type:'ObjectExpression'}});const leaf=P(['str'],{},d)"
+idt "a string inside a function is not data" 0 \
+  "const f=P(['fn']);const d=P(['vd'],{init:{type:'ArrayExpression'}},f);const leaf=P(['str'],{},d)"
+idt "a const built by a call is not data" 0 \
+  "const d=P(['vd'],{init:{type:'CallExpression'}});const leaf=P(['str'],{},d)"
+idt "a string in no declaration is not data" 0 \
+  "const leaf=P(['str'],{},null)"
+
+newrepo stridt
+node -e "import('$HERE/../cli/lib/scaffold-stryker.mjs').then(m=>m.scaffoldStryker('$PWD',''))" >/dev/null 2>&1
+N=$((N+1))
+if grep -q 'inDataTable(path)' stryker-classname-ignorer.mjs; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "the generated ignorer carries the rule"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL the generated ignorer has no data-table rule\n'
+fi
+
+# The upgrade, not the install. A project holding the v1 ignorer kept it forever
+# under the old "exists, so leave it" branch and never gained this rule.
+printf '// old v1 ignorer\nexport const strykerPlugins = [];\n' > stryker-classname-ignorer.mjs
+node -e "
+  import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
+    console.log(JSON.stringify(await m.scaffoldStryker('$PWD', '')));
+  });
+" > "$TMP/scaf.json" 2>&1
+scaf "an outdated ignorer is rewritten" \
+  "r.patched.some(p=>p.includes('stryker-classname-ignorer.mjs'))"
+N=$((N+1))
+if grep -q 'inDataTable(path)' stryker-classname-ignorer.mjs; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "and the upgraded file has the rule"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL the outdated ignorer was left in place\n'
+fi
+
+node -e "
+  import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
+    console.log(JSON.stringify(await m.scaffoldStryker('$PWD', '')));
+  });
+" > "$TMP/scaf.json" 2>&1
+scaf "a current ignorer is left alone" \
+  "r.kept.some(p=>p.includes('stryker-classname-ignorer.mjs'))"
 
 cd /
 rm -rf "$TMP"

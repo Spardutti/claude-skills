@@ -29,7 +29,7 @@ Rules that always hold:
 - **Never re-do a satisfied stage** — already committed? start at pr.
 - **Never skip a required stage** — `/ship release` with uncommitted work runs commit → pr → merge → release first.
 - A merge into the **main** branch always asks for confirmation, even when a target is set.
-- The **gate** (Step 0.5) runs once per invocation, before the first stage, unless `--force`.
+- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it.
 
 ## Step 0 — Prechecks and Start Detection
 
@@ -78,8 +78,16 @@ Each stage below re-verifies its own precondition and aborts if Step 0 routed it
 
 ## Step 0.5 — The Gate
 
-Runs **once**, before the first stage. `--force` in `$ARGUMENTS` skips it entirely — no
-argument, no questions. Skip it too when there is nothing to check.
+Runs **once**, immediately before the **pr** stage. `--force` in `$ARGUMENTS` skips it
+entirely — no argument, no questions. Skip it too when there is nothing to check.
+
+**Not before commit.** The gate's mutation scope is `merge-base..HEAD` — the whole branch,
+because the whole branch is what a PR ships. Running it before every commit re-mutated
+every file the branch had ever touched: a 46-file branch paid fifteen minutes on each of
+twenty commits. A commit publishes nothing, so it is not gated. If a run stops at commit,
+the gate never runs; the moment a run continues to pr, merge or release, it runs first.
+Ask for it earlier with a bare `bash .claude/hooks/ship-gate.sh` when you want the
+findings before the PR.
 
 This is the one enforcement moment. It does not re-run the test suite: the `gauntlet.sh`
 Stop hook already ran types and tests on every turn. It checks the three things nothing
