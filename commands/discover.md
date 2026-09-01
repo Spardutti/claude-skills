@@ -1,9 +1,9 @@
 ---
 name: discover
-description: "Turn a vague intuition into a decided direction before /preplan — diverges first: surfaces competing interpretations of what you said, stress-tests the framing with a blind critic subagent, then converges on a mental model and writes a discovery log"
+description: "Turn a vague intuition into a decided direction before /preplan — diverges first: generates competing framings through blind subagents under forced constraints, stress-tests the winner with a blind critic, and refuses to converge until every open question is answered or deferred, then writes a discovery log"
 category: Workflow
 allowed-tools: Read, Grep, Glob, Task, Write
-requires-agents: [discover-critic]
+requires-agents: [discover-critic, discover-framer]
 argument-hint: "<vague idea, or a feeling you can't articulate yet>"
 ---
 
@@ -42,6 +42,43 @@ Use the same markers in your own summaries so the user knows what you're treatin
 - **Read the codebase when a question is answerable from code.** Don't ask what `grep` can tell you.
 - **Prefer recognition over specification.** When the user stalls trying to describe something, stop asking for words: ask for examples of apps/screens that feel right, then tell them what interaction model they're probably responding to. People recognize far better than they specify.
 
+## The open-question ledger
+
+Discovery ends when there is nothing left to ask — not when a direction starts to feel right. Track that explicitly, in three buckets.
+
+### Open questions
+
+Ones you can state precisely, right now. A question sits on the **frontier** when everything it depends on is already answered; those are the ones you can ask without guessing. A question hanging off an unanswered one waits for a later round.
+
+Seed the ledger in Stage 1 and grow it as you go — answers spawn new questions, so add them. Seeds worth carrying every time:
+
+- Who acts, and at what moment?
+- What happens on the second one — two of the thing, none of it, one in two states at once?
+- What does the user do with the answer once they have it?
+- What is true today that stops this from already working?
+
+### Fog
+
+Areas where you can feel a question coming but cannot yet word it. **The test is whether you can state the question sharply now — not whether you can answer it.** A question you can phrase but not yet ask is an open question, blocked; only what you cannot phrase is fog.
+
+Write a patch as loosely as the view allows. Do not pre-slice it into question-shaped pieces — one patch may sharpen into three questions, or into none.
+
+Fog **graduates**. An answer clears the fog behind it, and a patch becomes real questions: move them to Open questions and delete the patch, so every unknown lives in exactly one place.
+
+### Out of scope
+
+Work that is sharp enough to state but sits past this problem. **Scope puts it here, not fuzziness** — and unlike fog it never graduates.
+
+Keep it clear of the framings Stage 3 rejected. "We chose a different abstraction" and "that is a different problem" are different notes, and collapsing them loses the scope boundary.
+
+### Keeping it honest
+
+After each answer, restate all three buckets compactly. A ledger you keep in your head is a ledger you will quietly drop.
+
+**Only two things close a question:** the user answers it, or you read the answer out of the codebase. Your own guess does not — if you catch yourself filling one in, it is still open, and say so.
+
+The user may mark any open question or fog patch **DEFERRED**. That closes it for this session and carries it into the log's Open questions. This is the only escape hatch, and you do not get to grant it to yourself.
+
 ## Stage 1 — Intent
 
 What is the user actually trying to achieve, one level above their proposed solution? Keep asking "what decision would you make with that?" or "what would you do differently if you had it?" until you hit an outcome rather than a feature.
@@ -56,20 +93,26 @@ Find the load-bearing words in what they said and show that they're underspecifi
 
 ## Stage 3 — Competing interpretations
 
-Give **2–4 genuinely different readings** of the problem, each with its own mental model. These must differ in *abstraction*, not in layout.
+You need **2–4 genuinely different readings** of the problem, each with its own mental model, differing in *abstraction* rather than in layout.
 
 > Bad (cosmetically different, conceptually identical): sidebar vs tabs vs cards.
 > Good (different abstractions): users manage **objects** / users manage **tasks** / users manage **events**.
 
-For each, state the mental model in one line and what it makes easy and hard.
+**You are the worst person to generate these.** Left alone you produce one idea in three outfits, because all three come from the reading you already have. So don't generate them alone.
 
-**Before showing them, run this test.** Name the **primary entity** of each interpretation — the thing the user acts on directly, the thing that would own a table.
+Spawn three `discover-framer` subagents in parallel via the Task tool, each under a different forced constraint:
 
-> If two interpretations share the same primary entity, they are the same interpretation wearing different clothes. Discard one and generate a replacement whose primary entity is different.
+- **A — Nothing new.** Assume the outcome is already reachable with what exists. Then what is actually missing?
+- **B — Demote the noun.** The noun the user opened with is not the primary entity. Make something else primary — the farm becomes an attribute of the issue rather than the issue an attribute of the farm.
+- **C — Move the moment.** The problem belongs to a different actor, or happens at a different point in time.
 
-The strongest replacement usually **demotes the noun the user opened with** — the farm becomes an attribute of the issue rather than the issue an attribute of the farm. If every interpretation still has the user's original noun as its primary entity, you have not diverged; produce one that doesn't.
+Pass each one the outcome, the core problem, and the user's own words. Do **not** pass your leading candidate or your read of the conversation — the constraint is what makes them diverge, and your steering is what collapses them back together.
 
-Then ask which one the user recognizes — or whether none of them fit.
+Each returns a framing: name, primary entity, mental model, what it makes easy, what it makes hard.
+
+**Then dedupe on primary entity.** Two framings sharing a primary entity are one framing wearing different clothes — keep the stronger, and say which you dropped and why. If every survivor still has the user's opening noun as its primary entity, constraint B failed: re-run it, naming what it must demote.
+
+Present the survivors and ask which one the user recognizes — or whether none of them fit.
 
 ## Stage 4 — Assumption stress-test
 
@@ -90,6 +133,10 @@ Write the model as a chain of nouns and state transitions, not as features:
 This is the artifact's most valuable line. Later work gets checked against it: "does this new feature violate the model?"
 
 ## Stage 6 — Converge
+
+**Do not enter this stage while the ledger holds an open question or a patch of fog.** Show all three buckets first: every question answered or deferred by the user, and every fog patch graduated or deferred. If something is still open, you are in Stage 1–4, not here. An emerging direction is not a reason to skip the rest of the ledger; it is the reason the rest of the ledger exists.
+
+Fog is the easier of the two to skip, because an unworded question does not feel like an unanswered one. It is the same debt.
 
 Now, and only now, narrow. Confirm the direction, list what was rejected and why, and state your confidence honestly (`high` / `medium` / `low`) with the reason. Low confidence with named open questions is a legitimate outcome — say so rather than manufacturing certainty.
 
@@ -118,8 +165,11 @@ Now, and only now, narrow. Confirm the direction, list what was rejected and why
 ## Surviving assumptions
 - <assumption> — risk: high/med/low — <how it could be cheaply falsified>
 
+## Out of scope
+- <sharp enough to state, but past this problem — and why>
+
 ## Open questions
-- <what's still unknown>
+- <what's still unknown, including anything deferred>
 
 ## Confidence
 <high | medium | low> — <one line: what would raise it>
@@ -134,14 +184,21 @@ If the user passed a path (e.g. "save to DISCOVERY.md"), write it there. Otherwi
 
 - Always state the marking protocol before the first question.
 - Always ask one open question at a time — never batch, never attach a suggested answer.
-- Always reach Stage 3 with at least 2 interpretations, and always name each one's primary entity before showing them — two interpretations sharing a primary entity is one interpretation, not two.
-- Always include at least one Stage 3 interpretation whose primary entity is *not* the noun the user opened with.
-- Always run `discover-critic` blind — never pass it the user's preference or the transcript.
+- Always maintain the ledger out loud — open questions, fog, out of scope — and restate all three after each answer.
+- Always sort an unknown by whether you can phrase the question now, not by whether you can answer it.
+- Always graduate a fog patch into open questions when an answer sharpens it, and delete the patch when you do.
+- Never file a rejected Stage 3 framing as out of scope — rejected framings belong in Considered approaches.
+- Always close a question with the user's answer or a fact from the codebase — never with your own guess.
+- Always reach Stage 3 through three `discover-framer` agents, one per constraint — never by generating the interpretations yourself.
+- Always dedupe Stage 3 on primary entity — two framings sharing a primary entity is one framing, not two.
+- Always include at least one Stage 3 framing whose primary entity is *not* the noun the user opened with.
+- Always run `discover-critic` and `discover-framer` blind — never pass either the user's preference or the transcript.
 - Always treat unmarked user input as a hypothesis; promote to DECISION only when the user says so.
 - Always check the codebase before asking something the code answers.
 - Never write code, sketch an implementation, or produce a file/module breakdown.
 - Never produce a Reuse/Extend/Add list or scope/edge-case matrix — that's `/preplan` and `/plan-feature`.
 - Never include metrics, timelines, personas, or stakeholder sections. This is not a PRD.
 - Never agree just to move forward, and never disagree just to seem rigorous.
+- Never converge, and never emit the discovery log, while the ledger holds a question the user has not answered or deferred, or a fog patch neither graduated nor deferred.
 - Never emit the discovery log while a kill-shot is unanswered — loop back to Stage 3 instead.
 - Cap the log at ~50 lines. If the problem needs more, it's more than one problem — tell the user to split it.
