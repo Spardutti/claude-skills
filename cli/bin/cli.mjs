@@ -8,7 +8,13 @@ import { dirname, join } from "node:path";
 import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
 import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../lib/prompt.mjs";
 import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
-import { setupHook, detectStack, writeGauntletConf } from "../lib/setup-hook.mjs";
+import {
+  setupHook,
+  detectStack,
+  writeGauntletConf,
+  autoModeRuleStatus,
+  writeAutoModeRule,
+} from "../lib/setup-hook.mjs";
 import { makeLocalSource, reportToolNeeds } from "../lib/local.mjs";
 import { scaffoldStryker } from "../lib/scaffold-stryker.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
@@ -172,6 +178,39 @@ async function main() {
       console.log();
       await setupHook();
       await setupClaudeMd();
+
+      // In auto mode the classifier denies the gate's ack, and it only reads
+      // autoMode.allow from the user's own ~/.claude/settings.json. Without this
+      // the gate cannot be satisfied at all, and the session cannot fix it
+      // either — an agent editing permission settings is denied by the same
+      // classifier. The installer is the only thing here running as the user.
+      const autoModeStatus = await autoModeRuleStatus();
+      if (autoModeStatus === "unreadable") {
+        console.log();
+        console.log(`  ${chalk.yellow("!")} ${chalk.dim("~/.claude/settings.json is not valid JSON — skipping the auto mode rule.")}`);
+      } else if (autoModeStatus !== "current") {
+        console.log();
+        console.log(chalk.dim("  Auto mode's classifier denies the gate's acknowledgement files, and"));
+        console.log(chalk.dim("  clearing that needs a rule in your own ~/.claude/settings.json. Claude"));
+        console.log(chalk.dim("  cannot add it — editing permission settings is denied to agents too."));
+        const addRule = await confirm({
+          message:
+            autoModeStatus === "stale"
+              ? "Update the auto mode allow rule in ~/.claude/settings.json? (Recommended)"
+              : "Add an auto mode allow rule to ~/.claude/settings.json? (Recommended)",
+          default: true,
+        });
+        if (addRule) {
+          try {
+            const written = await writeAutoModeRule();
+            console.log(`  Settings updated: ${written}`);
+          } catch (err) {
+            console.log(`  ${chalk.yellow("!")} ${chalk.dim(err.message)}`);
+          }
+        } else {
+          console.log(`  ${chalk.dim("Skipped. In auto mode the gate will block until you add it via /permissions.")}`);
+        }
+      }
 
       // Report what the gauntlet will actually run, so a silent no-op is visible.
       // This asks the installed hook itself — never a second copy of its logic.
