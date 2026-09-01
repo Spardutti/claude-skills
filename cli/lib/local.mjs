@@ -161,6 +161,7 @@ export async function reportToolNeeds(projectDir) {
         const at = rel ? rel + "/" : "";
         needs.push({
           label,
+          rel,
           tool: "Stryker",
           install: `npm --prefix ${rel || "."} i -D @stryker-mutator/core @stryker-mutator/vitest-runner`,
           config: `${at}stryker.config.json  {"testRunner":"vitest","plugins":["@stryker-mutator/vitest-runner"],"coverageAnalysis":"perTest"}`,
@@ -173,6 +174,20 @@ export async function reportToolNeeds(projectDir) {
             `${at}.gitignore  .stryker-tmp/`,
           ],
         });
+      } else {
+        // Stryker is installed, so this project is not missing a tool — but the
+        // projects that already run it are the ones grinding through mutants on
+        // className strings, and a setup done before the ignorer existed has no
+        // way to learn about it. Offer it here or it never reaches them.
+        let cfg = "";
+        try {
+          cfg = await readFile(join(dir, "stryker.config.json"), "utf-8");
+        } catch {
+          // no config of its own — the scaffolder writes one
+        }
+        if (!cfg.includes("tailwind-classnames")) {
+          needs.push({ label, rel, tool: "Stryker", ignorerOnly: true });
+        }
       }
     }
     if (pyp && !seen.has(label + ":py")) {

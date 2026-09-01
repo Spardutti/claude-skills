@@ -10,6 +10,7 @@ import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../
 import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
 import { setupHook, detectStack, writeGauntletConf } from "../lib/setup-hook.mjs";
 import { makeLocalSource, reportToolNeeds } from "../lib/local.mjs";
+import { scaffoldStryker } from "../lib/scaffold-stryker.mjs";
 import { setupClaudeMd } from "../lib/setup-claude-md.mjs";
 import {
   readManifest, writeManifest, computeOrphans, computeRemovals, scanInstalled, removeArtifacts,
@@ -209,11 +210,62 @@ async function main() {
       if (!selectedSkills.some((s) => s.dirName === "testing-best-practices")) {
         console.log(`    ${chalk.dim("Setting these up has traps — install the testing-best-practices skill for MUTATION-TESTING.md.")}`);
       }
-      for (const n of needs) {
+      for (const n of needs.filter((n) => !n.ignorerOnly)) {
         console.log(`    ${chalk.bold(n.label)} needs ${n.tool}`);
         console.log(`      ${chalk.cyan(n.install)}`);
         console.log(`      ${chalk.dim(n.config)}`);
         for (const line of n.also ?? []) console.log(`      ${chalk.dim(line)}`);
+      }
+      for (const n of needs.filter((n) => n.ignorerOnly)) {
+        console.log(`    ${chalk.bold(n.label)} runs ${n.tool} without the class-name ignorer`);
+        console.log(`      ${chalk.dim("~40% of a first React run is mutants on className strings, which no test can honestly kill")}`);
+      }
+
+      // Printing five steps meant every project was set up by hand, and the one
+      // step people skipped was the class-name ignorer — the reason a first run
+      // comes back with dozens of mutants on className strings that no test can
+      // honestly kill. Write the two files instead of describing them.
+      const stryker = needs.filter((n) => n.tool === "Stryker");
+      if (stryker.length > 0) {
+        console.log();
+        const doScaffold = await confirm({
+          message: `Write Stryker's config and the class-name ignorer for ${stryker.length} project(s)?`,
+          default: true,
+        });
+        if (doScaffold) {
+          const installs = [];
+          const vitest = [];
+          for (const n of stryker) {
+            const r = await scaffoldStryker(CWD, n.rel);
+            for (const f of r.wrote) console.log(`  Wrote: ${f}`);
+            for (const f of r.patched) console.log(`  Added the ignorer to: ${f}`);
+            for (const f of r.kept) console.log(`  ${chalk.dim(`Kept yours: ${f}`)}`);
+            for (const f of r.unreadable) {
+              console.log(`  ${chalk.yellow("!")} ${f} is not readable as JSON — left alone, add the ignorer by hand`);
+            }
+            // A project that already runs Stryker needs neither the install nor
+            // the vitest exclude repeated at it; it only lacked the ignorer.
+            if (!n.ignorerOnly) {
+              installs.push(r.install);
+              vitest.push(r.vitest);
+            }
+          }
+          // Left to the reader on purpose: installing touches the lockfile and
+          // the network, and editing an existing vitest config means parsing
+          // someone's plugins and aliases, where being wrong breaks their tests.
+          if (installs.length > 0) {
+            console.log(`\n  ${chalk.yellow("!")} ${chalk.bold("Two steps left, per project:")}`);
+            for (const c of installs) console.log(`      ${chalk.cyan(c)}`);
+            for (const v of vitest) console.log(`      ${chalk.dim(v)}`);
+          }
+          // The ignorer imports @stryker-mutator/api, which npm hoists by
+          // accident and pnpm does not. Missing, it prints one WARN PluginLoader
+          // line, loads nothing, and every className mutant comes back survived.
+          if (stryker.some((n) => n.ignorerOnly)) {
+            console.log(`\n  ${chalk.yellow("!")} ${chalk.bold("The ignorer needs its own dependency:")}`);
+            console.log(`      ${chalk.cyan("add @stryker-mutator/api as a dev dependency")} ${chalk.dim("— pnpm does not hoist it, and without it the ignorer silently does not load")}`);
+          }
+        }
       }
     }
   }
