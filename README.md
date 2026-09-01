@@ -88,6 +88,8 @@ Cross-cutting craft — applies to any stack, any language.
 |-------|----------------|
 | `code-structure` 📦 | Single Responsibility (when to split) + Avoid Hasty Abstractions (when *not* to extract) — hard size limits, separation of concerns, the Rule of Three |
 | `debugging` | Root cause before patching — reproduce, trace the failure backward to its origin, one hypothesis at a time, the 3-attempts-then-question-the-design rule |
+| `git-merge-conflicts` | Resolve a merge/rebase conflict by intent, not by side — `zdiff3` to see the merge base, the inverted meaning of `ours`/`theirs` during a rebase, the semantic and tree conflicts git never marks, lockfiles and migrations you regenerate instead of merging |
+| `research` | Open the source, don't recall it — route to the tool that owns the answer, primary sources only, pin the version you're actually on, run the validator instead of guessing, and mark every claim VERIFIED / INFERRED / UNVERIFIED |
 | `typescript-best-practices` | TypeScript 7.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
 | `testing-best-practices` 📦 | Arrange-Act-Assert, factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite; bundle covers mutation testing — Stryker and mutmut setup, diff-scoped runs, the traps, and working score thresholds |
 | `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
@@ -106,6 +108,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 | `/deep-review` | Multi-agent deep code review — 5 parallel subagents catch guard bypasses, lost async state, wrong-table queries, dead references, protocol violations |
 | `/test-review` | Write-then-verify test review — scopes to the diff, runs red-green + mutation gates, then an isolated read-only subagent proves each test would catch a regression instead of rubber-stamping it |
 | `/lockdown` | Per-repo supply-chain hardening — detects the package managers, Dockerfiles, and CI in use, then guides you through and applies install-time, deploy, and pipeline hardening for npm/pnpm, pip/uv, Docker, and GitHub Actions |
+| `/handoff` | Write a handoff doc so a fresh session picks the work up — captures what auto-compaction loses: decisions made and rejected, dead ends already ruled out, why the tree is dirty, and the one next step. Links to specs, commits, and PRs instead of restating them |
 
 ## How It Works
 
