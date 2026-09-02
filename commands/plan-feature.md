@@ -15,9 +15,11 @@ This is **not** a PRD. You are not scoping product value or success metrics. You
 
 ## Step 1 — Restate the Feature
 
-First, **check for a preplan log**. If `$ARGUMENTS` names a file, or a `PREPLAN.md` exists at the repo root, read it — `/preplan` produces one as a decision log meant to feed this command. If found, treat every decision, scope boundary, and edge case in it as **already resolved**: don't re-ask them later.
+First, **check for a discovery log**. If `$ARGUMENTS` names a file, or a `DISCOVERY.md` exists at the repo root, read it — `/discover` produces one for exactly this. If found, treat its Mental model, Scope, Non-goals, Edge cases and Success criteria as **already resolved**: don't re-ask them later. Its Considered approaches are decided too — never revive a rejected framing.
 
-Take `$ARGUMENTS` (the user's brief) plus the preplan log if present. In 1–2 sentences, restate what the feature is in your own words. If the brief is too vague to scan for (e.g. "improve the dashboard") and no preplan log clarifies it, ask **one** clarifying question first and stop. Otherwise continue.
+Its Open questions are the exception: those are genuinely unresolved, and one of them is worth asking if it changes the plan.
+
+Take `$ARGUMENTS` (the user's brief) plus the discovery log if present. In 1–2 sentences, restate what the feature is in your own words. If the brief is too vague to scan for (e.g. "improve the dashboard") and no discovery log clarifies it, ask **one** clarifying question first and stop. Otherwise continue.
 
 ## Step 2 — Spawn 3 Parallel Subagents
 
@@ -39,7 +41,7 @@ Now, and only now, ask the user clarifying questions — **batched in a single m
 - "Similar features (`OrderList`, `InvoiceList`) use `useInfiniteQuery` with cursor pagination — same approach here, or offset?"
 - "`src/api/router.ts` and `src/db/schema.ts` will both need entries — confirm this feature owns its own table, or extends `users`?"
 
-Skip questions whose answer is obvious from the scans, **or already settled by a preplan log** — never re-ask something the log resolved. If everything is clear, skip this step entirely.
+Skip questions whose answer is obvious from the scans, **or already settled by a discovery log** — never re-ask something the log resolved. If everything is clear, skip this step entirely.
 
 ## Step 4 — Produce the Integration Plan
 
@@ -74,7 +76,7 @@ If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write th
 
 ## Rules
 
-- Always check for a `PREPLAN.md` (or a path in `$ARGUMENTS`) before Step 1, and treat its decisions as resolved input — never re-ask what it already settled.
+- Always check for a `DISCOVERY.md` (or a path in `$ARGUMENTS`) before Step 1, and treat its scope, non-goals, edge cases and success criteria as resolved input — never re-ask what it already settled, and never revive a framing it rejected.
 - Always run the 3 subagents in parallel in a single Task message.
 - Always wait for all 3 to return before asking the user anything.
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.

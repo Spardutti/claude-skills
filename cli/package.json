@@ -1,6 +1,6 @@
 {
   "name": "@spardutti/claude-skills",
-  "version": "2.24.0",
+  "version": "2.25.0",
   "description": "CLI to install Claude Code skills from the claude-skills collection",
   "type": "module",
   "repository": {

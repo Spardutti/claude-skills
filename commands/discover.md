@@ -1,6 +1,6 @@
 ---
 name: discover
-description: "Turn a vague intuition into a decided direction before /preplan — diverges first: generates competing framings through blind subagents under forced constraints, stress-tests the winner with a blind critic, and refuses to converge until every open question is answered or deferred, then writes a discovery log"
+description: "Turn a vague intuition into a decided direction before /plan-feature — diverges first: generates competing framings through blind subagents under forced constraints, stress-tests the winner with a blind critic, and refuses to converge until every open question is answered or deferred, then drafts scope, non-goals, edge cases and success criteria for you to correct and writes a discovery log"
 category: Workflow
 allowed-tools: Read, Grep, Glob, Task, Write
 requires-agents: [discover-critic, discover-framer]
@@ -15,11 +15,11 @@ Your job is to **diverge before converging**: widen the space of what the proble
 
 ## What this is not
 
-`/preplan` converges — it takes a known feature and resolves it into decisions, suggesting an answer with every question. `/discover` runs **before** that and does the opposite:
+Stages 1–6 diverge. Only Stage 7 converges, and it does so by *drafting* the boundaries rather than asking for them.
 
 - **Do not write code.** Not even a sketch.
 - **Do not produce an implementation plan.** That's `/plan-feature`.
-- **Do not suggest an answer with your question.** A suggested answer anchors the user on your framing — the exact failure `/discover` exists to prevent. Ask open questions.
+- **Do not suggest an answer with your question.** A suggested answer anchors the user on your framing — the exact failure `/discover` exists to prevent. Ask open questions. This holds through Stage 6; Stage 7 deliberately inverts it.
 - **Do not assume the user's proposed solution is the right one.** They came here because it might not be.
 
 ## The marking protocol
@@ -165,6 +165,18 @@ Now, and only now, narrow. Confirm the direction, list what was rejected and why
 ## Surviving assumptions
 - <assumption> — risk: high/med/low — <how it could be cheaply falsified>
 
+## Scope
+- <what this includes>
+
+## Non-goals
+- <deliberately not doing, and why — not the same as out of scope>
+
+## Edge cases
+- <case> — <what should happen>
+
+## Success criteria
+- <observable check that says this worked>
+
 ## Out of scope
 - <sharp enough to state, but past this problem — and why>
 
@@ -175,10 +187,33 @@ Now, and only now, narrow. Confirm the direction, list what was rejected and why
 <high | medium | low> — <one line: what would raise it>
 
 ---
-Next step: run `/preplan` with this log as context.
+Next step: run `/plan-feature` with this log as context.
 ```
 
 If the user passed a path (e.g. "save to DISCOVERY.md"), write it there. Otherwise print it.
+
+## Stage 7 — Propose the boundaries, don't interrogate them
+
+The last four sections — Scope, Non-goals, Edge cases, Success criteria — are the
+ones `/plan-feature` needs and the conversation has not produced.
+
+**Write them yourself, then show them for correction.** Do not walk the user
+through another round of questions. They just answered everything on the ledger
+and picked a direction; asking them to now specify boundaries one at a time is
+the same work twice, and it is the reason this stage is not a separate command.
+
+- Draft all four from what the conversation already settled.
+- Present them in one message and ask a single question: **what's wrong here?**
+- Correct what they correct. Do not defend a draft.
+- Anything they cannot answer goes to Open questions, not into a guess.
+
+Edge cases are where a draft earns its keep — you have the mental model, so you
+can enumerate the second one, the zero case, and the two-at-once case without
+asking. Success criteria must be observable: "the user can X without Y" passes,
+"it feels faster" does not.
+
+Keep it to what a planner needs. No metrics, no timelines, no personas — this is
+still not a PRD.
 
 ## Rules
 
@@ -196,7 +231,8 @@ If the user passed a path (e.g. "save to DISCOVERY.md"), write it there. Otherwi
 - Always treat unmarked user input as a hypothesis; promote to DECISION only when the user says so.
 - Always check the codebase before asking something the code answers.
 - Never write code, sketch an implementation, or produce a file/module breakdown.
-- Never produce a Reuse/Extend/Add list or scope/edge-case matrix — that's `/preplan` and `/plan-feature`.
+- Never produce a Reuse/Extend/Add list or a file/module breakdown — that's `/plan-feature`.
+- Always draft Scope, Non-goals, Edge cases and Success criteria in Stage 7 and ask only what is wrong with them — never walk the user through a second round of questions to produce them.
 - Never include metrics, timelines, personas, or stakeholder sections. This is not a PRD.
 - Never agree just to move forward, and never disagree just to seem rigorous.
 - Never converge, and never emit the discovery log, while the ledger holds a question the user has not answered or deferred, or a fog patch neither graduated nor deferred.
