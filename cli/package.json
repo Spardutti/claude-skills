@@ -1,7 +1,7 @@
 {
   "name": "@spardutti/claude-skills",
-  "version": "2.25.0",
-  "description": "CLI to install Claude Code skills from the claude-skills collection",
+  "version": "2.25.1",
+  "description": "Guardrails for Claude Code — best-practice skills, planning commands, and delivery gates.",
   "type": "module",
   "repository": {
     "type": "git",
