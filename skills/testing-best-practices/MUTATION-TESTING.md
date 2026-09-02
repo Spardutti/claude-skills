@@ -13,6 +13,9 @@ the tests cannot accidentally pass.
 - [mutmut — Python](#mutmut--python)
 - [Reading the Output](#reading-the-output)
 - [Silencing Noise Without Going Blind](#silencing-noise-without-going-blind)
+  - [`next-line` Means The Next Line, Literally](#next-line-means-the-next-line-literally)
+  - [Prefer `ignoreStatic` Over Silencing A Data Table](#prefer-ignorestatic-over-silencing-a-data-table)
+- [An Incremental Typecheck Can Lie](#an-incremental-typecheck-can-lie)
 - [Scores and Thresholds](#scores-and-thresholds)
 - [Rules](#rules)
 
@@ -243,6 +246,72 @@ For a one-off, the comment escape hatch beats a global rule:
 
 Block form is `// Stryker disable <Mutator>` … `// Stryker restore <Mutator>`.
 
+### `next-line` Means The Next Line, Literally
+
+It binds to the physical line below the comment, and three things routinely move
+that line out from under it. One session lost three attempts to this before the
+directive took.
+
+```ts
+// BAD — the formatter owns this line. Biome or Prettier re-wraps the const onto
+// two lines and the directive now points at the opening bracket.
+// Stryker disable next-line StringLiteral: copy, asserted in the e2e test
+const label = buildLabel(prefix, suffix, separator, fallbackWhenEmpty)
+```
+
+```ts
+// BAD — above a declaration it targets the signature, not the body. The mutant
+// you meant to silence is inside the function and still gets generated.
+// Stryker disable next-line MethodExpression: equivalent, both sides folded
+function plain(text: string): string {
+  return text.toLowerCase().normalize('NFD')
+}
+```
+
+```ts
+// BAD — Stryker reads `//` comments in the source. Inside JSX this is a text
+// node, not a comment, and the directive is never seen.
+<span>{/* Stryker disable next-line StringLiteral */}{label}</span>
+```
+
+```ts
+// GOOD — hoist the expression to its own named const and put the comment
+// directly above it. One short line the formatter will not re-wrap, and the
+// mutant sits on exactly the line the directive names.
+function plain(text: string): string {
+  // Stryker disable next-line MethodExpression: equivalent, both sides folded
+  return text.toLowerCase().normalize('NFD')
+}
+```
+
+Re-run the gate after adding one. A directive that silently misses reads exactly
+like a directive that worked — the survivor is still there, and the only symptom
+is that your comment did nothing.
+
+### Prefer `ignoreStatic` Over Silencing A Data Table
+
+A string in a module-level array or object is a **static mutant** — evaluated
+once at file load. Stryker's docs give the same shape as the example:
+`const hi = '👋'` → `const hi = ''`. Testing one "often requires running all
+tests", so a table of 11 headings and 16 term rows produced 57 survivors and a
+ten-minute gate.
+
+Do not silence those one by one, and do not write threshold tests
+(`expect(TERMS.length).toBeGreaterThan(10)`) to kill them — that is a test
+written for the gate, not for the code. Set the option instead:
+
+```json
+{ "coverageAnalysis": "perTest", "ignoreStatic": true }
+```
+
+`ignoreStatic` requires `perTest` coverage analysis. On one real project this
+took the gate from timing out past 600s to 1m33s, and the `Stryker disable`
+blocks around both tables became dead and were deleted.
+
+**A mutant is only static if it never runs again after load.** A helper called
+at runtime is not static even when it is declared at module level, so its
+mutants still need a disable comment or a real test.
+
 ## An Incremental Typecheck Can Lie
 
 `tsc -b` reuses `.tsbuildinfo`, so a second run can report a green the first run earned
@@ -281,6 +350,12 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always invoke mutmut through the project's environment (`uv run`, `poetry run`, `./.venv/bin/`) — it is not on PATH.
 - Always use `source_paths` / `pytest_add_cli_args_test_selection` for mutmut 3; `paths_to_mutate` and `tests_dir` are silently ignored.
 - Always ignore a mutant by where it sits (Ignore plugin, disable comment), never by disabling a whole mutator globally.
+- Always set `ignoreStatic: true` alongside `perTest` — a module-level table is static, and one static mutant can cost a full suite run.
+- Always put `disable next-line` above a short line a formatter cannot re-wrap; hoist the expression to its own const when it is long.
+- Never put `disable next-line` above `function foo() {` — it targets the signature, not the body — or inside a JSX `{/* */}` comment, where it is never read.
+- Always re-run the gate after adding a disable comment; one that missed looks exactly like one that worked.
+- Never write a threshold test (`expect(TERMS.length).toBeGreaterThan(10)`) to kill a mutant — that is a test written for the gate, not for the code.
+- Always prefer mutating logic modules over presentation; component mutants are class names, copy and JSX shape, and none of it is behaviour.
 - Always add `@stryker-mutator/api` as a direct dependency on pnpm, or the Ignore plugin silently does not load.
 - Never mutate test files — that only asks whether the tests test the tests.
 - Never treat a surviving mutant as a fact about the code; it is a fact about the tests.

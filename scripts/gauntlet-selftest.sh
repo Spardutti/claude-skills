@@ -234,6 +234,40 @@ arg[run]
 arg[--mutate]
 arg[a.ts:1-1,b.ts:1-1]"
 
+# Mutation pays on logic and burns time on presentation. A component's mutants
+# are class names, copy and JSX shape — none of it behaviour — and one session
+# spent an evening killing them. Components are still length-checked and
+# skill-audited; they are only kept out of --mutate. Asserting the argv rather
+# than the verdict is the point: a .tsx quietly included still reports PASS.
+echo "ship-gate stryker argv, components out of scope"
+newrepo sg_argv_tsx
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+printf '#!/bin/sh\nfor a in "$@"; do echo "arg[$a]" >> %s; done\n' "$LOG" > bin/npx
+chmod +x bin/npx
+echo "const a=1" > a.ts
+echo "export const B = () => <p/>" > B.tsx
+argv "a .tsx in the diff is not mutated, the .ts beside it is" \
+"arg[--no-install]
+arg[stryker]
+arg[run]
+arg[--mutate]
+arg[a.ts:1-1]"
+
+# The other half of the same rule: out of --mutate is not out of the gate.
+echo "ship-gate components are still length-checked"
+newrepo sg_tsx_len
+printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
+mkdir -p .claude
+printf "GAUNTLET_MUTATE='echo clean'\nGAUNTLET_MAX_LINES=5\n" > .claude/gauntlet.conf
+for i in $(seq 1 20); do echo "// line $i" >> Big.tsx; done
+bash "$SG" > "$TMP/tsxlen.out" 2>&1
+N=$((N+1))
+if grep -q "Big.tsx" "$TMP/tsxlen.out"; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "an over-long .tsx is still reported"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL an over-long .tsx escaped the length check\n       gate said: %s\n' "$(cat "$TMP/tsxlen.out")"
+fi
+
 # Stryker validates every --mutate entry with Minimatch and refuses a range on
 # anything glob-shaped: "Cannot combine a glob expression with a mutation range".
 # A Next.js route folder is exactly that, so one [id] directory in the diff
@@ -949,66 +983,58 @@ else
   FAIL=$((FAIL+1)); printf '  FAIL the unparseable config was overwritten\n'
 fi
 
-# One table of 11 headings and 16 term rows produced 57 unkillable survivors and
-# a fifteen-minute gate. The only test that kills 'Pizzas' -> 'Stryker was here!'
-# asserts the table against a copy of the table. So string mutants inside a
-# module-level data table are ignored — by where they sit, like the className
-# rule, not by disabling the StringLiteral mutator everywhere.
-echo "stryker data-table ignorer"
-
-idt() {  # idt <label> <expected 1|0> <js defining `leaf`>
-  N=$((N+1))
-  if node -e "import('$HERE/../cli/lib/scaffold-stryker.mjs').then(m=>{const P=(k,node,parent)=>({isFunction:()=>k.includes('fn'),isVariableDeclarator:()=>k.includes('vd'),isStringLiteral:()=>k.includes('str'),node:node||{},parentPath:parent||null});$3;process.exit(m.inDataTable(leaf)===($2===1)?0:1)})" 2>/dev/null; then
-    PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
-  else
-    FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$1"
-  fi
-}
-
-idt "a string in a module-level array is data" 1 \
-  "const d=P(['vd'],{init:{type:'ArrayExpression'}});const leaf=P(['str'],{},d)"
-idt "a string in a module-level object is data" 1 \
-  "const d=P(['vd'],{init:{type:'ObjectExpression'}});const leaf=P(['str'],{},d)"
-idt "a string inside a function is not data" 0 \
-  "const f=P(['fn']);const d=P(['vd'],{init:{type:'ArrayExpression'}},f);const leaf=P(['str'],{},d)"
-idt "a const built by a call is not data" 0 \
-  "const d=P(['vd'],{init:{type:'CallExpression'}});const leaf=P(['str'],{},d)"
-idt "a string in no declaration is not data" 0 \
-  "const leaf=P(['str'],{},null)"
-
-newrepo stridt
-node -e "import('$HERE/../cli/lib/scaffold-stryker.mjs').then(m=>m.scaffoldStryker('$PWD',''))" >/dev/null 2>&1
-N=$((N+1))
-if grep -q 'inDataTable(path)' stryker-classname-ignorer.mjs; then
-  PASS=$((PASS+1)); printf '  ok   %s\n' "the generated ignorer carries the rule"
-else
-  FAIL=$((FAIL+1)); printf '  FAIL the generated ignorer has no data-table rule\n'
-fi
-
-# The upgrade, not the install. A project holding the v1 ignorer kept it forever
-# under the old "exists, so leave it" branch and never gained this rule.
-printf '// old v1 ignorer\nexport const strykerPlugins = [];\n' > stryker-classname-ignorer.mjs
+# A string in a module-level table is a STATIC mutant — evaluated once at file
+# load — and Stryker's docs say testing one often requires running all tests. A
+# table of 11 headings and 16 term rows produced 57 survivors and a gate that
+# timed out past 600s; ignoreStatic took the same gate to 1m33s. An earlier
+# ignorer rule described the same set the long way round and is gone.
+echo "stryker ignoreStatic"
+newrepo strstatic
 node -e "
   import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
     console.log(JSON.stringify(await m.scaffoldStryker('$PWD', '')));
   });
 " > "$TMP/scaf.json" 2>&1
-scaf "an outdated ignorer is rewritten" \
-  "r.patched.some(p=>p.includes('stryker-classname-ignorer.mjs'))"
+scaf "a fresh config sets ignoreStatic" \
+  "require('$PWD/stryker.config.json').ignoreStatic === true"
+scaf "and keeps perTest, which it requires" \
+  "require('$PWD/stryker.config.json').coverageAnalysis === 'perTest'"
 N=$((N+1))
-if grep -q 'inDataTable(path)' stryker-classname-ignorer.mjs; then
-  PASS=$((PASS+1)); printf '  ok   %s\n' "and the upgraded file has the rule"
+if grep -q 'inDataTable' stryker-classname-ignorer.mjs; then
+  FAIL=$((FAIL+1)); printf '  FAIL the retired data-table rule is still generated\n'
 else
-  FAIL=$((FAIL+1)); printf '  FAIL the outdated ignorer was left in place\n'
+  PASS=$((PASS+1)); printf '  ok   %s\n' "the retired data-table rule is gone"
 fi
 
+# The upgrade, not the install. This project already has the ignorer wired in,
+# which is exactly the config the old code called "kept" and never touched
+# again — so it would have run without ignoreStatic forever.
+newrepo strstatic2
+printf '{"testRunner":"vitest","coverageAnalysis":"perTest","ignorers":["tailwind-classnames"],"mutate":["src/**"]}\n' > stryker.config.json
 node -e "
   import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
     console.log(JSON.stringify(await m.scaffoldStryker('$PWD', '')));
   });
 " > "$TMP/scaf.json" 2>&1
-scaf "a current ignorer is left alone" \
-  "r.kept.some(p=>p.includes('stryker-classname-ignorer.mjs'))"
+scaf "an already-wired config still gains ignoreStatic" \
+  "r.patched.length === 1 && require('$PWD/stryker.config.json').ignoreStatic === true"
+scaf "and its own settings survive" \
+  "require('$PWD/stryker.config.json').mutate[0] === 'src/**'"
+
+# ignoreStatic is only correct under perTest. A project that deliberately chose
+# otherwise keeps its choice — switching it silently would change which mutants
+# the project reports.
+newrepo strstatic3
+printf '{"testRunner":"vitest","coverageAnalysis":"all","ignorers":["tailwind-classnames"]}\n' > stryker.config.json
+node -e "
+  import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
+    console.log(JSON.stringify(await m.scaffoldStryker('$PWD', '')));
+  });
+" > "$TMP/scaf.json" 2>&1
+scaf "a non-perTest config is left alone" \
+  "r.kept.length === 1 && require('$PWD/stryker.config.json').ignoreStatic === undefined"
+scaf "and its coverageAnalysis is not switched" \
+  "require('$PWD/stryker.config.json').coverageAnalysis === 'all'"
 
 cd /
 rm -rf "$TMP"

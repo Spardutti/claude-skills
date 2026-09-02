@@ -74,6 +74,13 @@ GAUNTLET_MUTATE=""
 GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
 GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|json|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"
 GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alembic/versions/*.py */components/ui/*.tsx */*.config.*"
+# Length-checked and skill-audited like everything else, but not mutated.
+# Mutation pays on logic and burns time on presentation: a component's mutants
+# are class names, copy and JSX shape, none of which is behaviour, and one
+# session spent an evening killing them. Logic that lives inside a component is
+# logic that wants extracting — which the 200-line rule already pushes toward.
+# Override in .claude/gauntlet.conf to mutate components too.
+GAUNTLET_NO_MUTATE='\.(tsx|jsx)$'
 [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
 [ -f ".claude/gauntlet.conf" ] && . ".claude/gauntlet.conf"
 
@@ -236,7 +243,7 @@ for owner in $OWNERS; do
   [ "$owner" = "." ] && label="<repo root>" || label="$owner/"
   OWNED=$(while IFS= read -r f; do
             [ "$(owner_of "$f")" = "$owner" ] && printf '%s\n' "$f"
-          done <<< "$FILES")
+          done <<< "$FILES" | grep -vE "$GAUNTLET_NO_MUTATE" || true)
   [ -z "$OWNED" ] && continue
 
   # ONE comma-joined --mutate value, never a flag per range. Stryker's CLI
