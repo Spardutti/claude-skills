@@ -273,6 +273,7 @@ async function main() {
         });
         if (doScaffold) {
           const installs = [];
+          const apiInstalls = [];
           const vitest = [];
           for (const n of stryker) {
             const r = await scaffoldStryker(CWD, n.rel);
@@ -284,7 +285,9 @@ async function main() {
             }
             // A project that already runs Stryker needs neither the install nor
             // the vitest exclude repeated at it; it only lacked the ignorer.
-            if (!n.ignorerOnly) {
+            if (n.ignorerOnly) {
+              apiInstalls.push(r.apiInstall);
+            } else {
               installs.push(r.install);
               vitest.push(r.vitest);
             }
@@ -300,9 +303,10 @@ async function main() {
           // The ignorer imports @stryker-mutator/api, which npm hoists by
           // accident and pnpm does not. Missing, it prints one WARN PluginLoader
           // line, loads nothing, and every className mutant comes back survived.
-          if (stryker.some((n) => n.ignorerOnly)) {
+          if (apiInstalls.length > 0) {
             console.log(`\n  ${chalk.yellow("!")} ${chalk.bold("The ignorer needs its own dependency:")}`);
-            console.log(`      ${chalk.cyan("add @stryker-mutator/api as a dev dependency")} ${chalk.dim("— pnpm does not hoist it, and without it the ignorer silently does not load")}`);
+            for (const c of apiInstalls) console.log(`      ${chalk.cyan(c)}`);
+            console.log(`      ${chalk.dim("without it the ignorer silently does not load")}`);
           }
         }
       }

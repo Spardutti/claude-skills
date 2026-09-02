@@ -954,6 +954,14 @@ scaf "its own settings survive" \
 scaf "the ignorer is wired in" \
   "require('$PWD/stryker.config.json').ignorers.includes('tailwind-classnames')"
 
+# This used to print an English sentence — "add @stryker-mutator/api as a dev
+# dependency" — leaving every reader to guess their own package manager and
+# path. It is a command now, and it asks for only the package that is missing.
+scaf "an existing install gets a runnable command" \
+  "/^(pnpm|npm) /.test(r.apiInstall)"
+scaf "and it asks for only the api package" \
+  "r.apiInstall.includes('@stryker-mutator/api') && !r.apiInstall.includes('@stryker-mutator/core')"
+
 node -e "
   import('$HERE/../cli/lib/local.mjs').then(async (l) => {
     console.log(JSON.stringify(await l.reportToolNeeds('$PWD')));
@@ -988,6 +996,22 @@ fi
 # table of 11 headings and 16 term rows produced 57 survivors and a gate that
 # timed out past 600s; ignoreStatic took the same gate to 1m33s. An earlier
 # ignorer rule described the same set the long way round and is gone.
+# A workspace keeps its lockfile at the root. Asking only apps/web handed a pnpm
+# monorepo an npm command, which is the exact command this branch now prints.
+echo "stryker scaffold, workspace lockfile"
+newrepo strws
+printf 'lockfileVersion: 9\n' > pnpm-lock.yaml
+mkdir -p apps/web
+node -e "
+  import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
+    console.log(JSON.stringify(await m.scaffoldStryker('$PWD', 'apps/web')));
+  });
+" > "$TMP/scaf.json" 2>&1
+scaf "a root lockfile makes a sub-project a pnpm install" \
+  "r.install.startsWith('pnpm --dir apps/web ')"
+scaf "and the api command follows the same lockfile" \
+  "r.apiInstall === 'pnpm --dir apps/web add -D @stryker-mutator/api'"
+
 echo "stryker ignoreStatic"
 newrepo strstatic
 node -e "

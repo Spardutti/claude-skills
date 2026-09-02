@@ -78,9 +78,11 @@ async function exists(p) {
 // npm's flat node_modules hoists it so the import resolves by accident, and
 // pnpm's isolated store does not. The failure is one WARN PluginLoader line and
 // an ignorer that never loads, so every class-name mutant comes back survived.
-async function installCommand(dir, rel) {
-  const pnpm = await exists(join(dir, "pnpm-lock.yaml"));
-  const pkgs = "@stryker-mutator/core @stryker-mutator/vitest-runner @stryker-mutator/api";
+// A workspace keeps its lockfile at the root, not in apps/web, so asking only
+// the sub-project hands a pnpm monorepo an npm command.
+async function installCommand(projectDir, dir, rel, pkgs) {
+  const pnpm =
+    (await exists(join(projectDir, "pnpm-lock.yaml"))) || (await exists(join(dir, "pnpm-lock.yaml")));
   return pnpm
     ? `pnpm --dir ${rel || "."} add -D ${pkgs}`
     : `npm --prefix ${rel || "."} i -D ${pkgs}`;
@@ -185,7 +187,17 @@ export async function scaffoldStryker(projectDir, rel) {
     kept,
     patched,
     unreadable,
-    install: await installCommand(dir, rel),
+    install: await installCommand(
+      projectDir,
+      dir,
+      rel,
+      "@stryker-mutator/core @stryker-mutator/vitest-runner @stryker-mutator/api",
+    ),
+    // A project that already runs Stryker has the other two packages and needs
+    // only this one, which nothing depends on directly. Printed as a command
+    // rather than a sentence: the sentence made every reader guess their own
+    // package manager and path.
+    apiInstall: await installCommand(projectDir, dir, rel, "@stryker-mutator/api"),
     // Stryker copies the whole project into .stryker-tmp/sandbox-*/, so every
     // test file briefly exists twice and the runner collects both. They pass,
     // so a doubled test count is the only symptom. Spread configDefaults.exclude
