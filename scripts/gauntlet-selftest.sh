@@ -386,6 +386,38 @@ export CLAUDE_PROJECT_DIR="$R/project-x"
 sg "a committed change is found from a subdirectory" "project-x/src/big.ts" 1
 export CLAUDE_PROJECT_DIR="$R"
 
+# A release bumps a version and writes a changelog, and both used to throw the
+# receipt away — so the gate demanded a full mutation pass at the exact moment a
+# tag was going out, to prove nothing about the two files that moved. No check
+# in this gate opens either one. The key has to ignore them, and still has to
+# move the instant real code changes, or it is not a key at all.
+# keycmp <label> <key a> <key b> <same|differ>
+keycmp() {
+  N=$((N+1))
+  ok=0
+  [ "$4" = same ] && [ "$2" = "$3" ] && ok=1
+  [ "$4" = differ ] && [ "$2" != "$3" ] && ok=1
+  if [ $ok = 1 ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s\n       want the keys to %s\n       a = %s\n       b = %s\n' "$1" "$4" "$2" "$3"
+  fi
+}
+
+echo "ship-gate receipt key scope"
+newrepo sg_key
+echo "const a=1" > src.ts
+k1=$(bash "$SG" --key)
+printf '{"version":"8.3.0"}\n' > package.json
+keycmp "a version bump does not invalidate the receipt" "$k1" "$(bash "$SG" --key)" same
+echo "# v8.3.0" > CHANGELOG.md
+keycmp "nor does a changelog entry"                     "$k1" "$(bash "$SG" --key)" same
+echo "const a=2" > src.ts
+k2=$(bash "$SG" --key)
+keycmp "editing the code does invalidate it"            "$k1" "$k2" differ
+# An unknown extension is what UNPROVEN is a verdict about, so it cannot be
+# dropped from the key the way an ignored one is.
+echo "pub fn main() {}" > main.zig
+keycmp "so does an extension the gate cannot place"     "$k2" "$(bash "$SG" --key)" differ
+
 # mutmut lives in the project's venv, not on PATH, and `mutmut run` prints 🙁 and
 # exits 0 whatever it finds — parsing that reports clean with survivors sitting
 # there. `mutmut results` is the readable source.

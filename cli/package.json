@@ -1,6 +1,6 @@
 {
   "name": "@spardutti/claude-skills",
-  "version": "2.25.2",
+  "version": "2.25.3",
   "description": "Guardrails for Claude Code — best-practice skills, planning commands, and delivery gates.",
   "type": "module",
   "repository": {
