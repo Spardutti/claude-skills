@@ -96,6 +96,15 @@ CHANGED=$( { git diff "$BASE"...HEAD --name-only 2>/dev/null
              git diff HEAD --name-only 2>/dev/null
              git ls-files --others --exclude-standard 2>/dev/null; } | sort -u )
 
+# Only the files this gate can actually read go into the key. It used to be every
+# changed file, so a version bump in package.json or a line in a changelog threw
+# away a receipt the gate would have re-earned unchanged — fifteen minutes of
+# mutation testing to prove nothing about the file that moved, at the one moment
+# a release is trying to ship. An ignored extension is one no check here opens,
+# so it cannot change a verdict. Unknown extensions stay in, because UNPROVEN is
+# a verdict about exactly those.
+KEYED=$(printf '%s\n' "$CHANGED" | grep -viE "\.($GAUNTLET_IGNORE_EXT)$")
+
 # The repo path plus the names and contents of the changed files, in a fixed
 # order. The path is in there because the key is otherwise pure content: two
 # repos holding the same file would share a receipt, and one would be waved
@@ -104,7 +113,7 @@ CHANGED=$( { git diff "$BASE"...HEAD --name-only 2>/dev/null
 # the moment it was committed. This is identical either side of a commit, and
 # changes the instant any of those files is edited.
 RECEIPT_KEY=$( { printf '%s\n' "$PROJECT_DIR"
-                 printf '%s\n' "$CHANGED" | while IFS= read -r f; do
+                 printf '%s\n' "$KEYED" | while IFS= read -r f; do
                    [ -n "$f" ] || continue
                    printf '%s\n' "$f"
                    [ -f "$f" ] && cat "$f"
