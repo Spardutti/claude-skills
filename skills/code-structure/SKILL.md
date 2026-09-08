@@ -91,5 +91,5 @@ The two forces meet here. Keep code together when:
 
 ## Reference Files
 
-- **SINGLE-RESPONSIBILITY.md** — read when deciding how to split a file, function, class, or module. Covers the hard-limit thresholds, separation of concerns (computation vs side effects, query vs command, policy vs mechanism), one-resource-per-class, levels of abstraction, early returns, pipeline-over-monolith, file organization, the SRP smell tests, and when *not* to split.
+- **SINGLE-RESPONSIBILITY.md** — read before writing a new file, function, class, or module, and when deciding how to split an existing one. The question is "how big may this get?", not "is this already too big?". Covers the hard-limit thresholds, separation of concerns (computation vs side effects, query vs command, policy vs mechanism), one-resource-per-class, levels of abstraction, early returns, pipeline-over-monolith, file organization, the SRP smell tests, and when *not* to split.
 - **AVOID-ABSTRACTIONS.md** — read when tempted to extract a helper, base class, or shared utility from duplicated code. Covers the Rule of Three, the boolean-flag failure pattern, BAD/GOOD pairs (mode flags, inheritance misuse, single-use helpers, over-generic utilities), shape vs intent, when extraction *is* correct, and how to undo a wrong abstraction.
