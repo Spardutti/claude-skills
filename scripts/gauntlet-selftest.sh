@@ -809,11 +809,70 @@ case "$aout" in
 esac
 rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
 
+# A .sql file is SQL and a Dockerfile is a Dockerfile — no package declares
+# either, so a skill naming paths and no tracks is taken at its word. This must
+# not leak into the tracked skills: rx still needs its dependency.
+echo "mandatory skills with no tracked package"
+newrepo sg_pathonly
+mkdir -p .claude/skills/dbq .claude/skills/dock .claude/skills/rx
+printf -- '---\nname: dbq\npaths: "**/*.sql"\n---\n## Rules\n- x\n' > .claude/skills/dbq/SKILL.md
+printf -- '---\nname: dock\npaths: "**/Dockerfile*, **/docker-compose*.yml"\n---\n## Rules\n- x\n' > .claude/skills/dock/SKILL.md
+printf -- '---\nname: rx\ntracks: react@19.2\npaths: "**/*.tsx"\n---\n## Rules\n- x\n' > .claude/skills/rx/SKILL.md
+# Deliberately no package.json and no pyproject.toml: a repo with no manifest
+# at all must still get its path-only skills.
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+SKG=".claude/hooks/skill-gate.sh"
+MSID="po$RUN"
+
+must "a sql file needs no package to prove it"   dbq   db/migrate/001.sql   marker
+must "a Dockerfile is matched by name"           dock  Dockerfile           marker
+must "a compose file is matched too"             dock  docker-compose.yml   marker
+must "loading it clears the path-only skill"     allow db/migrate/001.sql   loaded:dbq
+must "a tracked skill still needs its package"   allow src/App.tsx          marker
+rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+
+N=$((N+1))
+touch /tmp/claude-skill-gate-$MSID
+dout=$(printf '{"session_id":"%s","tool_name":"Bash","tool_input":{"command":"cat > Dockerfile <<EOF"}}' "$MSID" | bash "$SKG")
+case "$dout" in
+  *"not loaded: dock"*) PASS=$((PASS+1)); printf '  ok   %s\n' "a heredoc into a Dockerfile names it too" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL %s — got %s\n' "a heredoc into a Dockerfile names it too" "$dout" ;;
+esac
+rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+
+# code-structure and security-practices apply to every code file, so they claim
+# **/*. That must reach every gated file and no ungated one — a universal skill
+# that fired on prose too would gate every note the session writes.
+echo "a universal skill claims every gated file"
+newrepo sg_univ
+mkdir -p .claude/skills/univ
+printf -- '---\nname: univ\npaths: "**/*"\n---\n## Rules\n- x\n' > .claude/skills/univ/SKILL.md
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+SKG=".claude/hooks/skill-gate.sh"
+MSID="uv$RUN"
+
+must "a ts file is claimed"                univ  src/a.ts              marker
+must "a python file is claimed"            univ  app/main.py           marker
+must "a root config file is claimed"       univ  vite.config.ts        marker
+must "prose is not claimed"                allow NOTES.md              marker
+must "the settings file is not claimed"    allow .claude/settings.json marker
+must "loading it clears every file"        allow src/a.ts              loaded:univ
+rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+
 # The hook logic above is exercised against synthetic skills so it stays green
 # when skill content changes. This asserts the shipped skills actually opt in —
 # a paths: dropped from react/SKILL.md is silent everywhere else.
 echo "shipped skills declare their triggers"
-for s in react fastapi typescript-best-practices tanstack-query tanstack-router express drizzle-orm; do
+for s in sql docker-best-practices code-structure security-practices; do
+  N=$((N+1))
+  f="$HERE/../skills/$s/SKILL.md"
+  if grep -q '^paths:' "$f"; then
+    PASS=$((PASS+1)); printf '  ok   %s declares paths\n' "$s"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s is missing paths:\n' "$s"
+  fi
+done
+for s in react fastapi typescript-best-practices tanstack-query tanstack-router express drizzle-orm testing-best-practices drf-best-practices; do
   N=$((N+1))
   f="$HERE/../skills/$s/SKILL.md"
   if grep -q '^paths:' "$f" && grep -q '^tracks:' "$f"; then

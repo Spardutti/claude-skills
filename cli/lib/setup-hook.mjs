@@ -57,7 +57,9 @@ if [ "$TOOL" != "Bash" ]; then
   TARGET=$(printf '%s' "$INPUT" | grep -o '"file_path":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
   case "$TARGET" in
     # The settings file that configures the escape hatch cannot sit behind the
-    # gate, or a denied ack has no way to be un-denied.
+    # gate, or a denied ack has no way to be un-denied. The bare relative form
+    # matters: a skill claiming **/* gated it, and nothing could re-open it.
+    .claude/settings.json|.claude/settings.local.json) exit 0 ;;
     */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
     *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
   esac
@@ -90,8 +92,9 @@ if [ "$TOOL" = "Bash" ]; then
     *"<<"*|*python*" -c"*|*node*" -e"*|*perl*" -e"*|*ruby*" -e"*) WRITES=1 ;;
   esac
   [ -z "$WRITES" ] && exit 0
-  # A Bash write names its files in the command itself.
-  TARGETS=$(printf '%s' "$CMD" | grep -oiE "[A-Za-z0-9_./-]+\.($CODE_EXT)" 2>/dev/null)
+  # A Bash write names its files in the command itself. Dockerfile and
+  # .dockerignore carry no extension, so they are matched by name.
+  TARGETS=$(printf '%s' "$CMD" | grep -oiE "[A-Za-z0-9_./-]+\.($CODE_EXT)|[A-Za-z0-9_./-]*(Dockerfile[A-Za-z0-9_.-]*|\.dockerignore)" 2>/dev/null)
 fi
 
 # --- mandatory skills -------------------------------------------------------
@@ -106,10 +109,11 @@ fi
 # without both fields keep the old behaviour, so this tightens nothing that was
 # not deliberately declared.
 MISSING=""
+MANIFESTS=""
 if [ -n "$TARGETS" ]; then
   MANIFESTS=$(find "$PROJECT_DIR" -maxdepth 4 \\( -name node_modules -o -name .git -o -name .venv -o -name dist \\) -prune -o \\( -name package.json -o -name pyproject.toml -o -name requirements.txt \\) -print 2>/dev/null)
 fi
-if [ -n "$TARGETS" ] && [ -n "$MANIFESTS" ]; then
+if [ -n "$TARGETS" ]; then
   for SKILL_FILE in $(find "$PROJECT_DIR" -path '*/.claude/skills/*/SKILL.md' 2>/dev/null); do
     # paths: must be quoted in YAML — a scalar opening with * is an alias.
     UNQUOTE='s/^["'"'"']//; s/["'"'"']$//'
@@ -117,7 +121,6 @@ if [ -n "$TARGETS" ] && [ -n "$MANIFESTS" ]; then
     STRACKS=$(sed -n 's/^tracks:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
     SNAME=$(sed -n 's/^name:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
     [ -z "$SPATHS" ] && continue
-    [ -z "$STRACKS" ] && continue
     [ -z "$SNAME" ] && continue
 
     HIT=""
@@ -134,9 +137,14 @@ if [ -n "$TARGETS" ] && [ -n "$MANIFESTS" ]; then
 
     # A .tsx file is not proof of React — it could be Astro, Solid or Preact.
     # The packages the skill tracks are the proof, so the manifests decide.
+    #
+    # Some skills need no such proof: a .sql file is SQL and a Dockerfile is a
+    # Dockerfile, and no package declares either. A skill that names paths and
+    # no tracks is taken at its word.
     PY=""
     case "$STRACKS" in *pypi*) PY=1 ;; esac
     DEP=""
+    [ -z "$STRACKS" ] && DEP=1
     for P in $(printf '%s' "$STRACKS" | tr ',' ' '); do
       case "$P" in *@*) ;; *) continue ;; esac
       PKG=$(printf '%s' "$P" | sed 's/@[^@]*$//')

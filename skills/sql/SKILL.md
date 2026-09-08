@@ -1,5 +1,6 @@
 ---
 name: sql
+paths: "**/*.sql"
 category: Database
 description: "MUST USE when writing SQL, creating tables, defining columns, choosing data types, writing migrations, creating indexes, diagnosing slow queries, reading EXPLAIN output, writing JOINs, defining relationships, using subqueries, or writing code with any ORM (Prisma, Django, SQLAlchemy, ActiveRecord, TypeORM, Sequelize, Drizzle). Enforces correct types (TIMESTAMPTZ, NUMERIC for money), NOT NULL discipline, composite index order, SARGability, eager loading to prevent N+1, transaction safety, and safe migration patterns."
 ---
