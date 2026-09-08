@@ -223,6 +223,13 @@ fi
 py_mutmut() {
   d="$1"
   # Returned relative to the PROJECT, because the command runs from inside it.
+  # Tests that need a database, a queue, or any other service cannot run on the
+  # host: mutmut still generates every mutant and reports them all "not
+  # checked", which prints exactly like a clean run. An executable .mutmut-run
+  # in the project runs mutmut wherever those services are — typically
+  # `docker compose run` against the app container — and takes precedence over
+  # every host-local option below.
+  if [ -x "$d.mutmut-run" ]; then printf './.mutmut-run\n'; return; fi
   if [ -x "$d.venv/bin/mutmut" ]; then printf './.venv/bin/mutmut\n'; return; fi
   if [ -f "$d""uv.lock" ] && command -v uv >/dev/null 2>&1; then printf 'uv run mutmut\n'; return; fi
   if [ -f "$d""poetry.lock" ] && command -v poetry >/dev/null 2>&1; then printf 'poetry run mutmut\n'; return; fi
@@ -398,6 +405,32 @@ for owner in $OWNERS; do
     NOWF=$(mktemp)
     printf '%s\n' "$OUT" \
       | sed -n 's/^[[:space:]]*\([^[:space:]]*\): survived$/\1/p' | sort -u > "$NOWF"
+
+    # When the tests need a service the run cannot reach — a database, a queue
+    # — mutmut still generates every mutant and records it "not checked". No
+    # survivors come out, so the gate printed "nothing survived" and, with no
+    # baseline yet, wrote an EMPTY one and told the user to commit it. That
+    # repo's Python gate could never fail again.
+    #
+    # Counting kills cannot catch it: `mutmut results` SKIPS killed mutants
+    # unless --all (mutmut/__main__.py results()), so a perfect suite and a
+    # suite that ran nothing both print nothing. The status string is what
+    # separates them — "not checked" is exit code None in status_by_exit_code,
+    # meaning the mutant was never executed at all.
+    NOTCHECKED=$(printf '%s\n' "$OUT" | grep -c ': not checked$')
+    if [ "$NOTCHECKED" -gt 0 ]; then
+      echo "  $label mutmut — UNPROVEN: $NOTCHECKED mutant(s) were never run."
+      echo "      They are recorded \"not checked\", so the suite proved nothing"
+      echo "      about them. Usually the tests need a service this run cannot"
+      echo "      reach — a database, a queue. Put an executable .mutmut-run in"
+      echo "      ${base}that runs mutmut where those services are, typically"
+      echo "      docker compose run against the app container; the gate uses"
+      echo "      it ahead of every host-local option."
+      [ "$STATUS" = 0 ] && STATUS=2
+      rm -f "$NOWF"
+      continue
+    fi
+
     if [ "$MODE" = baseline ]; then
       cp "$NOWF" "$BL"
       NOTE="  $label mutmut — baseline set: $(wc -l < "$BL") survivor(s) accepted. Commit $BL."

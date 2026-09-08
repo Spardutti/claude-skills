@@ -460,6 +460,64 @@ echo "x=1" > apps/api/app/slugs.py
 : > apps/api/.mutmut-baseline
 sg "a stale mutant cache is cleared before the run" "nothing survived" 0
 
+# Tests that need a database cannot run on the host: mutmut generates every
+# mutant and records it "not checked". No survivor lines come out, so the gate
+# said "nothing survived" and, with no baseline yet, wrote an EMPTY one and
+# told the user to commit it — after which that repo's Python gate could never
+# fail again. Counting kills cannot catch this: `mutmut results` skips killed
+# mutants, so a perfect suite prints nothing too.
+newrepo sg_py_unchecked
+mkdir -p apps/api/.venv/bin apps/api/app
+printf '[project]\nname="api"\n[tool.mutmut]\nsource_paths=["app/"]\n' > apps/api/pyproject.toml
+touch apps/api/uv.lock
+cat > apps/api/.venv/bin/mutmut <<'M'
+#!/bin/sh
+case "$1" in
+  run)     exit 0 ;;
+  results) echo "    app.slugs.x_slugify__mutmut_1: not checked"
+           echo "    app.slugs.x_slugify__mutmut_2: not checked"; exit 0 ;;
+esac
+M
+chmod +x apps/api/.venv/bin/mutmut
+echo "x=1" > apps/api/app/slugs.py
+# Assert the sentence this change introduces, not the bare word UNPROVEN: the
+# old gate reached exit 2 down the "no baseline" path and printed UNPROVEN for
+# other reasons, so the looser assertion passed with the bug still in place.
+sg "a run that checked nothing is UNPROVEN, not clean" "2 mutant(s) were never run" 2
+N=$((N+1))
+if [ -f apps/api/.mutmut-baseline ]; then
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "and no baseline is written from it"
+else
+  PASS=$((PASS+1)); printf '  ok   %s\n' "and no baseline is written from it"
+fi
+
+# The fix for that: an executable .mutmut-run in the project runs mutmut where
+# the services are. It must win over .venv/bin/mutmut, which is the one that
+# cannot reach them. A stub that merely returned a verdict would agree with the
+# bug, so this asserts WHICH runner was executed.
+newrepo sg_py_runner
+mkdir -p apps/api/.venv/bin apps/api/app
+printf '[project]\nname="api"\n[tool.mutmut]\nsource_paths=["app/"]\n' > apps/api/pyproject.toml
+touch apps/api/uv.lock
+cat > apps/api/.venv/bin/mutmut <<'M'
+#!/bin/sh
+case "$1" in
+  results) echo "    app.host.x__mutmut_1: survived" ;;
+esac
+exit 0
+M
+cat > apps/api/.mutmut-run <<'M'
+#!/bin/sh
+case "$1" in
+  results) echo "    app.container.x__mutmut_1: survived" ;;
+esac
+exit 0
+M
+chmod +x apps/api/.venv/bin/mutmut apps/api/.mutmut-run
+echo "x=1" > apps/api/app/slugs.py
+: > apps/api/.mutmut-baseline
+sg ".mutmut-run wins over the host venv" "app.container.x__mutmut_1" 1
+
 # mutmut reports the whole repo's survivors, not the diff's, so without a
 # baseline the Python half of the gate can never go green. Recorded survivors
 # are accepted debt; only a name that is not in the baseline is a finding.
