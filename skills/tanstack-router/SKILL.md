@@ -3,7 +3,8 @@ name: tanstack-router
 category: Frontend
 description: "MUST USE when writing or editing TanStack Router routes, file-based routing, navigation, loaders, search params, beforeLoad auth guards, pendingComponent / loading UI, or route configuration. Enforces type-safe file-based routing, pending UI that prevents 'frozen on slow internet' navigation, auth checked once per subtree (not per page), loader caching with staleTime, and TanStack Query integration."
 tracks: @tanstack/react-router@1.x
-paths: "**/*.ts, **/*.tsx"
+metadata:
+  gate-paths: "**/*.ts, **/*.tsx"
 ---
 
 # TanStack Router Best Practices

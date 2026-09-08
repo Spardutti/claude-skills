@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it — 3 parallel Haiku subagents scan for reusable code, established patterns, and touch points, then ask grounded clarifying questions before producing an integration plan"
+description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and the plan lands with a contract and a per-worker file split; on your go it dispatches parallel implementation workers that each load their own skills and report back as one diff"
 category: Workflow
 allowed-tools: Read, Grep, Glob, Task, Write
 requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
@@ -66,6 +66,12 @@ Output a single markdown plan. Keep it short and actionable — this is a checkl
 ## Pattern to follow
 <1–3 bullets pointing at an existing feature to mirror, with file paths>
 
+## Contract
+<the interface the sides agree on, or "none — single worker" and why>
+
+## Workers
+<one line per worker: name — the files it owns, or "one worker" and why>
+
 ## Open questions
 <anything the user did not resolve in Step 3, or [] if none>
 ```
@@ -74,13 +80,74 @@ Output a single markdown plan. Keep it short and actionable — this is a checkl
 
 If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write the plan there with the Write tool. Otherwise just print it.
 
+## Step 5 — Write the Contract
+
+Workers run blind to each other. The contract is the only thing they share, so it is written **before** any of them starts, from the answers the user gave in Step 3.
+
+Write it yourself. Do not spawn a subagent for it — a subagent never saw Step 3, and the contract is made of exactly those answers.
+
+A contract names the interface and nothing else:
+
+```markdown
+## Contract
+POST /expenses
+  body:  { amount: number, category_id: string, note?: string }
+  200:   { id: string, amount: number, created_at: string }
+  422:   { field: string, message: string }[]
+  403:   when the category belongs to another user
+```
+
+Queries, transactions, permissions logic, migrations and edge cases are **not** contract. They are the backend worker's job and the frontend never needs them. If everything the backend does *is* the contract, say so — that feature is one worker, not two.
+
+For work with no interface between sides (a refactor, a single-layer change), write `none — single worker` and the reason.
+
+## Step 6 — Decide the Workers
+
+Group the `Extend` and `Add` paths into workers. Each worker owns a disjoint set of files — two workers writing one file overwrite each other.
+
+**Split only when each side has real work behind the contract.** A thin endpoint plus the form that calls it is one worker: the contract already is the backend, so a second worker would sit idle behind it.
+
+Name the files, not the layers:
+
+```markdown
+## Workers
+- backend  — app/api/expenses.py, app/services/expenses.py, migrations/
+- frontend — src/features/expenses/*.tsx, src/api/expenses.ts
+```
+
+A file both workers need is a design smell, not a coordination problem. Give it to one worker and say which in the plan.
+
+## Step 7 — Stop, Then Dispatch
+
+**Print the plan and stop.** Do not spawn anything until the user says go. They are approving the contract and the file split, and both are cheap to correct now and expensive to correct later.
+
+When the user says go, launch every worker in a **single message** so they run at once. Give each worker exactly:
+
+- the path to the plan file, or the plan text if it was not written to disk
+- its own file list from `## Workers`
+- the instruction: implement your files against the Contract, touch nothing outside your list, write the tests for what you write
+
+Do **not** pass a worker the conversation, your view of the other worker, or the skills it should load. The gate names the skills its files demand and blocks until it loads them — that is the mechanism, and pre-loading it by hand only teaches the worker to skip the gate.
+
+Wait for every worker, then report what changed as one diff. Do not relay their transcripts.
+
+If a worker reports it needed a file it does not own, that is a plan defect: say so, and fix the split rather than letting the other worker apply the change blind.
+
 ## Rules
 
 - Always check for a `DISCOVERY.md` (or a path in `$ARGUMENTS`) before Step 1, and treat its scope, non-goals, edge cases and success criteria as resolved input — never re-ask what it already settled, and never revive a framing it rejected.
 - Always run the 3 subagents in parallel in a single Task message.
 - Always wait for all 3 to return before asking the user anything.
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.
-- Never spawn more than the 3 declared subagents.
+- Never spawn more than the 3 declared subagents during Steps 1–4. The implementation workers in Step 7 are separate, and are launched only after the user says go.
+- Always write the Contract yourself in Step 5 — never delegate it to a subagent, which never saw the user's Step 3 answers.
+- Always give each worker a disjoint file list — two workers writing one file overwrite each other.
+- Always split into two workers only when each side has real work behind the contract; a thin endpoint plus its form is one worker.
+- Always print the plan and stop before Step 7 — never spawn a worker until the user approves the contract and the file split.
+- Always launch every worker in a single message so they run at once.
+- Never pass a worker the conversation, the other worker's plan, or the skills to load — the gate names the skills its files demand and blocks until it loads them.
+- Always report the workers' output as one diff — never relay their transcripts.
+- Always treat "a worker needed a file it does not own" as a plan defect and fix the split, rather than letting the other worker apply the change blind.
 - Never produce a plan that proposes building something a subagent already found as reusable, unless the user explicitly rejected reuse.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If a subagent returns nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.

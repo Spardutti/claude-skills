@@ -1,6 +1,7 @@
 ---
 name: docker-best-practices
-paths: "**/Dockerfile*, **/docker-compose*.yml, **/docker-compose*.yaml, **/compose.yml, **/compose.yaml, **/.dockerignore"
+metadata:
+  gate-paths: "**/Dockerfile*, **/docker-compose*.yml, **/docker-compose*.yaml, **/compose.yml, **/compose.yaml, **/.dockerignore"
 category: Backend
 description: "MUST USE when writing or editing Dockerfiles, docker-compose.yml, .dockerignore, or container configuration. Enforces multi-stage builds, layer caching, security hardening, Compose Watch for local dev, and health checks."
 ---

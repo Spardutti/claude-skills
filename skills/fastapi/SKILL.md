@@ -3,7 +3,8 @@ name: fastapi
 category: Backend
 description: "MUST USE when creating or editing FastAPI routes, async path operations, dependency injection, app lifespan/startup, middleware, or API configuration; or when working on Pydantic models and validators, SQLAlchemy/Alembic database migrations, or Celery background tasks and queues. Enforces async correctness, Annotated dependencies, yield-dependency cleanup, service layers, response models, and structured error handling."
 tracks: fastapi@0.141 (pypi), pydantic@2.13 (pypi), sqlalchemy@2.0 (pypi)
-paths: "**/*.py"
+metadata:
+  gate-paths: "**/*.py"
 ---
 
 # FastAPI — Endpoints, Dependencies, Async

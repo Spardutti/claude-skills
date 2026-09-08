@@ -1,6 +1,7 @@
 ---
 name: security-practices
-paths: "**/*"
+metadata:
+  gate-paths: "**/*"
 category: Foundations
 description: "MUST USE when writing or reviewing code that handles user input, authentication, authorization, API endpoints, database queries, secrets, or any security-sensitive functionality. Enforces OWASP Top 10 prevention, secure defaults, and defense-in-depth patterns."
 ---

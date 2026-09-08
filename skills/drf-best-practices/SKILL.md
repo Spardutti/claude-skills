@@ -1,7 +1,8 @@
 ---
 name: drf-best-practices
 tracks: djangorestframework@3.18 (pypi)
-paths: "**/*.py"
+metadata:
+  gate-paths: "**/*.py"
 category: Backend
 description: "MUST USE when creating or editing Django REST Framework views, serializers, viewsets, or API configuration. Enforces thin serializers, service layer, queryset optimization, and object-level permissions."
 ---

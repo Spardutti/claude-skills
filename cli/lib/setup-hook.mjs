@@ -4,7 +4,10 @@ import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 
 // PreToolUse gate on Write|Edit|MultiEdit. Blocks the tool call unless
-// a per-session marker file exists at /tmp/claude-skill-gate-<SESSION_ID>.
+// a marker file exists at /tmp/claude-skill-gate-<KEY>, where KEY is the
+// subagent's agent_id when the call comes from one, and the session_id
+// otherwise — a subagent reports the parent's session_id, so keying on that
+// alone let a worker inherit the main thread's cleared gate.
 // Per-session (not per-prompt) so simple confirmations like "yes" don't
 // re-lock the gate after evaluation has already happened in the session.
 // The PostToolUse hook on Skill creates the marker automatically; for
@@ -30,10 +33,25 @@ if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
 
-# The session marker is checked at the very bottom now, not here. A skill the
-# edited file's own stack demands is not something an already-cleared gate
-# excuses, so the required-skill scan below runs first.
-MARKER="/tmp/claude-skill-gate-$SESSION_ID"
+# A subagent reports the PARENT's session_id — measured, not assumed: a probe
+# hook dumped its own stdin from the main thread and from inside a subagent and
+# the two ids were identical. So a worker spawned to implement part of a plan
+# inherited the main thread's cleared markers and edited with none of the
+# skills loaded in its own context.
+#
+# agent_id is present only inside a subagent, and holds steady across that
+# subagent's turns, so keying on it gives each worker its own namespace and
+# costs it one Skill call per skill, not one per turn.
+AGENT_ID=$(printf '%s' "$INPUT" | grep -o '"agent_id":"[^"]*"' | head -1 | sed 's/"agent_id":"//; s/"$//')
+KEY="$SESSION_ID"
+if [ -n "$AGENT_ID" ]; then
+  KEY=$(printf '%s' "$AGENT_ID" | tr -cd 'A-Za-z0-9_-')
+fi
+
+# The marker is checked at the very bottom now, not here. A skill the edited
+# file's own stack demands is not something an already-cleared gate excuses,
+# so the required-skill scan below runs first.
+MARKER="/tmp/claude-skill-gate-$KEY"
 
 # Write|Edit|MultiEdit is not the only way to change a file. A session that edits
 # through \`python3 - <<'PY'\` in Bash walked past this gate entirely — twelve
@@ -115,9 +133,17 @@ if [ -n "$TARGETS" ]; then
 fi
 if [ -n "$TARGETS" ]; then
   for SKILL_FILE in $(find "$PROJECT_DIR" -path '*/.claude/skills/*/SKILL.md' 2>/dev/null); do
-    # paths: must be quoted in YAML — a scalar opening with * is an alias.
+    # Read gate-paths from under metadata:, never a bare paths: key. A bare
+    # paths: made Claude Code drop the skill from its registry outright —
+    # every Skill(name) call returned "Unknown skill" and, with no SKIP for a
+    # mandatory skill, the session could not edit code at all. metadata is
+    # documented as free-form and ignored by Claude Code, and the docs say in
+    # so many words not to reuse paths as a key inside it.
+    #
+    # The value must be quoted in YAML either way: a scalar opening with * is
+    # an alias indicator.
     UNQUOTE='s/^["'"'"']//; s/["'"'"']$//'
-    SPATHS=$(sed -n 's/^paths:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
+    SPATHS=$(sed -n 's/^[[:space:]]*gate-paths:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
     STRACKS=$(sed -n 's/^tracks:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
     SNAME=$(sed -n 's/^name:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
     [ -z "$SPATHS" ] && continue
@@ -160,7 +186,7 @@ if [ -n "$TARGETS" ]; then
     [ -z "$DEP" ] && continue
 
     SAFE=$(printf '%s' "$SNAME" | tr -cd 'A-Za-z0-9_-')
-    [ -f "/tmp/claude-skill-loaded-$SESSION_ID-$SAFE" ] && continue
+    [ -f "/tmp/claude-skill-loaded-$KEY-$SAFE" ] && continue
     case " $MISSING " in *" $SNAME "*) ;; *) MISSING="$MISSING $SNAME" ;; esac
   done
 fi
@@ -180,7 +206,7 @@ fi
 
 
 cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: skill evaluation required before file edits in this session.\\n\\nStep 1 — evaluate every available skill as ACTIVATE or SKIP with a one-line reason.\\n\\nStep 2 — you MUST take EXACTLY ONE of these tool actions to clear the gate. Listing skills in text is NOT enough; retrying the edit without doing one of these will be denied again:\\n  (a) If any skill is ACTIVATE → call Skill(name) for it. This auto-clears the gate.\\n  (b) If ALL skills are SKIP → run this Bash tool call: touch /tmp/claude-skill-gate-$SESSION_ID\\n\\nStep 3 — only after Step 2 completes, retry the file edit."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: skill evaluation required before file edits in this session.\\n\\nStep 1 — evaluate every available skill as ACTIVATE or SKIP with a one-line reason.\\n\\nStep 2 — you MUST take EXACTLY ONE of these tool actions to clear the gate. Listing skills in text is NOT enough; retrying the edit without doing one of these will be denied again:\\n  (a) If any skill is ACTIVATE → call Skill(name) for it. This auto-clears the gate.\\n  (b) If ALL skills are SKIP → run this Bash tool call: touch /tmp/claude-skill-gate-$KEY\\n\\nStep 3 — only after Step 2 completes, retry the file edit."}}
 EOF
 exit 0
 `;
@@ -199,14 +225,24 @@ if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
 
-touch "/tmp/claude-skill-gate-$SESSION_ID"
+# Keyed exactly as the gate keys it. A subagent carries the parent's
+# session_id, so both scripts fall back to agent_id when one is present — and
+# they must agree, or a loaded skill writes a marker the gate never looks for
+# and every edit is denied forever.
+AGENT_ID=$(printf '%s' "$INPUT" | grep -o '"agent_id":"[^"]*"' | head -1 | sed 's/"agent_id":"//; s/"$//')
+KEY="$SESSION_ID"
+if [ -n "$AGENT_ID" ]; then
+  KEY=$(printf '%s' "$AGENT_ID" | tr -cd 'A-Za-z0-9_-')
+fi
+
+touch "/tmp/claude-skill-gate-$KEY"
 
 SKILL_NAME=$(printf '%s' "$INPUT" | grep -o '"skill":"[^"]*"' | head -1 | sed 's/"skill":"//; s/"$//')
 if [ -n "$SKILL_NAME" ]; then
   # Sanitize: only allow [A-Za-z0-9_-] in the marker filename.
   SAFE_NAME=$(printf '%s' "$SKILL_NAME" | tr -cd 'A-Za-z0-9_-')
   if [ -n "$SAFE_NAME" ]; then
-    touch "/tmp/claude-skill-loaded-$SESSION_ID-$SAFE_NAME"
+    touch "/tmp/claude-skill-loaded-$KEY-$SAFE_NAME"
   fi
 fi
 
@@ -230,8 +266,16 @@ if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
 
-# Defer to the loading gate until it's been satisfied this session.
-if [ ! -f "/tmp/claude-skill-gate-$SESSION_ID" ]; then
+# Keyed exactly as the loading gate and the automark key it — see those two.
+# A subagent carries the parent's session_id, so all three must agree.
+AGENT_ID=$(printf '%s' "$INPUT" | grep -o '"agent_id":"[^"]*"' | head -1 | sed 's/"agent_id":"//; s/"$//')
+KEY="$SESSION_ID"
+if [ -n "$AGENT_ID" ]; then
+  KEY=$(printf '%s' "$AGENT_ID" | tr -cd 'A-Za-z0-9_-')
+fi
+
+# Defer to the loading gate until it's been satisfied for this key.
+if [ ! -f "/tmp/claude-skill-gate-$KEY" ]; then
   exit 0
 fi
 
@@ -282,10 +326,10 @@ fi
 
 # Collect every loaded-but-unacked skill so a single ack clears them all.
 UNACKED=""
-for marker in /tmp/claude-skill-loaded-$SESSION_ID-*; do
+for marker in /tmp/claude-skill-loaded-$KEY-*; do
   [ ! -f "$marker" ] && continue
-  skill_name="\${marker##/tmp/claude-skill-loaded-$SESSION_ID-}"
-  if [ ! -f "/tmp/claude-skill-acked-$SESSION_ID-$skill_name" ]; then
+  skill_name="\${marker##/tmp/claude-skill-loaded-$KEY-}"
+  if [ ! -f "/tmp/claude-skill-acked-$KEY-$skill_name" ]; then
     UNACKED="$UNACKED $skill_name"
   fi
 done
@@ -301,7 +345,7 @@ ACK_CMD="touch"
 NAMES=""
 RULES_BLOCKS=""
 for skill in $UNACKED; do
-  ACK_CMD="$ACK_CMD /tmp/claude-skill-acked-$SESSION_ID-$skill"
+  ACK_CMD="$ACK_CMD /tmp/claude-skill-acked-$KEY-$skill"
   NAMES="$NAMES, '$skill'"
   SKILL_MD="$PROJECT_DIR/.claude/skills/$skill/SKILL.md"
   RULES=""

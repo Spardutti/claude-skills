@@ -1,6 +1,7 @@
 ---
 name: code-structure
-paths: "**/*"
+metadata:
+  gate-paths: "**/*"
 category: Foundations
 description: "MUST USE when creating or editing any code file in any language — deciding how to split files, functions, classes, and modules, or whether to extract a shared helper, base class, or utility from duplicated code. Enforces the Single Responsibility Principle (one reason to change, file/function size limits, separation of concerns) and Avoid-Hasty-Abstractions (AHA / Rule of Three — prefer duplication over the wrong abstraction)."
 ---
