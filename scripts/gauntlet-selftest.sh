@@ -730,6 +730,99 @@ gatef "config files stay gated" deny "tsconfig.json"
 gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
 gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"
 
+# --------------------------------------------------------- mandatory skills
+# The generic gate offers an all-SKIP escape, and a session took it: it rated
+# every skill SKIP, touched the marker, and edited React files with none of the
+# React rules loaded. A skill declaring both paths: and tracks: no longer gets
+# that vote. These assert WHICH skills the deny names, not merely that it
+# denied — a gate that denies for the wrong reason still reads as green.
+echo "mandatory skills (paths + tracks)"
+newrepo sg_must
+mkdir -p .claude/skills/rx .claude/skills/api .claude/skills/plain
+printf -- '---\nname: rx\ntracks: react@19.2\npaths: "**/*.tsx, **/*.jsx"\n---\n## Rules\n- x\n' > .claude/skills/rx/SKILL.md
+printf -- '---\nname: api\ntracks: fastapi@0.141 (pypi)\npaths: "**/*.py"\n---\n## Rules\n- x\n' > .claude/skills/api/SKILL.md
+# No paths:/tracks: — must stay advisory, or this change tightens skills that
+# never opted in.
+printf -- '---\nname: plain\n---\n## Rules\n- x\n' > .claude/skills/plain/SKILL.md
+printf '%s\n' '{"dependencies":{"react":"19.2.0"}}' > package.json
+printf '%s\n' '[project]' > pyproject.toml
+printf '%s\n' 'dependencies = ["fastapi>=0.141"]' >> pyproject.toml
+node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
+SKG=".claude/hooks/skill-gate.sh"
+MSID="ms$RUN"
+
+# must <label> <allow|generic|comma-separated skill names> <file_path> [prime]
+# prime: "marker" pre-touches the session gate marker; "loaded:a,b" pre-touches
+# the per-skill loaded markers.
+must() {
+  N=$((N+1))
+  rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+  case "${4:-}" in
+    marker) touch /tmp/claude-skill-gate-$MSID ;;
+    loaded:*) touch /tmp/claude-skill-gate-$MSID
+      for s in $(printf '%s' "${4#loaded:}" | tr ',' ' '); do
+        touch "/tmp/claude-skill-loaded-$MSID-$s"
+      done ;;
+  esac
+  out=$(printf '{"session_id":"%s","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$MSID" "$3" | bash "$SKG")
+  case "$out" in
+    *"mandatory skills that are not loaded: "*)
+      got=$(printf '%s' "$out" | sed 's/.*not loaded: //; s/\..*//; s/, /,/g') ;;
+    *deny*) got=generic ;;
+    *)      got=allow ;;
+  esac
+  if [ "$got" = "$2" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got %s\n' "$1" "$2" "$got"; fi
+}
+
+must "a tsx edit names the react skill"            rx      src/App.tsx
+must "a touched marker does not excuse it"         rx      src/App.tsx        marker
+must "loading the skill clears it"                 allow   src/App.tsx        loaded:rx
+must "a py edit names the pypi-tracked skill"      api     app/main.py        marker
+must "the wrong stack's skill is not demanded"     allow   app/main.py        loaded:api
+must "a skill without paths stays advisory"        generic src/util.go
+must "prose is still ungated"                      allow   NOTES.md           marker
+must "a jsx edit matches the second glob"          rx      src/legacy/a.jsx
+
+# The same file written through Bash must reach the same verdict, or the
+# heredoc route walks past the mandatory skills the structured tools enforce.
+N=$((N+1))
+rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+touch /tmp/claude-skill-gate-$MSID
+bout=$(printf '{"session_id":"%s","tool_name":"Bash","tool_input":{"command":"cat > src/App.tsx <<EOF"}}' "$MSID" | bash "$SKG")
+case "$bout" in
+  *"not loaded: rx"*) PASS=$((PASS+1)); printf '  ok   %s\n' "a heredoc into tsx names the same skill" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL %s — got %s\n' "a heredoc into tsx names the same skill" "$bout" ;;
+esac
+
+# A .tsx file is not proof of React. Without the tracked dependency the skill
+# must go back to being advisory, or every Astro and Solid repo is blocked on
+# a React skill it should never load.
+N=$((N+1))
+printf '%s\n' '{"dependencies":{"astro":"5.0.0"}}' > package.json
+rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+touch /tmp/claude-skill-gate-$MSID
+aout=$(printf '{"session_id":"%s","tool_name":"Write","tool_input":{"file_path":"src/App.tsx"}}' "$MSID" | bash "$SKG")
+case "$aout" in
+  *mandatory*) FAIL=$((FAIL+1)); printf '  FAIL %s — got %s\n' "no react dependency means no mandatory react skill" "$aout" ;;
+  *) PASS=$((PASS+1)); printf '  ok   %s\n' "no react dependency means no mandatory react skill" ;;
+esac
+rm -f /tmp/claude-skill-gate-$MSID /tmp/claude-skill-loaded-$MSID-*
+
+# The hook logic above is exercised against synthetic skills so it stays green
+# when skill content changes. This asserts the shipped skills actually opt in —
+# a paths: dropped from react/SKILL.md is silent everywhere else.
+echo "shipped skills declare their triggers"
+for s in react fastapi typescript-best-practices tanstack-query tanstack-router express drizzle-orm; do
+  N=$((N+1))
+  f="$HERE/../skills/$s/SKILL.md"
+  if grep -q '^paths:' "$f" && grep -q '^tracks:' "$f"; then
+    PASS=$((PASS+1)); printf '  ok   %s declares paths and tracks\n' "$s"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s is missing paths: or tracks:\n' "$s"
+  fi
+done
+
 # --------------------------------------------- a skill that GAINS a reference file
 # A bundle grows: react gained FORMS.md and SHADCN.md. A project that installed
 # the skill before those existed has to receive them, or it keeps a SKILL.md

@@ -30,10 +30,10 @@ if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
 
+# The session marker is checked at the very bottom now, not here. A skill the
+# edited file's own stack demands is not something an already-cleared gate
+# excuses, so the required-skill scan below runs first.
 MARKER="/tmp/claude-skill-gate-$SESSION_ID"
-if [ -f "$MARKER" ]; then
-  exit 0
-fi
 
 # Write|Edit|MultiEdit is not the only way to change a file. A session that edits
 # through \`python3 - <<'PY'\` in Bash walked past this gate entirely — twelve
@@ -49,6 +49,9 @@ CODE_EXT='ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|sql
 
 TOOL=$(printf '%s' "$INPUT" | grep -o '"tool_name":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
 
+# Every file this call would write, collected for the required-skill scan below.
+TARGETS=""
+
 if [ "$TOOL" != "Bash" ]; then
   # The structured tools name their target outright.
   TARGET=$(printf '%s' "$INPUT" | grep -o '"file_path":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
@@ -58,6 +61,7 @@ if [ "$TOOL" != "Bash" ]; then
     */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
     *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
   esac
+  TARGETS="$TARGET"
 fi
 if [ "$TOOL" = "Bash" ]; then
   CMD=$(printf '%s' "$INPUT" | grep -o '"command":[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
@@ -86,6 +90,84 @@ if [ "$TOOL" = "Bash" ]; then
     *"<<"*|*python*" -c"*|*node*" -e"*|*perl*" -e"*|*ruby*" -e"*) WRITES=1 ;;
   esac
   [ -z "$WRITES" ] && exit 0
+  # A Bash write names its files in the command itself.
+  TARGETS=$(printf '%s' "$CMD" | grep -oiE "[A-Za-z0-9_./-]+\.($CODE_EXT)" 2>/dev/null)
+fi
+
+# --- mandatory skills -------------------------------------------------------
+# The generic gate below asks the model to rate every skill ACTIVATE or SKIP,
+# and hands it an all-SKIP escape. A session took that escape, touched the
+# marker, and edited React files with none of the React rules loaded. It had
+# followed the hook exactly: the hook let it decide.
+#
+# So a skill that declares BOTH paths: and tracks: stops getting a vote. If the
+# edited file matches its paths AND this project depends on a package it
+# tracks, that skill is mandatory and only Skill(<name>) clears it. Skills
+# without both fields keep the old behaviour, so this tightens nothing that was
+# not deliberately declared.
+MISSING=""
+if [ -n "$TARGETS" ]; then
+  MANIFESTS=$(find "$PROJECT_DIR" -maxdepth 4 \\( -name node_modules -o -name .git -o -name .venv -o -name dist \\) -prune -o \\( -name package.json -o -name pyproject.toml -o -name requirements.txt \\) -print 2>/dev/null)
+fi
+if [ -n "$TARGETS" ] && [ -n "$MANIFESTS" ]; then
+  for SKILL_FILE in $(find "$PROJECT_DIR" -path '*/.claude/skills/*/SKILL.md' 2>/dev/null); do
+    # paths: must be quoted in YAML — a scalar opening with * is an alias.
+    UNQUOTE='s/^["'"'"']//; s/["'"'"']$//'
+    SPATHS=$(sed -n 's/^paths:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
+    STRACKS=$(sed -n 's/^tracks:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
+    SNAME=$(sed -n 's/^name:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
+    [ -z "$SPATHS" ] && continue
+    [ -z "$STRACKS" ] && continue
+    [ -z "$SNAME" ] && continue
+
+    HIT=""
+    for G in $(printf '%s' "$SPATHS" | tr ',' ' '); do
+      # Claude Code writes these gitignore-style. A case glob has no **, but *
+      # already crosses / here, so dropping the **/ prefix is equivalent.
+      G=$(printf '%s' "$G" | sed 's!\\*\\*/!!g')
+      case "$G" in \\**|/*) ;; *) G="*$G" ;; esac
+      for T in $TARGETS; do
+        case "$T" in $G) HIT=1 ;; esac
+      done
+    done
+    [ -z "$HIT" ] && continue
+
+    # A .tsx file is not proof of React — it could be Astro, Solid or Preact.
+    # The packages the skill tracks are the proof, so the manifests decide.
+    PY=""
+    case "$STRACKS" in *pypi*) PY=1 ;; esac
+    DEP=""
+    for P in $(printf '%s' "$STRACKS" | tr ',' ' '); do
+      case "$P" in *@*) ;; *) continue ;; esac
+      PKG=$(printf '%s' "$P" | sed 's/@[^@]*$//')
+      [ -z "$PKG" ] && continue
+      for M in $MANIFESTS; do
+        if [ -n "$PY" ]; then
+          grep -qiE "(^|[^A-Za-z0-9_.-])$PKG([^A-Za-z0-9_.-]|$)" "$M" 2>/dev/null && DEP=1
+        else
+          grep -qs "\\"$PKG\\"" "$M" && DEP=1
+        fi
+      done
+    done
+    [ -z "$DEP" ] && continue
+
+    SAFE=$(printf '%s' "$SNAME" | tr -cd 'A-Za-z0-9_-')
+    [ -f "/tmp/claude-skill-loaded-$SESSION_ID-$SAFE" ] && continue
+    case " $MISSING " in *" $SNAME "*) ;; *) MISSING="$MISSING $SNAME" ;; esac
+  done
+fi
+
+if [ -n "$MISSING" ]; then
+  LIST=$(printf '%s' "$MISSING" | sed 's/^ //; s/ /, /g')
+  FIRST=$(printf '%s' "$MISSING" | awk '{print $1}')
+  cat <<EOF
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: this file's stack has mandatory skills that are not loaded: $LIST.\\n\\nThere is no SKIP for these. The file matches each skill's declared paths AND this project depends on a package that skill tracks, so they apply as a matter of fact, not judgement. Touching the gate marker will not clear them.\\n\\nCall Skill($FIRST) now — then every other name in the list — and retry the edit."}}
+EOF
+  exit 0
+fi
+
+if [ -f "$MARKER" ]; then
+  exit 0
 fi
 
 

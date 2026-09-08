@@ -3,6 +3,7 @@ name: tanstack-query
 category: Frontend
 description: "MUST USE when writing any @tanstack/react-query code (TanStack Query, formerly React Query), including useQuery, useMutation, useInfiniteQuery, useSuspenseQuery, useQueries, QueryClient setup, designing query keys or key factories, invalidating or prefetching cache, doing optimistic or pessimistic mutations, configuring select/error handling/retry/refetchType, or migrating from v4 to v5. Enforces v5 single-object signatures, the pending/isLoading rename, gcTime over cacheTime, serializable query keys, queryFn throwing on error, pessimistic-first mutation strategy, the cancelQueries → snapshot → setQueryData → rollback → invalidate template, refetchType: 'none' for broad invalidation, and the @lukemorales/query-key-factory merge pattern."
 tracks: @tanstack/react-query@5.x
+paths: "**/*.ts, **/*.tsx"
 ---
 
 # TanStack Query — Cache, Queries, Mutations
@@ -209,6 +210,6 @@ qc.invalidateQueries({ queryKey: ['todos', id], exact: true }); // only this one
 
 For deeper guidance, load the file matching what you're working on:
 
-- **QUERY-KEYS.md** — read when designing query keys, building a `@lukemorales/query-key-factory` factory, or invalidating cache by prefix. Covers the merge pattern (one `createQueryKeys` file per domain, composed via `mergeQueryKeys`), the `_def` / `_ctx` / `contextQueries` shapes, fuzzy vs exact invalidation targets, and `inferQueryKeys` for type extraction.
+- **QUERY-KEYS.md** — read before your first `useQuery` in a repo — it may already have a key factory you must extend — and when designing query keys, building a `@lukemorales/query-key-factory` factory, or invalidating cache by prefix. Covers the merge pattern (one `createQueryKeys` file per domain, composed via `mergeQueryKeys`), the `_def` / `_ctx` / `contextQueries` shapes, fuzzy vs exact invalidation targets, and `inferQueryKeys` for type extraction.
 - **MUTATIONS.md** — read when writing `useMutation`, doing optimistic updates, or invalidating after a write. Covers the `mutate` vs `mutateAsync` choice, the `onMutate → mutationFn → onSuccess/onError → onSettled` lifecycle, **pessimistic vs optimistic — pick the default**, the canonical `cancelQueries → snapshot → setQueryData → rollback → invalidate` template, the full `refetchType` table (including `'none'` for broad invalidations), call-site vs hook-level callbacks, and concurrent-mutation `scope`.
 - **QUERIES.md** — read when reading data, tuning options, handling errors, or integrating devtools. Covers `select` for derived state and re-render stability, error handling (`throwOnError`, retry, retryDelay, error boundaries), full `useInfiniteQuery` example + key-change reset gotcha, `useSuspenseQuery` and `useQueries` examples, stale closures in `queryFn`, network/focus options (`networkMode`, dev-mode `refetchOnWindowFocus`, `gcTime: 0`), and Devtools setup.

@@ -3,6 +3,7 @@ name: express
 category: Backend
 description: "MUST USE when writing or reviewing Express routes, middleware, or error handling. Express 5 — automatic async error forwarding, the four-argument error handler, named wildcards, validation at the boundary, thin routes, and the security baseline every production app needs. Bundle covers tRPC v11 on Express."
 tracks: express@5.2, @trpc/server@11.18
+paths: "**/*.ts, **/*.js"
 ---
 
 # Express
@@ -236,4 +237,4 @@ Without this a deploy kills in-flight requests mid-write.
 
 ## Reference Files
 
-- **TRPC.md** — read when working on tRPC routers, procedures, or the Express adapter. Covers `createExpressMiddleware` and typed context, `protectedProcedure` middleware that narrows the context type, why a plain `Error` becomes a 500 and `TRPCError` does not, the error-code-to-HTTP mapping, `errorFormatter` for field-level Zod errors (and the Zod 3 → 4 difference), `maxBodySize`, and where tRPC and REST routes coexist in one app.
+- **TRPC.md** — read before adding any endpoint to a repo that already has a tRPC router — a new route belongs there, not in a fresh REST handler — and when working on tRPC routers, procedures, or the Express adapter. Covers `createExpressMiddleware` and typed context, `protectedProcedure` middleware that narrows the context type, why a plain `Error` becomes a 500 and `TRPCError` does not, the error-code-to-HTTP mapping, `errorFormatter` for field-level Zod errors (and the Zod 3 → 4 difference), `maxBodySize`, and where tRPC and REST routes coexist in one app.
