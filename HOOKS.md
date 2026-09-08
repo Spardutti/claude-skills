@@ -200,6 +200,25 @@ provide, so a repo that works today keeps working.
 Setting `GAUNTLET_TEST` or `GAUNTLET_TYPECHECK` switches the repo to explicit mode:
 auto-detection is off and only what you set runs.
 
+**Tests that cannot run on the host.** When a project's tests need a database, a
+queue, or anything else that only exists in Compose, every host runner detection
+finds is the wrong one — and it fails quietly rather than loudly. Drop an
+executable runner in that project's directory and every gate uses it instead:
+
+```sh
+# apps/api/.gauntlet-test
+#!/bin/sh
+exec docker compose run --rm -T api pytest "$@"
+```
+
+`.gauntlet-test` takes the changed files as arguments; `.gauntlet-typecheck` takes
+none. The ship gate reads `.mutmut-run` the same way.
+
+This is per **project**, not per repo — any directory holding a `package.json` or
+`pyproject.toml`. `GAUNTLET_TEST` disables detection everywhere, so a monorepo
+needing a container for one stack had to hand-write commands for all of them.
+A runner file leaves the other half auto-detecting on the host.
+
 **A missing tool is a skip, not a red.** A fresh clone with no `node_modules`, or a
 venv without pytest, would otherwise fail every gate and block every turn — so the
 hook reports `skipped: node_modules is missing — run your install first` and gets

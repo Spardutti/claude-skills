@@ -454,6 +454,18 @@ const GAUNTLET_SCRIPT = `#!/usr/bin/env bash
 # Setting either command switches the whole repo to explicit mode — auto-detection
 # is off, and only what you set runs.
 #
+# Per-project runners, for tests that cannot run on the host at all:
+#   <project>/.gauntlet-test        executable; run instead of the detected test
+#                                   command, with $FILES as its arguments
+#   <project>/.gauntlet-typecheck   executable; run instead of the detected
+#                                   typecheck command
+#
+# <project> is any directory holding a package.json or pyproject.toml, so one
+# half of a monorepo can run on the host while the other runs in a container.
+# Unlike GAUNTLET_TEST these do not disable detection anywhere else. Typically a
+# two-line \`docker compose run --rm -T api pytest "$@"\`. Same shape as
+# ship-gate's .mutmut-run.
+#
 # Every run records why it ended in /tmp/claude-gauntlet-<session>.why, so a green
 # run and a skipped one are told apart without re-running the hook.
 
@@ -550,6 +562,26 @@ add_dir_gates() {
   have_tc=""; have_test=""
   [ -n "$d" ] && [ -n "\${ROOT_TC:-}" ] && have_tc="skip"
   [ -n "$d" ] && [ -n "\${ROOT_TEST:-}" ] && have_test="skip"
+
+  # A project whose tests need a database, a queue, or any other service cannot
+  # run them on the host, and detection here finds the host runner every time.
+  # An executable runner in the project directory says where they DO run —
+  # usually \`docker compose run\` against the app container — and wins over
+  # everything detected below.
+  #
+  # Per project, not per repo: GAUNTLET_TEST switches the WHOLE repo to explicit
+  # mode, so a monorepo needing a container for one stack had to hand-write
+  # commands for all of them. These let one half run on the host and the other
+  # in a container. Same shape as ship-gate's .mutmut-run, deliberately.
+  RUNNER_EXT="($JS_EXT|py)"
+  if [ -z "$have_tc" ] && [ -x "$d\${d:+/}.gauntlet-typecheck" ]; then
+    add_gate typecheck "$pre$RUNNER_EXT\\$" "\${run}./.gauntlet-typecheck"
+    have_tc="skip"
+  fi
+  if [ -z "$have_test" ] && [ -x "$d\${d:+/}.gauntlet-test" ]; then
+    add_gate tests "$pre$RUNNER_EXT\\$" "\${run}./.gauntlet-test \\$FILES"
+    have_test="skip"
+  fi
 
   if [ -f "$d\${d:+/}package.json" ]; then
     pkg="$d\${d:+/}package.json"

@@ -131,6 +131,58 @@ check "web change runs web gates" "green: gates passed" "web-test"
 rm web/src/a.ts; echo "x=1" > api/a.py
 check "api change runs api gates" "green: gates passed" "api-test"
 
+# A project whose tests need a database cannot run them on the host, and
+# detection finds the host runner every time. GAUNTLET_TEST could override it,
+# but that switches the WHOLE repo to explicit mode — so a monorepo needing a
+# container for one stack had to hand-write commands for all of them. A
+# per-project executable runner fixes exactly that, and only that.
+echo "per-project runners"
+newrepo r_runner
+mkdir -p web api
+printf '{"scripts":{"test":"x","typecheck":"y"},"devDependencies":{"vitest":"^4"}}\n' > web/package.json
+printf '[project]\nname="api"\n' > api/pyproject.toml
+# The runner and the host tool it must beat. Each logs which one ran, so this
+# asserts WHICH command executed — a stub that only returned a verdict would
+# agree with the bug and still come out green.
+printf '#!/bin/sh\necho RUNNER-IN-CONTAINER >> %s\nexit 0\n' "$LOG" > api/.gauntlet-test
+chmod +x api/.gauntlet-test
+stub python "HOST-PYTEST"
+stub npx "HOST-VITEST"
+echo "print(1)" > api/main.py
+check "the project runner replaces the host tool" "green: gates passed" "RUNNER-IN-CONTAINER"
+
+newrepo r_runner_host
+mkdir -p web api
+printf '{"scripts":{"test":"x"},"devDependencies":{"vitest":"^4"}}\n' > web/package.json
+printf '[project]\nname="api"\n' > api/pyproject.toml
+printf '#!/bin/sh\necho RUNNER-IN-CONTAINER >> %s\nexit 0\n' "$LOG" > api/.gauntlet-test
+chmod +x api/.gauntlet-test
+stub python "HOST-PYTEST"
+stub npx "HOST-VITEST"
+echo "export const a = 1" > web/a.ts
+# The other half of the monorepo declares no runner, so it keeps its detected
+# host command. This is what GAUNTLET_TEST could not express.
+check "the half with no runner still auto-detects" "green: gates passed" "HOST-VITEST"
+
+newrepo r_runner_tc
+mkdir -p api
+printf '[project]\nname="api"\n[tool.mypy]\n' > api/pyproject.toml
+printf '#!/bin/sh\necho RUNNER-TYPECHECK >> %s\nexit 0\n' "$LOG" > api/.gauntlet-typecheck
+chmod +x api/.gauntlet-typecheck
+stub python "HOST-MYPY"
+echo "print(1)" > api/main.py
+check "a typecheck runner replaces host mypy" "green: gates passed" "RUNNER-TYPECHECK"
+
+newrepo r_runner_unexec
+mkdir -p api
+printf '[project]\nname="api"\n' > api/pyproject.toml
+# Not executable: the gate cannot run it, so falling back to detection is the
+# only safe reading. Silently gating on a file it cannot execute would be worse.
+printf '#!/bin/sh\nexit 0\n' > api/.gauntlet-test
+stub python "HOST-PYTEST"
+echo "print(1)" > api/main.py
+check "a non-executable runner is ignored" "green: gates passed" "HOST-PYTEST"
+
 echo "a path containing a space stays one argument"
 newrepo r7
 echo '{"devDependencies":{"vitest":"^4"}}' > package.json
