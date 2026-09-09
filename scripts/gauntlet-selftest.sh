@@ -1073,17 +1073,20 @@ done
 #
 # preflight only compares the files it is told to. This asserts the list is
 # complete, which is the part that was wrong.
-echo "every embedded hook script has a source file"
-for c in $(grep -o '^const [A-Z_]*_SCRIPT = `' "$HERE/../cli/lib/setup-hook.mjs" | sed 's/^const //; s/ = .*//'); do
+echo "every installed hook has a source file, and ships"
+SH="$HERE/../cli/lib/setup-hook.mjs"
+PKG="$HERE/../cli/package.json"
+for fn in $(grep -o '^const [A-Z_]*_FILENAME = "[^"]*"' "$SH" | grep -v 'LEGACY_' | sed 's/.*"\(.*\)"/\1/'); do
   N=$((N+1))
-  # GATE_SCRIPT -> GATE_FILENAME, and the filename constant holds the real name.
-  fn=$(grep -o "^const ${c%_SCRIPT}_FILENAME = \"[^\"]*\"" "$HERE/../cli/lib/setup-hook.mjs" | sed 's/.*"\(.*\)"/\1/')
-  if [ -z "$fn" ]; then
-    FAIL=$((FAIL+1)); printf '  FAIL %s has no matching _FILENAME constant\n' "$c"
-  elif [ -f "$HERE/../scripts/$fn" ]; then
-    PASS=$((PASS+1)); printf '  ok   %s <- scripts/%s\n' "$c" "$fn"
+  if [ ! -f "$HERE/../scripts/$fn" ]; then
+    FAIL=$((FAIL+1)); printf '  FAIL %s is installed with no scripts/%s behind it\n' "$fn" "$fn"
+  # Reading from disk only works if the file is in the published tarball. A
+  # script added to scripts/ and not to prepack installs from a clone and
+  # 404s for everyone else, and no test that runs from the repo would notice.
+  elif ! grep -q "scripts/$fn" "$PKG"; then
+    FAIL=$((FAIL+1)); printf '  FAIL %s is not copied into the package by prepack\n' "$fn"
   else
-    FAIL=$((FAIL+1)); printf '  FAIL %s is embedded with no scripts/%s to compare against\n' "$c" "$fn"
+    PASS=$((PASS+1)); printf '  ok   %s <- scripts/%s, packed\n' "$fn" "$fn"
   fi
 done
 

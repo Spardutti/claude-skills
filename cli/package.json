@@ -1,6 +1,6 @@
 {
   "name": "@spardutti/claude-skills",
-  "version": "2.31.0",
+  "version": "2.32.0",
   "description": "Guardrails for Claude Code — best-practice skills, planning commands, and delivery gates.",
   "type": "module",
   "repository": {
@@ -11,15 +11,16 @@
     "claude-skills": "bin/cli.mjs"
   },
   "scripts": {
-    "prepack": "cp ../README.md README.md",
-    "postpack": "git checkout -- README.md"
+    "prepack": "cp ../README.md README.md && mkdir -p hooks && cp ../scripts/skill-gate.sh ../scripts/skill-gate-automark.sh ../scripts/skill-application-gate.sh ../scripts/gauntlet.sh ../scripts/ship-gate.sh ../scripts/ship-gate-hook.sh ../scripts/version-check.sh hooks/",
+    "postpack": "git checkout -- README.md && rm -rf hooks"
   },
   "engines": {
     "node": ">=18"
   },
   "files": [
     "bin",
-    "lib"
+    "lib",
+    "hooks"
   ],
   "keywords": [
     "claude",

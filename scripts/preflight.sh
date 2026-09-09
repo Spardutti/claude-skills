@@ -27,30 +27,40 @@ if node scripts/validate-skills.mjs; then ok "validator"; else bad "validator"; 
 step "2. Behavioural self-tests"
 if bash scripts/gauntlet-selftest.sh; then ok "self-tests"; else bad "self-tests"; fi
 
-step "3. Embedded scripts match their source"
-# The CLI ships copies of the hook scripts as JS template literals. An edit to a
-# script that is not re-embedded publishes the old one, and nothing else notices.
+step "3. The published package installs the real scripts"
+# The hook scripts used to be pasted into setup-hook.mjs as template literals,
+# and this step compared the two copies. They are read from disk now, so that
+# drift cannot happen — but a new one can: `files` and the prepack copy decide
+# what reaches the tarball, and a script that is in scripts/ and not in the
+# package installs fine from a clone and is missing for every real user.
+#
+# Running from the repo cannot see that, because the reader falls back to
+# scripts/. So this packs for real, installs from the tarball, and compares.
 TMP=$(mktemp -d)
-node -e "
-  import('$ROOT/cli/lib/setup-hook.mjs').then(async (m) => {
-    await m.setupHook('$TMP');
-  });
-" >/dev/null 2>&1
-# All seven, not the four this listed for months. The three skill-gate scripts
-# existed ONLY as template literals inside setup-hook.mjs, so the most-edited
-# hook in the repo was the one with no source file and no drift check — every
-# change to it was made by editing an escaped string, and nothing could tell
-# whether the installed copy still matched anything.
-for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh version-check.sh \
-         skill-gate.sh skill-gate-automark.sh skill-application-gate.sh; do
-  if [ ! -f "$TMP/.claude/hooks/$f" ]; then
-    bad "$f was not installed at all"
-  elif cmp -s "$TMP/.claude/hooks/$f" "scripts/$f"; then
-    ok "$f is current"
-  else
-    bad "$f differs from scripts/$f — re-embed it in cli/lib/setup-hook.mjs"
-  fi
-done
+# The folder is the ARGUMENT, not --prefix: --prefix sets the install prefix and
+# leaves npm packing the current directory, which from the repo root is the
+# private dev-tooling package and fails with "must have name and version".
+# `npm pack <folder>` is the same form the publish workflow uses.
+if ! npm pack "$ROOT/cli" --pack-destination "$TMP" >/dev/null 2>&1; then
+  bad "npm pack failed"
+else
+  tar -xzf "$TMP"/*.tgz -C "$TMP"
+  node -e "
+    import('$TMP/package/lib/setup-hook.mjs').then((m) => m.setupHook('$TMP/target'));
+  " >/dev/null 2>&1
+  for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh version-check.sh \
+           skill-gate.sh skill-gate-automark.sh skill-application-gate.sh; do
+    if [ ! -f "$TMP/package/hooks/$f" ]; then
+      bad "$f is not in the tarball — add it to cli/package.json prepack"
+    elif [ ! -x "$TMP/target/.claude/hooks/$f" ]; then
+      bad "$f was not installed executable from the package"
+    elif cmp -s "$TMP/target/.claude/hooks/$f" "scripts/$f"; then
+      ok "$f ships and installs from the package"
+    else
+      bad "$f installs from the package but differs from scripts/$f"
+    fi
+  done
+fi
 rm -rf "$TMP"
 
 step "4. Detection against real repositories"
