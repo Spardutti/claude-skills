@@ -1063,6 +1063,30 @@ for f in "$HERE"/../skills/*/SKILL.md; do
   fi
 done
 
+# --------------------------------------------- every embedded script has a source
+# Four of the seven hook scripts had a file in scripts/ and were compared against
+# it by preflight. The other three — the skill gate, its automark, and the
+# application gate — existed ONLY as template literals inside setup-hook.mjs. So
+# the most-edited hook in the repo was the one with no source of truth: every
+# change to it was made by editing an escaped string, and no check could tell
+# whether the installed copy still matched anything.
+#
+# preflight only compares the files it is told to. This asserts the list is
+# complete, which is the part that was wrong.
+echo "every embedded hook script has a source file"
+for c in $(grep -o '^const [A-Z_]*_SCRIPT = `' "$HERE/../cli/lib/setup-hook.mjs" | sed 's/^const //; s/ = .*//'); do
+  N=$((N+1))
+  # GATE_SCRIPT -> GATE_FILENAME, and the filename constant holds the real name.
+  fn=$(grep -o "^const ${c%_SCRIPT}_FILENAME = \"[^\"]*\"" "$HERE/../cli/lib/setup-hook.mjs" | sed 's/.*"\(.*\)"/\1/')
+  if [ -z "$fn" ]; then
+    FAIL=$((FAIL+1)); printf '  FAIL %s has no matching _FILENAME constant\n' "$c"
+  elif [ -f "$HERE/../scripts/$fn" ]; then
+    PASS=$((PASS+1)); printf '  ok   %s <- scripts/%s\n' "$c" "$fn"
+  else
+    FAIL=$((FAIL+1)); printf '  FAIL %s is embedded with no scripts/%s to compare against\n' "$c" "$fn"
+  fi
+done
+
 # ------------------------------------------- a declared agent that nothing invokes
 # ship.md declared gauntlet-skills, described the skills audit as one of "the three
 # things nothing else does", and never contained a step that ran it. It shipped

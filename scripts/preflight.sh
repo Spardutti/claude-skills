@@ -36,7 +36,13 @@ node -e "
     await m.setupHook('$TMP');
   });
 " >/dev/null 2>&1
-for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh version-check.sh; do
+# All seven, not the four this listed for months. The three skill-gate scripts
+# existed ONLY as template literals inside setup-hook.mjs, so the most-edited
+# hook in the repo was the one with no source file and no drift check — every
+# change to it was made by editing an escaped string, and nothing could tell
+# whether the installed copy still matched anything.
+for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh version-check.sh \
+         skill-gate.sh skill-gate-automark.sh skill-application-gate.sh; do
   if [ ! -f "$TMP/.claude/hooks/$f" ]; then
     bad "$f was not installed at all"
   elif cmp -s "$TMP/.claude/hooks/$f" "scripts/$f"; then
