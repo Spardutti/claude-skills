@@ -34,14 +34,40 @@ function getAuthHeaders() {
   return headers;
 }
 
-// raw.githubusercontent.com is not the API and does not take an API token. Sent
-// one, it answers 503 — measured: the same URL returns 200 without the header
-// and 503 with it. The CLI passed its API headers to every raw fetch, so a
-// machine with `gh auth token` set lost most skill files to "Warning: Failed to
-// fetch ..., skipping" and installed a partial set, while a machine without gh
-// worked fine. Raw needs the User-Agent and nothing else.
+// raw.githubusercontent.com is not the API and the token buys nothing there, so
+// it is not sent. This is hygiene, not a fix: it was first committed as the
+// cause of a wave of 503s, and that was wrong. Measured after: bare requests
+// returned 503 at the same rate as authenticated ones, and both went back to
+// 200 once the window passed. raw was simply unwell for a few minutes.
 function getRawHeaders() {
   return { "User-Agent": "claude-skills-cli" };
+}
+
+// What actually cost the user seven skills was the handling below, not the
+// headers: a failed fetch printed a warning, returned null, and the install
+// exited 0 having quietly dropped whatever it could not get. A 503 that clears
+// in two seconds should never reach the user, and one that does not clear must
+// not look like success.
+const RETRIES = 4;
+
+async function fetchRaw(url) {
+  let last = "";
+  for (let attempt = 0; attempt < RETRIES; attempt++) {
+    // 400ms, 800ms, 1600ms. The outage that prompted this cleared well inside
+    // that; a longer wait would only make a real outage slower to report.
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
+    try {
+      const r = await fetch(url, { headers: getRawHeaders() });
+      if (r.ok) return await r.text();
+      last = `${r.status} ${r.statusText}`;
+      // A missing file is an answer, not a hiccup. Retrying it wastes the
+      // user's time and still ends in the same place.
+      if (r.status === 404) break;
+    } catch (e) {
+      last = e.message;
+    }
+  }
+  throw new Error(`${url} — ${last || "unreachable"} after ${RETRIES} attempts`);
 }
 
 async function fetchListing({ apiUrl, label, entryFilter, buildRawUrl, mapEntry, allow404 = false }) {
@@ -58,20 +84,13 @@ async function fetchListing({ apiUrl, label, entryFilter, buildRawUrl, mapEntry,
 
   const entries = (await res.json()).filter(entryFilter);
 
+  // No try/catch: a file this listing named and the network could not deliver
+  // is a failed install, not a smaller one. Promise.all rejects on the first
+  // failure and the error carries the URL and the last status.
   const results = await Promise.all(
-    entries.map(async (entry) => {
-      try {
-        const r = await fetch(buildRawUrl(entry), { headers: getRawHeaders() });
-        if (!r.ok) {
-          console.warn(`  Warning: Failed to fetch ${label} ${entry.name}, skipping`);
-          return null;
-        }
-        return mapEntry(entry, await r.text());
-      } catch {
-        console.warn(`  Warning: Failed to fetch ${entry.name}, skipping`);
-        return null;
-      }
-    })
+    entries.map(async (entry) =>
+      mapEntry(entry, await fetchRaw(buildRawUrl(entry)))
+    )
   );
 
   return results.filter(Boolean);
@@ -90,40 +109,36 @@ export async function fetchSkills() {
 
   const dirs = (await res.json()).filter((e) => e.type === "dir");
 
+  // A transient raw outage used to land here as seven "skipping" warnings and
+  // an exit code of 0 — the catalog simply came back smaller, and the picker
+  // offered whatever survived. Every failure now throws, after fetchRaw has
+  // already retried it.
   const skills = await Promise.all(
     dirs.map(async (dir) => {
-      try {
-        const listRes = await fetch(`${CONTENTS_API}/${dir.name}`, { headers });
-        if (!listRes.ok) {
-          console.warn(`  Warning: Failed to list skill ${dir.name}, skipping`);
-          return null;
-        }
-        const files = (await listRes.json()).filter((e) => e.type === "file");
+      const listRes = await fetch(`${CONTENTS_API}/${dir.name}`, { headers });
+      if (!listRes.ok) {
+        throw new Error(`Failed to list skill ${dir.name}: ${listRes.status} ${listRes.statusText}`);
+      }
+      const files = (await listRes.json()).filter((e) => e.type === "file");
 
-        const fetched = await Promise.all(
-          files.map(async (f) => {
-            const r = await fetch(`${RAW_BASE}/${dir.name}/${f.name}`, { headers: getRawHeaders() });
-            if (!r.ok) {
-              console.warn(`  Warning: Failed to fetch ${dir.name}/${f.name}, skipping`);
-              return null;
-            }
-            return { name: f.name, content: await r.text(), executable: f.name.endsWith(".sh") };
-          })
-        );
+      const fetched = await Promise.all(
+        files.map(async (f) => ({
+          name: f.name,
+          content: await fetchRaw(`${RAW_BASE}/${dir.name}/${f.name}`),
+          executable: f.name.endsWith(".sh"),
+        }))
+      );
 
-        const valid = fetched.filter(Boolean);
-        const skillMd = valid.find((f) => f.name === "SKILL.md");
-        if (!skillMd) {
-          console.warn(`  Warning: ${dir.name}/SKILL.md missing, skipping`);
-          return null;
-        }
-        const peerFiles = valid.filter((f) => f.name !== "SKILL.md");
-        const { name, description, category } = parseFrontmatter(skillMd.content, dir.name);
-        return { dirName: dir.name, name, description, category, content: skillMd.content, peerFiles };
-      } catch {
-        console.warn(`  Warning: Failed to fetch ${dir.name}, skipping`);
+      const skillMd = fetched.find((f) => f.name === "SKILL.md");
+      // Now genuinely a repo problem rather than a lost download, so it is
+      // still a skip — but the listing said this directory exists, so say so.
+      if (!skillMd) {
+        console.warn(`  Warning: ${dir.name} has no SKILL.md in the repo, skipping`);
         return null;
       }
+      const peerFiles = fetched.filter((f) => f.name !== "SKILL.md");
+      const { name, description, category } = parseFrontmatter(skillMd.content, dir.name);
+      return { dirName: dir.name, name, description, category, content: skillMd.content, peerFiles };
     })
   );
 

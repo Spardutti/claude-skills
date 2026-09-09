@@ -1097,14 +1097,87 @@ node -e "
   });
 " > "$TMP/hdr.out" 2>"$TMP/hdr.err"
 
-hdr() {  # hdr <label> <expected line>
+hdr() {  # hdr <label> <expected line> [file, default hdr.out]
   N=$((N+1))
-  if grep -qx "$2" "$TMP/hdr.out"; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
-  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got: %s\n' "$1" "$2" "$(tr '\n' ' ' < "$TMP/hdr.out")"; fi
+  f="$TMP/${3:-hdr.out}"
+  if grep -qx "$2" "$f"; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got: %s\n' "$1" "$2" "$(tr '\n' ' ' < "$f")"; fi
 }
 
 hdr "the token goes to the API" "api=2:all-auth"
 hdr "and never to raw"          "raw=1:all-bare"
+
+# raw.githubusercontent.com served intermittent 503s for a few minutes and the
+# CLI turned that into seven "skipping" warnings and an exit code of 0 — a
+# half-installed catalog that looked like a successful run. The headers were
+# blamed first and were not the cause: bare requests failed at the same rate.
+#
+# Two behaviours, and only the pair is safe. Retrying without failing hard would
+# still exit 0 on a real outage; failing hard without retrying would turn every
+# blip into a dead install.
+echo "raw fetch retries, then fails loudly"
+node -e "
+  let n = 0;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.github.com')) {
+      const dir = u.endsWith('/skills');
+      return { ok: true, status: 200, json: async () =>
+        dir ? [{ name: 'sql', type: 'dir' }] : [{ name: 'SKILL.md', type: 'file' }] };
+    }
+    // Unwell for the first two attempts, exactly like the real window.
+    if (++n <= 2) return { ok: false, status: 503, statusText: 'Service Unavailable' };
+    return { ok: true, status: 200, text: async () => '---\nname: sql\n---\n' };
+  };
+  import('$HERE/../cli/lib/github.mjs').then(async (gh) => {
+    const s = await gh.fetchSkills();
+    console.log('recovered=' + s.length + ' attempts=' + n);
+  }).catch((e) => console.log('threw=' + e.message));
+" > "$TMP/retry.out" 2>&1
+hdr "a blip is retried, not skipped" "recovered=1 attempts=3" retry.out
+
+node -e "
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.github.com')) {
+      const dir = u.endsWith('/skills');
+      return { ok: true, status: 200, json: async () =>
+        dir ? [{ name: 'sql', type: 'dir' }] : [{ name: 'SKILL.md', type: 'file' }] };
+    }
+    return { ok: false, status: 503, statusText: 'Service Unavailable' };
+  };
+  import('$HERE/../cli/lib/github.mjs').then(async (gh) => {
+    const s = await gh.fetchSkills();
+    console.log('SILENTLY-RETURNED=' + s.length);
+  }).catch(() => console.log('threw'));
+" > "$TMP/dead.out" 2>&1
+N=$((N+1))
+if grep -qx "threw" "$TMP/dead.out"; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "an outage that never clears fails the install"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s — got: %s\n' "an outage that never clears fails the install" "$(cat "$TMP/dead.out")"
+fi
+
+# A file the repo does not have is an answer. Retrying it three more times only
+# makes the user wait to hear the same thing.
+node -e "
+  let n = 0;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.github.com')) {
+      const dir = u.endsWith('/skills');
+      return { ok: true, status: 200, json: async () =>
+        dir ? [{ name: 'sql', type: 'dir' }] : [{ name: 'SKILL.md', type: 'file' }] };
+    }
+    n++;
+    return { ok: false, status: 404, statusText: 'Not Found' };
+  };
+  import('$HERE/../cli/lib/github.mjs')
+    .then((gh) => gh.fetchSkills())
+    .then(() => console.log('no-throw'))
+    .catch(() => console.log('attempts=' + n));
+" > "$TMP/nf.out" 2>&1
+hdr "a 404 is not retried" "attempts=1" nf.out
 
 # --------------------------------------------- a skill that GAINS a reference file
 # A bundle grows: react gained FORMS.md and SHADCN.md. A project that installed
