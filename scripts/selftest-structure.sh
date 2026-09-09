@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Structural checks on the repo itself: that what a file declares is what the
+# repo actually has. Both of these caught a real gap the first time they ran.
+# Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
+
+
+# --------------------------------------------- every embedded script has a source
+# Four of the seven hook scripts had a file in scripts/ and were compared against
+# it by preflight. The other three — the skill gate, its automark, and the
+# application gate — existed ONLY as template literals inside setup-hook.mjs. So
+# the most-edited hook in the repo was the one with no source of truth: every
+# change to it was made by editing an escaped string, and no check could tell
+# whether the installed copy still matched anything.
+#
+# preflight only compares the files it is told to. This asserts the list is
+# complete, which is the part that was wrong.
+echo "every installed hook has a source file, and ships"
+SH="$HERE/../cli/lib/setup-hook.mjs"
+PKG="$HERE/../cli/package.json"
+for fn in $(grep -o '^const [A-Z_]*_FILENAME = "[^"]*"' "$SH" | grep -v 'LEGACY_' | sed 's/.*"\(.*\)"/\1/'); do
+  N=$((N+1))
+  if [ ! -f "$HERE/../scripts/$fn" ]; then
+    FAIL=$((FAIL+1)); printf '  FAIL %s is installed with no scripts/%s behind it\n' "$fn" "$fn"
+  # Reading from disk only works if the file is in the published tarball. A
+  # script added to scripts/ and not to prepack installs from a clone and
+  # 404s for everyone else, and no test that runs from the repo would notice.
+  elif ! grep -q "scripts/$fn" "$PKG"; then
+    FAIL=$((FAIL+1)); printf '  FAIL %s is not copied into the package by prepack\n' "$fn"
+  else
+    PASS=$((PASS+1)); printf '  ok   %s <- scripts/%s, packed\n' "$fn" "$fn"
+  fi
+done
+
+# ------------------------------------------- a declared agent that nothing invokes
+# ship.md declared gauntlet-skills, described the skills audit as one of "the three
+# things nothing else does", and never contained a step that ran it. It shipped
+# that way for months: the agent existed, the CLI installed it, and no command
+# ever called it. Four forms went out on useActionState in a repo whose React
+# skill routes to a FORMS.md naming React Hook Form as the default.
+#
+# A name in requires-agents that appears nowhere else in the file is the whole
+# signature of that bug, and it is cheap to assert.
+echo "every declared agent is actually invoked"
+for f in "$HERE"/../commands/*.md; do
+  req=$(sed -n 's/^requires-agents:[[:space:]]*\[\(.*\)\]/\1/p' "$f" | tr -d ' ' | tr ',' ' ')
+  [ -z "$req" ] && continue
+  for a in $req; do
+    N=$((N+1))
+    # One reference is the frontmatter declaring it. A command that uses the
+    # agent names it again in the body.
+    refs=$(grep -c -- "$a" "$f")
+    if [ "$refs" -gt 1 ]; then
+      PASS=$((PASS+1)); printf '  ok   %s invokes %s\n' "$(basename "$f")" "$a"
+    else
+      FAIL=$((FAIL+1)); printf '  FAIL %s declares %s and never invokes it\n' "$(basename "$f")" "$a"
+    fi
+  done
+done
+
+# Catalog fetching has its own file — it is about the CLI talking to GitHub,
+# not about the gauntlet, and this file is the repo's largest debt.
