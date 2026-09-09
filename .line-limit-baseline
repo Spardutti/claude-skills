@@ -1,4 +1,2 @@
-207 cli/lib/scaffold-stryker.mjs
-577 scripts/gauntlet-selftest.sh
 328 scripts/gauntlet.sh
 506 scripts/ship-gate.sh
