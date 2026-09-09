@@ -61,7 +61,7 @@ newrepo strhave
 printf '{"devDependencies":{"@stryker-mutator/core":"10"}}\n' > package.json
 printf '{"testRunner":"vitest","coverageAnalysis":"perTest","mutate":["src/**"]}\n' > stryker.config.json
 node -e "
-  import('$HERE/../cli/lib/local.mjs').then(async (l) => {
+  import('$HERE/../cli/lib/tool-needs.mjs').then(async (l) => {
     const n = await l.reportToolNeeds('$PWD');
     console.log(JSON.stringify(n.map((x) => [x.label, x.ignorerOnly === true])));
   });
@@ -93,7 +93,7 @@ scaf "and it asks for only the api package" \
   "r.apiInstall.includes('@stryker-mutator/api') && !r.apiInstall.includes('@stryker-mutator/core')"
 
 node -e "
-  import('$HERE/../cli/lib/local.mjs').then(async (l) => {
+  import('$HERE/../cli/lib/tool-needs.mjs').then(async (l) => {
     console.log(JSON.stringify(await l.reportToolNeeds('$PWD')));
   });
 " > "$TMP/have.json" 2>&1

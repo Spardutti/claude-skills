@@ -5,14 +5,9 @@
 // decides what gets installed.
 import { confirm, input } from "@inquirer/prompts";
 import chalk from "chalk";
-import {
-  setupHook,
-  detectStack,
-  writeGauntletConf,
-  autoModeRuleStatus,
-  writeAutoModeRule,
-} from "./setup-hook.mjs";
-import { reportToolNeeds } from "./local.mjs";
+import { setupHook, detectStack, writeGauntletConf } from "./setup-hook.mjs";
+import { autoModeRuleStatus, writeAutoModeRule } from "./auto-mode.mjs";
+import { reportToolNeeds } from "./tool-needs.mjs";
 import { scaffoldStryker } from "./scaffold-stryker.mjs";
 import { setupClaudeMd } from "./setup-claude-md.mjs";
 

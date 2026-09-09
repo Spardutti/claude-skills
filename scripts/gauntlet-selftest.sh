@@ -307,7 +307,7 @@ AMH="$PWD/home"
 AMS="$AMH/.claude/settings.json"
 mkdir -p "$AMH/.claude"
 
-amrun() { node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.writeAutoModeRule('$AMH')).catch(e=>{console.error(e.message);process.exit(1)})"; }
+amrun() { node -e "import('$HERE/../cli/lib/auto-mode.mjs').then(m=>m.writeAutoModeRule('$AMH')).catch(e=>{console.error(e.message);process.exit(1)})"; }
 
 am() {  # am <label> <node expression over s, the parsed global settings>
   N=$((N+1))
@@ -553,7 +553,7 @@ printf '{"name":"next"}\n' > .next/package.json
 printf '{"name":"sa"}\n'   > .next/standalone/package.json
 printf '{"name":"dev"}\n'  > .next/dev/package.json
 node -e "
-  import('$HERE/../cli/lib/local.mjs').then(async (local) => {
+  import('$HERE/../cli/lib/tool-needs.mjs').then(async (local) => {
     const needs = await local.reportToolNeeds('$PWD');
     console.log(needs.map((n) => n.label).join(' '));
   });

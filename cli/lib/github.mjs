@@ -1,3 +1,4 @@
+import { parseFrontmatter } from "./frontmatter.mjs";
 import { execSync } from "node:child_process";
 
 const REPO_OWNER = "Spardutti";
@@ -171,37 +172,4 @@ export function fetchAgents() {
       return { fileName: file.name, name, content };
     },
   });
-}
-
-function parseFrontmatter(content, fallbackName) {
-  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (!match) {
-    return { name: fallbackName, description: "", category: "General", requiresAgents: [] };
-  }
-
-  const block = match[1];
-  const name = block.match(/^name:\s*(.+)$/m)?.[1]?.trim() || fallbackName;
-  const description = block.match(/^description:\s*(.+)$/m)?.[1]?.trim() || "";
-  const category = block.match(/^category:\s*(.+)$/m)?.[1]?.trim() || "General";
-  const requiresAgents = parseAgentList(block);
-
-  return { name, description, category, requiresAgents };
-}
-
-function parseAgentList(block) {
-  const inline = block.match(/^requires-agents:\s*\[([^\]]*)\]\s*$/m);
-  if (inline) {
-    return inline[1]
-      .split(",")
-      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
-      .filter(Boolean);
-  }
-  const multiline = block.match(/^requires-agents:\s*\n((?:\s{2,}-\s*.+\n?)+)/m);
-  if (multiline) {
-    return multiline[1]
-      .split("\n")
-      .map((l) => l.replace(/^\s*-\s*/, "").trim().replace(/^["']|["']$/g, ""))
-      .filter(Boolean);
-  }
-  return [];
 }

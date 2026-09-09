@@ -59,3 +59,79 @@ done
 
 # Catalog fetching has its own file — it is about the CLI talking to GitHub,
 # not about the gauntlet, and this file is the repo's largest debt.
+# parseFrontmatter existed twice — once in github.mjs, once in local.mjs — with
+# different implementations that disagreed on four of five inputs. A real
+# install and a --local install read the same file differently, and the quote
+# difference was masked downstream by a stripQuotes() in prompt.mjs, which is
+# what let it live: the picker looked right, so nobody looked further.
+#
+# One parser now. These assert the behaviour that was kept, not merely that a
+# function exists.
+echo "frontmatter parsing"
+fm() {  # fm <label> <content> <expected JSON>
+  N=$((N+1))
+  # Via the environment, not argv: a value starting with --- is read by node as
+  # an option and the process dies before the test runs.
+  got=$(FM_INPUT="$2" node -e "
+    import('$HERE/../cli/lib/frontmatter.mjs').then((m) =>
+      console.log(JSON.stringify(m.parseFrontmatter(process.env.FM_INPUT, 'fb'))));
+  " 2>&1)
+  if [ "$got" = "$3" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s\n       want %s\n       got  %s\n' "$1" "$3" "$got"; fi
+}
+
+fm "a quoted description loses its quotes" \
+  '---
+name: a
+description: "d"
+---' \
+  '{"name":"a","description":"d","category":"General","requiresAgents":[]}'
+
+fm "a quoted category loses its quotes too" \
+  '---
+name: c
+category: "Q"
+---' \
+  '{"name":"c","description":"","category":"Q","requiresAgents":[]}'
+
+# Both spellings mean one list. github.mjs used to return [] for the bare form,
+# so a command written that way installed none of the agents it declares.
+fm "a bracketed agent list parses" \
+  '---
+name: a
+requires-agents: [p, q]
+---' \
+  '{"name":"a","description":"","category":"General","requiresAgents":["p","q"]}'
+
+fm "and a bare one parses the same" \
+  '---
+name: b
+requires-agents: p, q
+---' \
+  '{"name":"b","description":"","category":"General","requiresAgents":["p","q"]}'
+
+fm "no frontmatter falls back to the filename" \
+  'no frontmatter at all' \
+  '{"name":"fb","description":"","category":"General","requiresAgents":[]}'
+
+# The point of one parser is that both callers get the same answer. Assert it
+# rather than trusting the import.
+N=$((N+1))
+same=$(node -e "
+  Promise.all([
+    import('$HERE/../cli/lib/github.mjs'),
+    import('$HERE/../cli/lib/local.mjs'),
+    import('$HERE/../cli/lib/frontmatter.mjs'),
+  ]).then(() => {
+    const fs = require('fs');
+    const g = fs.readFileSync('$HERE/../cli/lib/github.mjs', 'utf8');
+    const l = fs.readFileSync('$HERE/../cli/lib/local.mjs', 'utf8');
+    const dup = /function parseFrontmatter/;
+    console.log(dup.test(g) || dup.test(l) ? 'DUPLICATED' : 'single');
+  });
+" 2>&1)
+if [ "$same" = "single" ]; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "neither caller keeps its own copy"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s — got: %s\n' "neither caller keeps its own copy" "$same"
+fi
