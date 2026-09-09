@@ -34,6 +34,16 @@ function getAuthHeaders() {
   return headers;
 }
 
+// raw.githubusercontent.com is not the API and does not take an API token. Sent
+// one, it answers 503 — measured: the same URL returns 200 without the header
+// and 503 with it. The CLI passed its API headers to every raw fetch, so a
+// machine with `gh auth token` set lost most skill files to "Warning: Failed to
+// fetch ..., skipping" and installed a partial set, while a machine without gh
+// worked fine. Raw needs the User-Agent and nothing else.
+function getRawHeaders() {
+  return { "User-Agent": "claude-skills-cli" };
+}
+
 async function fetchListing({ apiUrl, label, entryFilter, buildRawUrl, mapEntry, allow404 = false }) {
   const headers = getAuthHeaders();
   const res = await fetch(apiUrl, { headers });
@@ -51,7 +61,7 @@ async function fetchListing({ apiUrl, label, entryFilter, buildRawUrl, mapEntry,
   const results = await Promise.all(
     entries.map(async (entry) => {
       try {
-        const r = await fetch(buildRawUrl(entry), { headers });
+        const r = await fetch(buildRawUrl(entry), { headers: getRawHeaders() });
         if (!r.ok) {
           console.warn(`  Warning: Failed to fetch ${label} ${entry.name}, skipping`);
           return null;
@@ -92,7 +102,7 @@ export async function fetchSkills() {
 
         const fetched = await Promise.all(
           files.map(async (f) => {
-            const r = await fetch(`${RAW_BASE}/${dir.name}/${f.name}`, { headers });
+            const r = await fetch(`${RAW_BASE}/${dir.name}/${f.name}`, { headers: getRawHeaders() });
             if (!r.ok) {
               console.warn(`  Warning: Failed to fetch ${dir.name}/${f.name}, skipping`);
               return null;

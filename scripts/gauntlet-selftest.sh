@@ -1063,6 +1063,49 @@ for f in "$HERE"/../skills/*/SKILL.md; do
   fi
 done
 
+# ------------------------------------------------- which headers reach which host
+# raw.githubusercontent.com is not the API and does not take an API token: sent
+# one it answers 503, while the same URL without the header returns 200. The CLI
+# passed its API headers to every raw fetch, so a machine with `gh auth token`
+# set lost most skill files to "Failed to fetch ..., skipping" and installed a
+# partial set, while a machine without gh worked fine.
+#
+# Asserting that files arrived would not catch it — the CLI "succeeds" by
+# skipping. This intercepts fetch and asserts the header list per host, which is
+# the thing that was wrong.
+echo "github fetch headers"
+newrepo cli_headers
+node -e "
+  const calls = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    calls.push([new URL(u).host, (opts.headers || {}).Authorization ? 'auth' : 'none']);
+    const api = u.includes('api.github.com');
+    const dir = u.endsWith('/skills') || u.endsWith('/commands') || u.endsWith('/agents');
+    const body = api
+      ? JSON.stringify(dir ? [{ name: 'sql', type: 'dir' }] : [{ name: 'SKILL.md', type: 'file' }])
+      : '---\nname: sql\n---\n';
+    return { ok: true, status: 200, json: async () => JSON.parse(body), text: async () => body };
+  };
+  process.env.GITHUB_TOKEN = 'ghp_fake_token_for_the_test';
+  import('$HERE/../cli/lib/github.mjs').then(async (gh) => {
+    await gh.fetchSkills();
+    const api = calls.filter((c) => c[0] === 'api.github.com');
+    const raw = calls.filter((c) => c[0] === 'raw.githubusercontent.com');
+    console.log('api=' + api.length + ':' + (api.every((c) => c[1] === 'auth') ? 'all-auth' : 'some-bare'));
+    console.log('raw=' + raw.length + ':' + (raw.every((c) => c[1] === 'none') ? 'all-bare' : 'some-auth'));
+  });
+" > "$TMP/hdr.out" 2>"$TMP/hdr.err"
+
+hdr() {  # hdr <label> <expected line>
+  N=$((N+1))
+  if grep -qx "$2" "$TMP/hdr.out"; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got: %s\n' "$1" "$2" "$(tr '\n' ' ' < "$TMP/hdr.out")"; fi
+}
+
+hdr "the token goes to the API" "api=2:all-auth"
+hdr "and never to raw"          "raw=1:all-bare"
+
 # --------------------------------------------- a skill that GAINS a reference file
 # A bundle grows: react gained FORMS.md and SHADCN.md. A project that installed
 # the skill before those existed has to receive them, or it keeps a SKILL.md
