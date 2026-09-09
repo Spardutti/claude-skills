@@ -1,20 +1,7 @@
 #!/usr/bin/env bash
-# Cases for scripts/line-limit.sh. Sourced by gauntlet-selftest.sh, so it shares
-# that script's $HERE, $TMP, $N, $PASS and $FAIL rather than counting its own.
-#
-# In its own file because adding it inline pushed gauntlet-selftest.sh past its
-# baseline. That is the ratchet working, and re-baselining to silence it is the
-# move CLAUDE.md forbids.
+# Cases for scripts/line-limit.sh, the 200-line ratchet.
+# Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
 
-# ------------------------------------------------------------- the 200-line rule
-# CLAUDE.md used to exempt this repo from the limit its own skills teach, and
-# under that exemption setup-hook.mjs reached 1740 lines. A hard cap fails on
-# eight files today, so line-limit.sh is a ratchet: recorded debt may not grow,
-# and anything unrecorded gets the real limit. All three outcomes matter, and a
-# ratchet that only ever says "ok" is decoration.
-#
-# Run against a throwaway tree rather than this repo, so the assertions do not
-# move every time a real file here changes.
 echo "the 200-line ratchet"
 LL="$TMP/ll"; rm -rf "$LL"; mkdir -p "$LL/scripts"
 cp "$HERE/line-limit.sh" "$LL/scripts/line-limit.sh"

@@ -1,18 +1,7 @@
 #!/usr/bin/env bash
-# Cases for the CLI's GitHub fetching. Sourced by gauntlet-selftest.sh, so it
-# shares that script's $HERE, $TMP, $N, $PASS and $FAIL rather than counting
-# its own.
+# Cases for the CLI's GitHub fetching: which headers, and what a failure does.
+# Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
 
-# ------------------------------------------------- which headers reach which host
-# raw.githubusercontent.com is not the API and does not take an API token: sent
-# one it answers 503, while the same URL without the header returns 200. The CLI
-# passed its API headers to every raw fetch, so a machine with `gh auth token`
-# set lost most skill files to "Failed to fetch ..., skipping" and installed a
-# partial set, while a machine without gh worked fine.
-#
-# Asserting that files arrived would not catch it — the CLI "succeeds" by
-# skipping. This intercepts fetch and asserts the header list per host, which is
-# the thing that was wrong.
 echo "github fetch headers"
 newrepo cli_headers
 node -e "

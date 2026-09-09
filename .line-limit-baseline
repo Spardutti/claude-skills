@@ -3,6 +3,6 @@
 216 cli/lib/local.mjs
 207 cli/lib/scaffold-stryker.mjs
 327 cli/lib/setup-hook.mjs
-1493 scripts/gauntlet-selftest.sh
+630 scripts/gauntlet-selftest.sh
 328 scripts/gauntlet.sh
 506 scripts/ship-gate.sh
