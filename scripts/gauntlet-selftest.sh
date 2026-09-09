@@ -1063,6 +1063,32 @@ for f in "$HERE"/../skills/*/SKILL.md; do
   fi
 done
 
+# ------------------------------------------- a declared agent that nothing invokes
+# ship.md declared gauntlet-skills, described the skills audit as one of "the three
+# things nothing else does", and never contained a step that ran it. It shipped
+# that way for months: the agent existed, the CLI installed it, and no command
+# ever called it. Four forms went out on useActionState in a repo whose React
+# skill routes to a FORMS.md naming React Hook Form as the default.
+#
+# A name in requires-agents that appears nowhere else in the file is the whole
+# signature of that bug, and it is cheap to assert.
+echo "every declared agent is actually invoked"
+for f in "$HERE"/../commands/*.md; do
+  req=$(sed -n 's/^requires-agents:[[:space:]]*\[\(.*\)\]/\1/p' "$f" | tr -d ' ' | tr ',' ' ')
+  [ -z "$req" ] && continue
+  for a in $req; do
+    N=$((N+1))
+    # One reference is the frontmatter declaring it. A command that uses the
+    # agent names it again in the body.
+    refs=$(grep -c -- "$a" "$f")
+    if [ "$refs" -gt 1 ]; then
+      PASS=$((PASS+1)); printf '  ok   %s invokes %s\n' "$(basename "$f")" "$a"
+    else
+      FAIL=$((FAIL+1)); printf '  FAIL %s declares %s and never invokes it\n' "$(basename "$f")" "$a"
+    fi
+  done
+done
+
 # ------------------------------------------------- which headers reach which host
 # raw.githubusercontent.com is not the API and does not take an API token: sent
 # one it answers 503, while the same URL without the header returns 200. The CLI

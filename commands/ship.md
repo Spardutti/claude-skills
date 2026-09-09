@@ -3,7 +3,7 @@ name: ship
 description: "Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
 category: Workflow
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task
-requires-agents: [gauntlet-skills, test-review-gates]
+requires-agents: [gauntlet-skills]
 argument-hint: "[pr | release] [--force to skip the gate]"
 ---
 
@@ -148,6 +148,46 @@ when the implementation is removed**. A test that passes without the code assert
 nothing and is worse than the gap it filled: throw it out and report the gap instead.
 Re-run the script rather than declaring it fixed. Stop after **two** attempts at a gap.
 
+### 2 — skills audit: one `gauntlet-skills` agent per applicable skill
+
+This step was described in this file for months and never written, so it never ran. Four
+forms shipped on `useActionState` in a repo whose React skill routes to a `FORMS.md`
+saying React Hook Form is the default. Nothing opened it, because nothing was asked to.
+
+**This is the only check that covers code the session did not write.** The `skill-gate.sh`
+hook fires on Write/Edit/Bash, so a file that arrived in the tree some other way — written
+before the gate existed, by another session, or by hand — reaches the commit having never
+met a skill. The ship scope is where that is caught, or nowhere.
+
+1. List the installed skills: `ls .claude/skills/*/SKILL.md`. If there are none, say so
+   and skip to Result.
+2. For each skill, decide whether the ship scope contains a file it applies to. A skill's
+   `metadata.gate-paths` names its globs when it has them; otherwise use its
+   `description`. A skill with no file in scope is not run — say which you skipped and
+   why, in one line.
+3. Launch every remaining skill's audit **in a single message** so they run at once, one
+   `gauntlet-skills` agent per skill. Pass each exactly what its Input section asks for:
+   the `SKILL.md` path, the changed files that skill applies to with their line ranges,
+   and the unified diff for those files. One skill per agent — an agent given two skills
+   half-reads both.
+4. Wait for all of them. Each returns JSON with `violations`.
+
+Then **fix what they found**, in the code, the same way stage 1 and 3 fixes what the
+script found. Do not hand the user a list and continue.
+
+- Apply each violation's `fix` where you agree with it. Editing a file invalidates the
+  ship-gate receipt, so re-run `ship-gate.sh` afterwards — that is the design, not a
+  problem.
+- Where you disagree, say which violation and why, and leave the code alone. The agent
+  audits a diff without knowing the conversation; it can be wrong.
+- A violation you cannot fix without a design decision — a form that should be rebuilt on
+  a different library, a file that needs splitting — **stops the ship**. That is the
+  user's call, not a silent one.
+
+Never audit a skill yourself instead of launching its agent. The point of the subagent is
+that it reads the skill fresh, with no memory of having decided earlier that the skill did
+not apply — which is exactly the failure this step exists to catch.
+
 ### Result
 
 - **Everything fixed** → say what was fixed in one or two lines, then continue to the first stage. The fixes are part of the commit.
@@ -239,6 +279,9 @@ gh release create <version> --title '<version>' --notes-file <file>
 - NEVER merge a PR that is a draft, has conflicts, has failing CI, or is missing required reviews — stop and report.
 - NEVER squash the release PR into main — use a merge commit so the feature history survives for future changelog/version detection.
 - NEVER interpolate a branch name, tag, version, or title containing shell metacharacters (`` ` ``, `$(`, `;`, `&&`, `|`) into a command — pass interpolated values as single-quoted literals, pass PR/release bodies via `--body-file`/stdin, and abort if such a value contains metacharacters.
+- ALWAYS run the skills audit — one `gauntlet-skills` agent per applicable skill, all launched in one message. NEVER audit a skill yourself instead: the agent reads it fresh, with no memory of having decided it did not apply.
+- NEVER skip a skill because the diff "looks fine" — skip it only when no file in the ship scope matches it, and say which you skipped.
+- ALWAYS fix what the audit finds, re-running `ship-gate.sh` afterwards because the edits invalidate its receipt; a violation needing a design decision stops the ship rather than being noted and passed.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.
 - ALWAYS confirm the release version, and confirm before any merge into `main`.
