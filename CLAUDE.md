@@ -87,9 +87,25 @@ it happens once and the shared half stops growing.
 
 When adding or renaming a skill or command, update the README's tables to match.
 
-## Skill authoring rule: 200-line limit
+## The 200-line limit — for the skills, and for this repo
 
 Skills should teach consumers to **never write a single file longer than 200
 lines of code**. If a skill includes code examples or generates code, that
-guidance must be reflected in the skill's content. This is a rule *for the
-skills*, not a rule for files in this repo.
+guidance must be reflected in the skill's content.
+
+**It applies here too.** This file used to end that paragraph with "this is a
+rule *for the skills*, not a rule for files in this repo" — and under that
+exemption `setup-hook.mjs` reached 1740 lines with nothing objecting, because
+1400 of them were a pasted second copy of files that already existed. A repo
+that ships a rule and exempts itself from it has stopped believing the rule.
+
+`scripts/line-limit.sh` enforces it, and preflight runs it. It is a **ratchet**,
+not a cliff: the eight files already over the limit are recorded in
+`.line-limit-baseline` and may not grow, and anything not in that file gets the
+real 200-line limit. A hard cap would have failed on day one, and a gate that
+cannot go green on day one is a gate someone deletes.
+
+Pay debt down by splitting a file, then `bash scripts/line-limit.sh --baseline`
+to bank it. Never re-baseline to make a *growth* failure go away — that is the
+same move as `--baseline` on a live mutmut survivor, and it is wrong for the
+same reason.

@@ -24,10 +24,16 @@ bad()  { printf '  FAIL %s\n' "$1"; FAILED=1; }
 step "1. Skill references and length caps"
 if node scripts/validate-skills.mjs; then ok "validator"; else bad "validator"; fi
 
-step "2. Behavioural self-tests"
+step "2. The 200-line rule, applied to this repo"
+# The skills teach consumers never to write a file over 200 lines, and CLAUDE.md
+# used to exempt this repo from its own rule. That sentence is why
+# setup-hook.mjs reached 1740 lines with nothing objecting.
+if bash scripts/line-limit.sh; then ok "line limit"; else bad "line limit"; fi
+
+step "3. Behavioural self-tests"
 if bash scripts/gauntlet-selftest.sh; then ok "self-tests"; else bad "self-tests"; fi
 
-step "3. The published package installs the real scripts"
+step "4. The published package installs the real scripts"
 # The hook scripts used to be pasted into setup-hook.mjs as template literals,
 # and this step compared the two copies. They are read from disk now, so that
 # drift cannot happen — but a new one can: `files` and the prepack copy decide
@@ -63,7 +69,7 @@ else
 fi
 rm -rf "$TMP"
 
-step "4. Detection against real repositories"
+step "5. Detection against real repositories"
 # Detection breaks on the shapes real repos have and invented ones do not:
 # a delegating root, a package two levels down, two stacks in one tree.
 if [ -d "$HOME/projects" ]; then
@@ -77,12 +83,12 @@ else
   printf '  skipped — no ~/projects to survey\n'
 fi
 
-step "5. Version claims against the registries"
+step "6. Version claims against the registries"
 # A skill that names a version goes stale silently — two react claims were a few
 # minors behind and nothing noticed until someone checked by hand.
 if node scripts/check-freshness.mjs; then ok "no skill is a major behind"; else bad "a skill teaches a superseded major"; fi
 
-step "6. Version"
+step "7. Version"
 V=$(node -p "require('$ROOT/cli/package.json').version")
 PUB=$(npm view @spardutti/claude-skills version --prefer-online 2>/dev/null || echo "?")
 printf '  local %s · published %s\n' "$V" "$PUB"
