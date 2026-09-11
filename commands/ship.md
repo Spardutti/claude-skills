@@ -218,7 +218,14 @@ Precondition: changes committed, on a feature branch (not protected), commits ah
 gh pr create --base <base> --title '<conventional title, ≤70 chars>' --body-file <file>
 ```
 
-PR body sections: **Summary** (why — 1-3 bullets), **Changes** (grouped, notable only), **Test plan** (specific, checkable steps).
+**The PR body is read by a reviewer who did not write the code.** They need the problem, what changed, and how to see it working. They do not need the reasoning behind every decision — that is a comment on the PR, not the body. Four sections, nothing else, under 250 words before the test plan:
+
+- **Summary** — 1-3 bullets. What a person hit, and what they see now. Name the screen, the button, the report. Not the mechanism.
+- **Changes** — one line per change, at most 8. A reason only where a reviewer would push back, and then one sentence. No paragraphs, no file tables.
+- **Test plan** — numbered manual steps first: the page, the action, what you see. Then the commands that ran, with their counts. Every line a checkbox.
+- **Ship gate** — one line. `clean`, or `forced — <what remains, in plain words>`. The finding list goes in a PR comment.
+
+No other sections — no Review notes, Related, Decisions, Verification, Background. No tooling words a teammate would not know: say "a test gap the mutation tool found", not "a surviving mutant". A body that needs a sentence over 25 words is explaining, not describing — cut it.
 
 5. Show the PR URL.
 
@@ -247,7 +254,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
    - No tags yet → suggest `v0.1.0`.
    - **Always confirm the version with the user.**
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
-3. **Changelog** — group commits since the last tag: Breaking Changes, Features (`feat`), Bug Fixes (`fix`), Performance (`perf`), Other. Short descriptions, include PR/issue numbers, skip merge and version-bump noise.
+3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
 4. **Release PR** — `git checkout -b release/<version>`, push, then `gh pr create --base <main> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
 5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on.
 6. **Tag + GitHub release**:
