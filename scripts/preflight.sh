@@ -54,8 +54,8 @@ else
   node -e "
     import('$TMP/package/lib/setup-hook.mjs').then((m) => m.setupHook('$TMP/target'));
   " >/dev/null 2>&1
-  for f in gauntlet.sh ship-gate.sh ship-gate-hook.sh version-check.sh \
-           skill-gate.sh skill-gate-automark.sh skill-application-gate.sh; do
+  # Read from the installer: a hand list missed ship-gate-projects.sh, which the gate cannot run without.
+  for f in $(grep -o '^const [A-Z_]*_FILENAME = "[^"]*"' cli/lib/setup-hook.mjs | grep -v LEGACY_ | sed 's/.*"\(.*\)"/\1/'); do
     if [ ! -f "$TMP/package/hooks/$f" ]; then
       bad "$f is not in the tarball — add it to cli/package.json prepack"
     elif [ ! -x "$TMP/target/.claude/hooks/$f" ]; then

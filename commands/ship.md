@@ -123,10 +123,14 @@ So: run that command. Show its output verbatim. Obey its exit code.
 - **2** — it ran but could not prove the tests, almost always because no mutation tool
   is installed. Report that plainly and continue. Do not describe this as passing.
 
-Python is the one place the gate cannot scope itself to your diff: mutmut has no
-per-line scoping, so it reports the whole repo's survivors. A `.mutmut-baseline` file
-holds the ones already accepted, and only a name outside it fails. The first run writes
-that file and exits 2 — commit it and run the gate again. **Never run `--baseline` to
+A project that passed is not re-run until the gate or a changed file of its own kind
+changes: fixing API tests does not re-run Stryker on the JS apps.
+
+Python cannot be scoped to lines: mutmut has no per-line scoping, so the gate mutates
+every function in each changed module, and a changed module's old survivors come back
+with it. A `.mutmut-baseline` file holds the ones already accepted, and only a name
+outside it fails. The first run covers the whole repo, writes that file and exits 2 —
+commit it and run the gate again. **Never run `--baseline` to
 make a finding go away.** It accepts a survivor as permanent debt, so it is for a mutant
 that genuinely cannot be killed — an equivalent mutant, where the change alters nothing
 observable. Say which mutant and why, in the commit, or write the test instead.

@@ -17,6 +17,7 @@ import { homedir } from "node:os";
 //                             explicitly applied before the first edit
 //   gauntlet.sh               Stop — fast typecheck and tests on the diff
 //   ship-gate.sh              file length and mutation, behind an exit code
+//   ship-gate-projects.sh     sourced by ship-gate.sh — project detection, reuse
 //   ship-gate-hook.sh         PreToolUse on Bash — no commit without a receipt
 //   version-check.sh          SessionStart — a line when a newer catalog exists
 
@@ -25,6 +26,7 @@ const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
 const APPLICATION_GATE_FILENAME = "skill-application-gate.sh";
 const GAUNTLET_FILENAME = "gauntlet.sh";
 const SHIP_GATE_FILENAME = "ship-gate.sh";
+const SHIP_GATE_PROJECTS_FILENAME = "ship-gate-projects.sh";
 const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
@@ -103,6 +105,7 @@ export async function setupHook(targetDir = process.cwd()) {
     APPLICATION_GATE_FILENAME,
     GAUNTLET_FILENAME,
     SHIP_GATE_FILENAME,
+    SHIP_GATE_PROJECTS_FILENAME,
     SHIP_GATE_HOOK_FILENAME,
     VERSION_CHECK_FILENAME,
   ]) {
@@ -124,7 +127,7 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${APPLICATION_GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${GAUNTLET_FILENAME}`);
-  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
+  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship and /plan-feature)`);
   console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }

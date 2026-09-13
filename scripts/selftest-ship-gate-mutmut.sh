@@ -36,7 +36,7 @@ case "$1" in
 esac
 M
 chmod +x apps/api/.venv/bin/mutmut
-echo "app.old.x__mutmut_1: survived" > apps/api/mutants/cached
+echo "app.slugs.x__mutmut_1: survived" > apps/api/mutants/cached
 echo "x=1" > apps/api/app/slugs.py
 : > apps/api/.mutmut-baseline
 sg "a stale mutant cache is cleared before the run" "nothing survived" 0
@@ -83,24 +83,24 @@ touch apps/api/uv.lock
 cat > apps/api/.venv/bin/mutmut <<'M'
 #!/bin/sh
 case "$1" in
-  results) echo "    app.host.x__mutmut_1: survived" ;;
+  results) echo "    app.slugs.x_host__mutmut_1: survived" ;;
 esac
 exit 0
 M
 cat > apps/api/.mutmut-run <<'M'
 #!/bin/sh
 case "$1" in
-  results) echo "    app.container.x__mutmut_1: survived" ;;
+  results) echo "    app.slugs.x_container__mutmut_1: survived" ;;
 esac
 exit 0
 M
 chmod +x apps/api/.venv/bin/mutmut apps/api/.mutmut-run
 echo "x=1" > apps/api/app/slugs.py
 : > apps/api/.mutmut-baseline
-sg ".mutmut-run wins over the host venv" "app.container.x__mutmut_1" 1
+sg ".mutmut-run wins over the host venv" "app.slugs.x_container__mutmut_1" 1
 
-# mutmut reports the whole repo's survivors, not the diff's, so without a
-# baseline the Python half of the gate can never go green. Recorded survivors
+# mutmut reports every survivor in a changed module, not the diff's lines, so
+# without a baseline the Python half of the gate can never go green. Recorded survivors
 # are accepted debt; only a name that is not in the baseline is a finding.
 newrepo sg_py_base
 mkdir -p apps/api/.venv/bin apps/api/app
@@ -114,18 +114,18 @@ case "$1" in
 esac
 M
 chmod +x apps/api/.venv/bin/mutmut
-printf 'app.old.x_a__mutmut_1: survived\napp.old.x_b__mutmut_2: survived\n' > survivors
+printf 'app.slugs.x_a__mutmut_1: survived\napp.slugs.x_b__mutmut_2: survived\n' > survivors
 echo "x=1" > apps/api/app/slugs.py
 sg "with no baseline the repo's debt is recorded, not charged" "existing survivor(s)" 2
 sg "a baselined survivor is not a finding" "nothing survived" 0
 
-printf 'app.old.x_a__mutmut_1: survived\napp.old.x_b__mutmut_2: survived\napp.new.x_c__mutmut_1: survived\n' > survivors
-sg "a survivor outside the baseline fails" "app.new.x_c__mutmut_1" 1
+printf 'app.slugs.x_a__mutmut_1: survived\napp.slugs.x_b__mutmut_2: survived\napp.slugs.x_c__mutmut_1: survived\n' > survivors
+sg "a survivor outside the baseline fails" "app.slugs.x_c__mutmut_1" 1
 
-printf 'app.old.x_a__mutmut_1: survived\n' > survivors
+printf 'app.slugs.x_a__mutmut_1: survived\n' > survivors
 sg "killing a baselined survivor is reported, not required" "1 baselined survivor(s) now killed" 0
 
-printf 'app.old.x_a__mutmut_1: survived\napp.new.x_c__mutmut_1: survived\n' > survivors
+printf 'app.slugs.x_a__mutmut_1: survived\napp.slugs.x_c__mutmut_1: survived\n' > survivors
 bash "$SG" --baseline >/dev/null 2>&1
 sg "--baseline accepts the new survivor" "nothing survived" 0
 
@@ -134,7 +134,7 @@ sg "--baseline accepts the new survivor" "nothing survived" 0
 echo "ship-gate receipt"
 newrepo sg2
 mkdir -p .claude/hooks
-cp "$SG" "$SGH" .claude/hooks/
+cp "$SG" "$SGH" "$HERE/ship-gate-projects.sh" .claude/hooks/
 chmod +x .claude/hooks/*.sh
 H=".claude/hooks/ship-gate-hook.sh"
 echo "const a=1" > a.ts

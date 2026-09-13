@@ -61,6 +61,8 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-gauntlet-hook.sh"      # the Stop hook: skips, detection, runners
 . "$HERE/selftest-ship-gate-stryker.sh"  # the JS half of the ship gate
 . "$HERE/selftest-ship-gate-mutmut.sh"   # the Python half, and the git receipt
+. "$HERE/selftest-ship-gate-mutmut-scope.sh"  # the Python half scoped to changed modules
+. "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed
 . "$HERE/selftest-skill-gate.sh"         # deny messages, exemptions, auto mode
 . "$HERE/selftest-mandatory-skills.sh"   # which skills are not optional
 . "$HERE/selftest-line-limit.sh"         # the 200-line ratchet

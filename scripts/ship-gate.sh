@@ -45,6 +45,9 @@
 
 set -uo pipefail
 
+HERE=$(cd "$(dirname "$0")" && pwd)
+. "$HERE/ship-gate-projects.sh" || { echo "ship-gate: cannot read $HERE/ship-gate-projects.sh"; exit 1; }
+
 MODE=""
 case "${1:-}" in
   --key)      MODE=key; shift ;;
@@ -218,36 +221,6 @@ fi
 # ---------------------------------------------------------- which project owns
 # A monorepo holds several projects, each with its own runner and its own
 # mutation tool. Walk up from each changed file to the nearest manifest.
-# mutmut is installed into the project's environment, not onto PATH. Ask the
-# project how to run its own tools before falling back to a bare binary.
-py_mutmut() {
-  d="$1"
-  # Returned relative to the PROJECT, because the command runs from inside it.
-  # Tests that need a database, a queue, or any other service cannot run on the
-  # host: mutmut still generates every mutant and reports them all "not
-  # checked", which prints exactly like a clean run. An executable .mutmut-run
-  # in the project runs mutmut wherever those services are — typically
-  # `docker compose run` against the app container — and takes precedence over
-  # every host-local option below.
-  if [ -x "$d.mutmut-run" ]; then printf './.mutmut-run\n'; return; fi
-  if [ -x "$d.venv/bin/mutmut" ]; then printf './.venv/bin/mutmut\n'; return; fi
-  if [ -f "$d""uv.lock" ] && command -v uv >/dev/null 2>&1; then printf 'uv run mutmut\n'; return; fi
-  if [ -f "$d""poetry.lock" ] && command -v poetry >/dev/null 2>&1; then printf 'poetry run mutmut\n'; return; fi
-  command -v mutmut >/dev/null 2>&1 && printf 'mutmut\n'
-}
-
-owner_of() {
-  d=$(dirname "$1")
-  while :; do
-    if [ -f "$d/package.json" ] || [ -f "$d/pyproject.toml" ] \
-       || [ -f "$d/pytest.ini" ] || [ -f "$d/setup.cfg" ]; then
-      printf '%s\n' "${d#./}"; return
-    fi
-    [ "$d" = "." ] || [ "$d" = "/" ] && { printf '.\n'; return; }
-    d=$(dirname "$d")
-  done
-}
-
 OWNERS=$(while IFS= read -r f; do owner_of "$f"; done <<< "$FILES" | sort -u)
 
 # --------------------------------------------- check 2: mutation, per project
@@ -291,7 +264,7 @@ for owner in $OWNERS; do
     esac
   done <<< "$OWNED"
 
-  base=""; RUN=""
+  base=""; RUN=""; SCOPE_RE=""; GLOBS=""; MODS=""; MLOG="${TMPDIR:-/tmp}/ship-gate-mutmut.$$"
   if [ "$owner" != "." ]; then base="$owner/"; RUN="cd '$owner' && "; fi
   if [ -n "$GAUNTLET_MUTATE" ]; then
     CMD="$GAUNTLET_MUTATE"; TOOL="config"
@@ -318,15 +291,18 @@ for owner in $OWNERS; do
     continue
   elif [ -n "$(py_mutmut "$base")" ]; then
     TOOL="mutmut"
-    # mutmut takes its scope from [tool.mutmut] in pyproject, not from a flag:
-    # --paths-to-mutate was 2.x, and 3.x filters by fnmatch globs over mutant
-    # NAMES (app.balance.reserve.*). There is no per-line scoping at all.
+    # 3.x has no per-line scoping, only fnmatch globs over mutant NAMES, so a
+    # compare run is scoped to the changed modules. A baseline is recorded whole.
     #
     # `mutmut run` prints 🙁 for a survivor and exits 0 either way — parsing it
     # reports clean with survivors sitting there, which is a false green and
     # worse than reporting nothing. `mutmut results` is the readable source:
     # it prints "<mutant name>: survived" per survivor.
     M="$(py_mutmut "$base")"
+    [ "$MODE" != baseline ] && [ -f "$base.mutmut-baseline" ] && MODS=$(printf '%s\n' "$OWNED" \
+      | sed -n "s#^$base\(.*\)\.py\$#\1#p" | tr / . | sed 's#^src\.##' | sort -u)
+    [ -n "$MODS" ] && GLOBS=$(printf " '%s.x*'" $MODS) \
+      && SCOPE_RE=$(printf '%s\n' "$MODS" | sed 's/\./\\./g' | paste -sd'|' -)
     # mutmut caches verdicts in ./mutants and only invalidates one when the
     # SOURCE of that function changes. Adding a test does not, so it replays the
     # old "survived" and calls mutants the new tests kill still alive — measured
@@ -335,7 +311,7 @@ for owner in $OWNERS; do
     # makes both describe the tree being shipped; `mutmut run` rewrites it
     # anyway, and a cold run is ~35s for ~1000 mutants.
     # One cd for all three: they run in the same shell, already there.
-    CMD="${RUN}rm -rf mutants; $M run >/dev/null 2>&1; $M results"
+    CMD="${RUN}rm -rf mutants; $M run$GLOBS >'$MLOG' 2>&1; $M results"
   else
     MISSING="$MISSING  $label needs mutmut:
       uv add --dev mutmut     # or: poetry add --group dev mutmut, pip install mutmut
@@ -348,7 +324,14 @@ for owner in $OWNERS; do
     continue
   fi
 
+  # Only a clean run is recorded, and a baseline run always asks mutmut afresh.
+  PKEY=""; [ "$TOOL" != config ] && PKEY="/tmp/claude-shipgate-project-$(project_key "$owner" "$TOOL")"
+  if [ -n "$PKEY" ] && [ -f "$PKEY" ] && { [ "$TOOL" != mutmut ] || [ "$MODE" != baseline ]; }; then
+    echo "  $label $TOOL — ok, not re-run: nothing of its kind changed since it passed"
+    continue
+  fi
   OUT=$(eval "$CMD" 2>&1); RC=$?
+  [ -n "$SCOPE_RE" ] && [ $RC -eq 0 ] && OUT=$(printf '%s\n' "$OUT" | grep -E "^[[:space:]]*($SCOPE_RE)\.x")
   # Match a finding, never a summary row. Stryker prints a `# survived` COLUMN
   # HEADER every run and repeats the word in its table, so a bare grep reports
   # survivors on a clean run — worse than not running at all. Stryker marks each
@@ -389,19 +372,15 @@ for owner in $OWNERS; do
   FIXED=0
   NOTE=""
 
-  # Stryker takes --mutate per changed hunk, so it already answers "did YOUR
-  # change get tested". mutmut cannot be asked that — 3.x dropped 1.x's
-  # --use-patch-file and never replaced it — so it mutates all of source_paths
-  # and reports the repo's entire backlog. Held to the same bar, the Python half
-  # answers "is this repo perfect" instead, which it never is, so it could never
-  # go green. The baseline supplies the missing half: survivors recorded once
-  # are accepted debt, and only a name that is not in it fails the gate.
-  #
-  # A mutant name carries an index within its own function, not a line number,
-  # so editing elsewhere in the file does not rename it — and editing the
-  # function itself DOES, which correctly re-charges its survivors to that edit.
+  # Module scope still returns a changed file's old survivors; the baseline accepts
+  # them. Names index within a function, so only editing that function re-charges them.
   if [ "$TOOL" = mutmut ]; then
     BL="$base.mutmut-baseline"
+    # A glob that matches no mutant aborts the run, so nothing in scope was tested.
+    if [ -n "$SCOPE_RE" ] && grep -qs "nothing matches" "$MLOG"; then
+      echo "  $label mutmut — UNPROVEN: no mutant in the changed module(s): $(printf '%s ' $MODS)"
+      [ "$STATUS" = 0 ] && STATUS=2; rm -f "$MLOG"; continue
+    fi
     NOWF=$(mktemp)
     printf '%s\n' "$OUT" \
       | sed -n 's/^[[:space:]]*\([^[:space:]]*\): survived$/\1/p' | sort -u > "$NOWF"
@@ -419,15 +398,9 @@ for owner in $OWNERS; do
     # meaning the mutant was never executed at all.
     NOTCHECKED=$(printf '%s\n' "$OUT" | grep -c ': not checked$')
     if [ "$NOTCHECKED" -gt 0 ]; then
-      echo "  $label mutmut — UNPROVEN: $NOTCHECKED mutant(s) were never run."
-      echo "      They are recorded \"not checked\", so the suite proved nothing"
-      echo "      about them. Usually the tests need a service this run cannot"
-      echo "      reach — a database, a queue. Put an executable .mutmut-run in"
-      echo "      ${base}that runs mutmut where those services are, typically"
-      echo "      docker compose run against the app container; the gate uses"
-      echo "      it ahead of every host-local option."
+      mutmut_unchecked "$label" "$base" "$NOTCHECKED" "$MLOG"
       [ "$STATUS" = 0 ] && STATUS=2
-      rm -f "$NOWF"
+      rm -f "$NOWF" "$MLOG"
       continue
     fi
 
@@ -439,7 +412,7 @@ for owner in $OWNERS; do
       # -Fxv against an empty baseline reports every survivor, which is right:
       # an empty baseline means nothing has been accepted.
       SURVIVED=$(grep -Fxv -f "$BL" "$NOWF" | head -20)
-      FIXED=$(grep -Fxvc -f "$NOWF" "$BL")
+      FIXED=$(grep -E "^(${SCOPE_RE:-.*})\.x" "$BL" | grep -Fxvc -f "$NOWF")
     else
       cp "$NOWF" "$BL"
       NOTE="  $label mutmut — no baseline, so nothing could be compared. Recorded
@@ -448,7 +421,7 @@ for owner in $OWNERS; do
       SURVIVED=""
       [ "$STATUS" = 0 ] && STATUS=2
     fi
-    rm -f "$NOWF"
+    rm -f "$NOWF" "$MLOG"
   fi
 
   if [ -n "$SURVIVED" ]; then
@@ -473,6 +446,7 @@ for owner in $OWNERS; do
     printf '%s\n' "$NOTE"
   else
     echo "  $label $TOOL — ok, nothing survived and nothing was uncovered"
+    [ -n "$PKEY" ] && touch "$PKEY"
     [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
   fi
 done
