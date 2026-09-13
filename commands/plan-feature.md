@@ -1,8 +1,8 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and the plan lands with a contract and a per-worker file split; on your go it dispatches parallel implementation workers that each load their own skills and report back as one diff"
+description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and the plan lands with a contract and a per-worker file split; on your go it dispatches parallel implementation workers that each load their own skills, then mutation-tests their work once and sends each test gap back to the worker that wrote it, and reports one diff"
 category: Workflow
-allowed-tools: Read, Grep, Glob, Task, Write
+allowed-tools: Read, Grep, Glob, Task, Write, SendMessage, Bash(bash .claude/hooks/ship-gate.sh)
 requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
 argument-hint: "<short feature description>"
 ---
@@ -129,9 +129,29 @@ When the user says go, launch every worker in a **single message** so they run a
 
 Do **not** pass a worker the conversation, your view of the other worker, or the skills it should load. The gate names the skills its files demand and blocks until it loads them — that is the mechanism, and pre-loading it by hand only teaches the worker to skip the gate.
 
-Wait for every worker, then report what changed as one diff. Do not relay their transcripts.
+Wait for every worker, then run Step 8 before reporting what changed as one diff. Do not relay their transcripts.
 
 If a worker reports it needed a file it does not own, that is a plan defect: say so, and fix the split rather than letting the other worker apply the change blind.
+
+## Step 8 — Prove the Tests
+
+Tests written beside the code pass by construction. Prove them now, while each worker still holds its code in context — not at `/ship`, where the same gaps pile up across the whole branch and fresh agents relearn every file to close them.
+
+When every worker has reported, run the gate **once**, yourself:
+
+```bash
+bash .claude/hooks/ship-gate.sh
+```
+
+Never ask a worker to run it. Parallel mutmut runs delete each other's `mutants/` directory, and an API suite often shares one test database. If the script is missing, say the tests are unproven and report the diff.
+
+Show its output verbatim and obey the exit code:
+
+- **0** — report the diff.
+- **2** — it could not prove the tests, usually a missing mutation tool. Say so plainly; never call it a pass.
+- **1** — group every finding by the worker that owns its file, and send each worker only its own list with SendMessage, which resumes it with its context. The worker writes the test that kills each survivor and checks that test fails without the code. A survivor that changes nothing observable — an equivalent mutant — comes back with a one-line reason instead of a test. Then run the gate again.
+
+Stop after **two** rounds and report what is still open, with each worker's reason for every equivalent mutant. Accepting those into `.mutmut-baseline` is decided at `/ship`, not here.
 
 ## Rules
 
@@ -147,6 +167,9 @@ If a worker reports it needed a file it does not own, that is a plan defect: say
 - Always launch every worker in a single message so they run at once.
 - Never pass a worker the conversation, the other worker's plan, or the skills to load — the gate names the skills its files demand and blocks until it loads them.
 - Always report the workers' output as one diff — never relay their transcripts.
+- Always run `ship-gate.sh` once, yourself, after every worker has reported — never inside a worker, where parallel mutmut runs delete each other's `mutants/`.
+- Always send each gate finding back to the worker that owns its file, and stop after two gate rounds.
+- Never accept a survivor into `.mutmut-baseline` here — report it with the worker's reason and leave that call to `/ship`.
 - Always treat "a worker needed a file it does not own" as a plan defect and fix the split, rather than letting the other worker apply the change blind.
 - Never produce a plan that proposes building something a subagent already found as reusable, unless the user explicitly rejected reuse.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
