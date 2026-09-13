@@ -4,7 +4,7 @@ tracks: vitest@5, pytest@9 (pypi)
 metadata:
   gate-paths: "**/*.test.ts, **/*.test.tsx, **/*.spec.ts, **/*.spec.tsx, **/test_*.py, **/*_test.py"
 category: Foundations
-description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage; bundle covers mutation testing (Stryker, mutmut) for proving the tests would catch a break."
+description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, assertions that fail when the code breaks (exact values, list ties, side effects, limits), factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage; bundle covers mutation testing (Stryker, mutmut) for proving the tests would catch a break."
 ---
 
 # Testing Best Practices
@@ -42,6 +42,83 @@ def test_create_user_stores_user_with_default_role():
     user = service.get_user("alice@example.com")
     assert user.email == "alice@example.com"
     assert user.role == "member"
+```
+
+## Assert What Would Break
+
+A test that still passes when the code is wrong proves nothing. Each case below is a gap mutation testing found in a suite that was green.
+
+### Values, not shapes
+
+```python
+# BAD: every value could be wrong, and so could the message
+assert set(body) == {"id", "slug", "name"}
+assert response.status_code == 409
+
+# GOOD
+assert (body["slug"], body["name"]) == ("caribe", "Caribe")
+assert response.json() == {"detail": "Another destino already uses that slug"}
+```
+
+### Lists: a tie, a short page, an empty result
+
+Two distinct rows still pass with the tiebreak dropped, the `LIMIT` dropped, or `total or 1`.
+
+```python
+# GOOD: a tie that comes back out of order without the id tiebreak
+older = await make_destino(db, slug="alaska", name="Alaska")
+await make_destino(db, slug="caribe", name="Caribe")
+older.name = "Caribe"  # an UPDATE rewrites the row after newer ones on disk
+await db.flush()
+assert await listed_slugs(client, "/destinos") == ["alaska", "caribe"]
+
+# GOOD: more rows than the page holds
+for slug in ("a", "b", "c"):
+    await make_destino(db, slug=slug)
+body = (await client.get("/destinos?size=2")).json()
+assert (len(body["items"]), body["total"]) == (2, 3)
+
+# GOOD: nothing to list
+assert (await client.get("/destinos")).json()["total"] == 0
+```
+
+### The side effect, not just the response
+
+```python
+# BAD: passes with the audit row missing
+assert (await client.delete(f"/navieras/{naviera.id}")).status_code == 204
+
+# GOOD
+await client.delete(f"/navieras/{naviera.id}")
+entry = (await db.scalars(select(AuditLog))).one()
+assert (entry.user_id, entry.data_before["slug"]) == (admin.id, "oceania")
+```
+
+### Both sides of a limit
+
+```typescript
+test("accepts a photo exactly at the size limit", () => {
+  expect(refusal(fileOfSize(MAX_PHOTO_BYTES))).toBeNull();
+});
+
+test("refuses a photo one byte over the size limit", () => {
+  expect(refusal(fileOfSize(MAX_PHOTO_BYTES + 1))).toBe("photo.jpg is over 10 MB");
+});
+```
+
+### A mirrored domain gets parametrized tests, not copied ones
+
+Copying `tests/navieras/` into `tests/destinos/` copies every gap, and each one then fails once per copy.
+
+```python
+@pytest.mark.parametrize("url, make", [
+    ("/navieras", make_naviera),
+    ("/destinos", make_destino),
+], ids=["navieras", "destinos"])
+async def test_a_page_holds_at_most_size_items(client, db, url, make):
+    for slug in ("a", "b", "c"):
+        await make(db, slug=slug)
+    assert len((await client.get(f"{url}?size=2")).json()["items"]) == 2
 ```
 
 ## Arrange-Act-Assert
@@ -207,6 +284,11 @@ test.each([
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
 11. **A green suite is not evidence** — tests written beside the code pass by construction; prove them with mutation testing (MUTATION-TESTING.md) before trusting them
+12. **Assert values, not shapes** — the exact fields and error message, never only key names or a status code
+13. **Give list tests a tie, more rows than the page, and an empty case** — two distinct rows cannot catch a dropped tiebreak or `LIMIT`
+14. **Assert the side effect** — the audit row, the stored file, the sent message, not only the response
+15. **Test both sides of every limit** — exactly at it, and one past it
+16. **Parametrize a mirrored domain's tests** — never copy a test folder; its gaps come with it
 
 ## Reference Files
 
@@ -220,5 +302,6 @@ test.each([
 | "This is too simple to need a test" | If it's simple, the test is one line. Write it. |
 | "I tested it manually, it works" | Manual tests don't run in CI. The next refactor breaks it silently. |
 | "Mocking the DB is fine here" | Mocked-DB tests pass while real migrations fail. Hit a real DB at the integration layer. |
+| "The status code proves the endpoint works" | A 409 with the wrong message, or a 204 that skipped the audit row, returns the same code. |
 | "100% coverage means it's well tested" | Coverage measures lines executed, not behavior verified. A test with no meaningful assertion is worthless. |
 | "The test is flaky, just retry it in CI" | A flaky test is a broken test. Fix the race or delete it — retries hide real bugs. |
