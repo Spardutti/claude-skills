@@ -1,8 +1,8 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and the plan lands with a contract and a per-worker file split; on your go it dispatches parallel implementation workers that each load their own skills, then mutation-tests their work once and sends each test gap back to the worker that wrote it, and reports one diff"
+description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and on your go the same agent builds the plan and proves its tests with the ship gate"
 category: Workflow
-allowed-tools: Read, Grep, Glob, Task, Write, SendMessage, Bash(bash .claude/hooks/ship-gate.sh)
+allowed-tools: Read, Grep, Glob, Task, Write, Edit, Bash(bash .claude/hooks/ship-gate.sh)
 requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
 argument-hint: "<short feature description>"
 ---
@@ -45,7 +45,7 @@ Skip questions whose answer is obvious from the scans, **or already settled by a
 
 ## Step 4 — Produce the Integration Plan
 
-Output a single markdown plan. Keep it short and actionable — this is a checklist for whoever implements next, not a design doc.
+Output a single markdown plan. Keep it short and actionable — this is a checklist for building next, not a design doc.
 
 ```markdown
 # Integration Plan — <feature name>
@@ -66,92 +66,37 @@ Output a single markdown plan. Keep it short and actionable — this is a checkl
 ## Pattern to follow
 <1–3 bullets pointing at an existing feature to mirror, with file paths>
 
-## Contract
-<the interface the sides agree on, or "none — single worker" and why>
-
-## Workers
-<one line per worker: name — the files it owns, or "one worker" and why>
-
 ## Open questions
 <anything the user did not resolve in Step 3, or [] if none>
 ```
 
-**Size check.** Each `must_modify` touch-point carries a `loc` (current line count). If extending a file would push it near or over 200 lines, the "Extend" entry must say so and fold the split into the plan as a planned step — don't leave it for whoever implements to discover. A file already over 200 before this feature is flagged the same way, so the split is approved up front rather than surfaced mid-implementation.
+**Size check.** Each `must_modify` touch-point carries a `loc` (current line count). If extending a file would push it near or over 200 lines, the "Extend" entry must say so and fold the split into the plan as a planned step — don't leave it to be discovered mid-build. A file already over 200 before this feature is flagged the same way, so the split is approved up front rather than surfaced mid-implementation.
 
 If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write the plan there with the Write tool. Otherwise just print it.
 
-## Step 5 — Write the Contract
+## Step 5 — Stop, Then Build It Yourself
 
-Workers run blind to each other. The contract is the only thing they share, so it is written **before** any of them starts, from the answers the user gave in Step 3.
+**Print the plan and stop.** Build nothing until the user says go. The plan is cheap to correct now and expensive to correct later.
 
-Write it yourself. Do not spawn a subagent for it — a subagent never saw Step 3, and the contract is made of exactly those answers.
+When the user says go, build the plan yourself, in this conversation. Do not spawn agents to write code: parallel code-writing workers each reloaded their skills and the plan, crossed messages, and re-reported, and one feature spent 51 minutes waiting on its slowest worker. One agent gives the user one diff to review.
 
-A contract names the interface and nothing else:
+Build the side others depend on first (schema and API before the screens that call them). Write the tests for what you write, and run each touched app's tests and type check before moving on. Do not run Stryker or mutmut yourself — a hand run mutates whole files, components included; Step 6 scopes it to the diff.
 
-```markdown
-## Contract
-POST /expenses
-  body:  { amount: number, category_id: string, note?: string }
-  200:   { id: string, amount: number, created_at: string }
-  422:   { field: string, message: string }[]
-  403:   when the category belongs to another user
-```
+## Step 6 — Prove the Tests
 
-Queries, transactions, permissions logic, migrations and edge cases are **not** contract. They are the backend worker's job and the frontend never needs them. If everything the backend does *is* the contract, say so — that feature is one worker, not two.
-
-For work with no interface between sides (a refactor, a single-layer change), write `none — single worker` and the reason.
-
-## Step 6 — Decide the Workers
-
-Group the `Extend` and `Add` paths into workers. Each worker owns a disjoint set of files — two workers writing one file overwrite each other.
-
-**Split only when each side has real work behind the contract.** A thin endpoint plus the form that calls it is one worker: the contract already is the backend, so a second worker would sit idle behind it.
-
-Name the files, not the layers:
-
-```markdown
-## Workers
-- backend  — app/api/expenses.py, app/services/expenses.py, migrations/
-- frontend — src/features/expenses/*.tsx, src/api/expenses.ts
-```
-
-A file both workers need is a design smell, not a coordination problem. Give it to one worker and say which in the plan.
-
-## Step 7 — Stop, Then Dispatch
-
-**Print the plan and stop.** Do not spawn anything until the user says go. They are approving the contract and the file split, and both are cheap to correct now and expensive to correct later.
-
-When the user says go, launch every worker in a **single message** so they run at once. Give each worker exactly:
-
-- the path to the plan file, or the plan text if it was not written to disk
-- its own file list from `## Workers`
-- the instruction: implement your files against the Contract, touch nothing outside your list, write the tests for what you write
-
-Do **not** pass a worker the conversation, your view of the other worker, or the skills it should load. The gate names the skills its files demand and blocks until it loads them — that is the mechanism, and pre-loading it by hand only teaches the worker to skip the gate.
-
-Wait for every worker, then run Step 8 before reporting what changed as one diff. Do not relay their transcripts.
-
-If a worker reports it needed a file it does not own, that is a plan defect: say so, and fix the split rather than letting the other worker apply the change blind.
-
-## Step 8 — Prove the Tests
-
-Tests written beside the code pass by construction. Prove them now, while each worker still holds its code in context — not at `/ship`, where the same gaps pile up across the whole branch and fresh agents relearn every file to close them.
-
-When every worker has reported, run the gate **once**, yourself:
+When the build is done and its tests pass, run the gate **once**:
 
 ```bash
 bash .claude/hooks/ship-gate.sh
 ```
 
-Never ask a worker to run it. Parallel mutmut runs delete each other's `mutants/` directory, and an API suite often shares one test database. If the script is missing, say the tests are unproven and report the diff.
-
-Show its output verbatim and obey the exit code:
+If the script is missing, say the tests are unproven and report the diff. Otherwise show its output verbatim and obey the exit code:
 
 - **0** — report the diff.
-- **2** — it could not prove the tests, usually a missing mutation tool. Say so plainly; never call it a pass.
-- **1** — group every finding by the worker that owns its file, and send each worker only its own list with SendMessage, which resumes it with its context. The worker writes the test that kills each survivor and checks that test fails without the code. A survivor that changes nothing observable — an equivalent mutant — comes back with a one-line reason instead of a test. Then run the gate again.
+- **2** — it could not prove the tests. Say so plainly and report what it printed; never call it a pass.
+- **1** — for each finding, write the test that kills the survivor and check that test fails without the code. A survivor that changes nothing observable (an equivalent mutant) gets a one-line reason instead of a test. Then run the gate again.
 
-Stop after **two** rounds and report what is still open, with each worker's reason for every equivalent mutant. Accepting those into `.mutmut-baseline` is decided at `/ship`, not here.
+Stop after **two** rounds and report what is still open, with the reason for each equivalent mutant. Accepting those into `.mutmut-baseline` is decided at `/ship`, not here.
 
 ## Rules
 
@@ -159,18 +104,10 @@ Stop after **two** rounds and report what is still open, with each worker's reas
 - Always run the 3 subagents in parallel in a single Task message.
 - Always wait for all 3 to return before asking the user anything.
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.
-- Never spawn more than the 3 declared subagents during Steps 1–4. The implementation workers in Step 7 are separate, and are launched only after the user says go.
-- Always write the Contract yourself in Step 5 — never delegate it to a subagent, which never saw the user's Step 3 answers.
-- Always give each worker a disjoint file list — two workers writing one file overwrite each other.
-- Always split into two workers only when each side has real work behind the contract; a thin endpoint plus its form is one worker.
-- Always print the plan and stop before Step 7 — never spawn a worker until the user approves the contract and the file split.
-- Always launch every worker in a single message so they run at once.
-- Never pass a worker the conversation, the other worker's plan, or the skills to load — the gate names the skills its files demand and blocks until it loads them.
-- Always report the workers' output as one diff — never relay their transcripts.
-- Always run `ship-gate.sh` once, yourself, after every worker has reported — never inside a worker, where parallel mutmut runs delete each other's `mutants/`.
-- Always send each gate finding back to the worker that owns its file, and stop after two gate rounds.
-- Never accept a survivor into `.mutmut-baseline` here — report it with the worker's reason and leave that call to `/ship`.
-- Always treat "a worker needed a file it does not own" as a plan defect and fix the split, rather than letting the other worker apply the change blind.
+- Never spawn more than the 3 declared subagents, and never spawn one to write code — you build the plan yourself.
+- Always print the plan and stop before Step 5 — never build until the user approves it.
+- Never run Stryker or mutmut by hand — run `ship-gate.sh` once after the build, fix what it finds, and stop after two rounds.
+- Never accept a survivor into `.mutmut-baseline` here — report it with its reason and leave that call to `/ship`.
 - Never produce a plan that proposes building something a subagent already found as reusable, unless the user explicitly rejected reuse.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If a subagent returns nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
