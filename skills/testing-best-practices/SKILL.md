@@ -283,7 +283,7 @@ test.each([
 8. **Follow the pyramid** — ~70% unit, ~20% integration, ~10% E2E
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
-11. **A green suite is not evidence** — tests written beside the code pass by construction; prove them with mutation testing (MUTATION-TESTING.md) before trusting them
+11. **A green suite is not evidence** — tests written beside the code pass by construction; prove them with `bash .claude/hooks/ship-gate.sh`, which mutates only the changed lines and skips components. Never hand-run Stryker or mutmut on whole files; without the gate, scope the run to the diff (MUTATION-TESTING.md)
 12. **Assert values, not shapes** — the exact fields and error message, never only key names or a status code
 13. **Give list tests a tie, more rows than the page, and an empty case** — two distinct rows cannot catch a dropped tiebreak or `LIMIT`
 14. **Assert the side effect** — the audit row, the stored file, the sent message, not only the response
