@@ -85,9 +85,20 @@ lacks "and does not blame a database" "a database, a queue" "Failed to run clean
 rm -f cleanfail
 : > survivors
 
-# Recorded from a scoped run, the baseline would miss other modules' debt and
-# charge it to the next diff that touches them.
-run_args "--baseline records the whole repo" "run" --baseline
+# Rebuilding the whole baseline re-mutated an entire API to accept eleven names.
+run_args "--baseline runs only the changed modules" "run app.orders.__init__.x* app.slugs.x*" --baseline
+
+# Scoped, it must still keep every other module's accepted debt, or the next diff
+# touching one of them is charged for survivors it did not create.
+printf 'app.auth.login.x_check__mutmut_1\napp.slugs.x_old__mutmut_1\n' > apps/api/.mutmut-baseline
+printf '    app.slugs.x_new__mutmut_2: survived\n' > survivors
+bash "$SG" --baseline >/dev/null 2>&1
+N=$((N+1))
+want=$(printf 'app.auth.login.x_check__mutmut_1\napp.slugs.x_new__mutmut_2')
+got=$(cat apps/api/.mutmut-baseline)
+if [ "$got" = "$want" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "a scoped --baseline keeps other modules and replaces the changed ones"
+else FAIL=$((FAIL+1)); printf '  FAIL %s\n       want: %s\n       got:  %s\n' "a scoped --baseline keeps other modules and replaces the changed ones" "$want" "$got"; fi
+: > survivors
 rm -f apps/api/.mutmut-baseline
 run_args "with no baseline the whole repo is recorded" "run"
 

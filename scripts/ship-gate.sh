@@ -291,15 +291,15 @@ for owner in $OWNERS; do
     continue
   elif [ -n "$(py_mutmut "$base")" ]; then
     TOOL="mutmut"
-    # 3.x has no per-line scoping, only fnmatch globs over mutant NAMES, so a
-    # compare run is scoped to the changed modules. A baseline is recorded whole.
+    # 3.x has no per-line scoping, only fnmatch globs over mutant NAMES, so once a
+    # baseline exists every run, --baseline included, is scoped to the changed modules.
     #
     # `mutmut run` prints 🙁 for a survivor and exits 0 either way — parsing it
     # reports clean with survivors sitting there, which is a false green and
     # worse than reporting nothing. `mutmut results` is the readable source:
     # it prints "<mutant name>: survived" per survivor.
     M="$(py_mutmut "$base")"
-    [ "$MODE" != baseline ] && [ -f "$base.mutmut-baseline" ] && MODS=$(printf '%s\n' "$OWNED" \
+    [ -f "$base.mutmut-baseline" ] && MODS=$(printf '%s\n' "$OWNED" \
       | sed -n "s#^$base\(.*\)\.py\$#\1#p" | tr / . | sed 's#^src\.##' | sort -u)
     [ -n "$MODS" ] && GLOBS=$(printf " '%s.x*'" $MODS) \
       && SCOPE_RE=$(printf '%s\n' "$MODS" | sed 's/\./\\./g' | paste -sd'|' -)
@@ -405,7 +405,7 @@ for owner in $OWNERS; do
     fi
 
     if [ "$MODE" = baseline ]; then
-      cp "$NOWF" "$BL"
+      baseline_write "$BL" "$NOWF" "$SCOPE_RE"
       NOTE="  $label mutmut — baseline set: $(wc -l < "$BL") survivor(s) accepted. Commit $BL."
       SURVIVED=""
     elif [ -f "$BL" ]; then

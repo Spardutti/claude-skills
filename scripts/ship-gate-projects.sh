@@ -52,6 +52,14 @@ mutmut_unchecked() {  # mutmut_unchecked <label> <base> <count> <run log>
   echo "      it ahead of every host-local option."
 }
 
+# A scoped --baseline replaces only the changed modules' names. Rebuilding the whole
+# file re-mutated an entire API to accept eleven of them.
+baseline_write() {  # baseline_write <baseline file> <survivors file> <scope regex, or empty>
+  if [ -z "$3" ]; then cp "$2" "$1"; return; fi
+  grep -vE "^($3)\.x" "$1" | cat - "$2" | sort -u > "$1.new"
+  mv "$1.new" "$1"
+}
+
 family_of() {  # js, py, or any when no manifest says
   o=$(owner_of "$1")
   if [ -f "$o/package.json" ]; then echo js
