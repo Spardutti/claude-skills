@@ -61,6 +61,22 @@ survivor_list() {  # survivor_list <survivors> <tool>
   echo "      not equivalent — see testing-best-practices/MUTATION-TESTING.md."
 }
 
+changed_files() {
+  { git diff "$BASE"...HEAD --name-only 2>/dev/null
+    git diff HEAD --name-only 2>/dev/null
+    git ls-files --others --exclude-standard 2>/dev/null; } | sort -u
+}
+
+# Ignored extensions are left out; see the comment where ship-gate.sh first calls this.
+receipt_key() {
+  { printf '%s\n' "$PROJECT_DIR"
+    changed_files | grep -viE "\.($GAUNTLET_IGNORE_EXT)$" | while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      printf '%s\n' "$f"
+      [ -f "$f" ] && cat "$f"
+    done; } | git hash-object --stdin
+}
+
 # A scoped --baseline replaces only the changed modules' names. Rebuilding the whole
 # file re-mutated an entire API to accept eleven of them.
 baseline_write() {  # baseline_write <baseline file> <survivors file> <scope regex, or empty>

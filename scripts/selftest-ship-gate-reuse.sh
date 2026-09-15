@@ -71,7 +71,9 @@ ran_in "a failing run is tested" "admin web"
 : > "$STRYKER_OUT"
 ran_in "and is not recorded, so the next run tests it again" "admin web"
 
-ran_in "--baseline still asks mutmut, not a JS app that passed" "api" --baseline
+ran_in "--baseline on an unchanged tree replays the last run" "" --baseline
+echo "y=4" >> apps/api/app/slugs.py
+ran_in "--baseline after a change asks mutmut, not a JS app that passed" "api" --baseline
 
 # A verdict from an older gate is a verdict from whatever bugs it had.
 mkdir -p "$TMP/gate2"

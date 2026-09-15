@@ -9,8 +9,8 @@
 #   bash .claude/hooks/ship-gate.sh [base-ref]
 #   bash .claude/hooks/ship-gate.sh --key      print the receipt key and stop
 #   bash .claude/hooks/ship-gate.sh --force    write a FORCED receipt, run nothing
-#   bash .claude/hooks/ship-gate.sh --baseline record today's mutmut survivors as
-#                                              accepted debt, write no receipt
+#   bash .claude/hooks/ship-gate.sh --baseline accept the survivors as debt, reusing
+#                                              this tree's last run, and write the receipt
 #
 # On completion it writes a RECEIPT at /tmp/claude-shipgate-<key>, and the
 # PreToolUse hook refuses `git commit` / `git push` without a matching one. The
@@ -95,9 +95,7 @@ if [ -z "$BASE" ]; then
          || git rev-list --max-parents=0 HEAD | head -1)
 fi
 
-CHANGED=$( { git diff "$BASE"...HEAD --name-only 2>/dev/null
-             git diff HEAD --name-only 2>/dev/null
-             git ls-files --others --exclude-standard 2>/dev/null; } | sort -u )
+CHANGED=$(changed_files)
 
 # Only the files this gate can actually read go into the key. It used to be every
 # changed file, so a version bump in package.json or a line in a changelog threw
@@ -106,8 +104,7 @@ CHANGED=$( { git diff "$BASE"...HEAD --name-only 2>/dev/null
 # a release is trying to ship. An ignored extension is one no check here opens,
 # so it cannot change a verdict. Unknown extensions stay in, because UNPROVEN is
 # a verdict about exactly those.
-KEYED=$(printf '%s\n' "$CHANGED" | grep -viE "\.($GAUNTLET_IGNORE_EXT)$")
-
+#
 # The repo path plus the names and contents of the changed files, in a fixed
 # order. The path is in there because the key is otherwise pure content: two
 # repos holding the same file would share a receipt, and one would be waved
@@ -115,12 +112,7 @@ KEYED=$(printf '%s\n' "$CHANGED" | grep -viE "\.($GAUNTLET_IGNORE_EXT)$")
 # diff-based key changes when the content did not, and the receipt would go stale
 # the moment it was committed. This is identical either side of a commit, and
 # changes the instant any of those files is edited.
-RECEIPT_KEY=$( { printf '%s\n' "$PROJECT_DIR"
-                 printf '%s\n' "$KEYED" | while IFS= read -r f; do
-                   [ -n "$f" ] || continue
-                   printf '%s\n' "$f"
-                   [ -f "$f" ] && cat "$f"
-                 done; } | git hash-object --stdin )
+RECEIPT_KEY=$(receipt_key)
 RECEIPT="/tmp/claude-shipgate-$RECEIPT_KEY"
 
 if [ "$MODE" = key ]; then printf '%s\n' "$RECEIPT_KEY"; exit 0; fi
@@ -324,13 +316,16 @@ for owner in $OWNERS; do
     continue
   fi
 
-  # Only a clean run is recorded, and a baseline run always asks mutmut afresh.
+  # Only a clean run is recorded. A baseline replays this tree's last mutmut run, log
+  # included, rather than repeating it: accepting survivors used to cost two more runs.
   PKEY=""; [ "$TOOL" != config ] && PKEY="/tmp/claude-shipgate-project-$(project_key "$owner" "$TOOL")"
   if [ -n "$PKEY" ] && [ -f "$PKEY" ] && { [ "$TOOL" != mutmut ] || [ "$MODE" != baseline ]; }; then
     echo "  $label $TOOL — ok, not re-run: nothing of its kind changed since it passed"
     continue
   fi
+  [ "$TOOL" = mutmut ] && [ "$MODE" = baseline ] && [ -f "$PKEY.out" ] && CMD="cp '$PKEY.log' '$MLOG' 2>/dev/null; cat '$PKEY.out'"
   OUT=$(eval "$CMD" 2>&1); RC=$?
+  [ "$TOOL" = mutmut ] && [ $RC -eq 0 ] && { printf '%s\n' "$OUT" > "$PKEY.out"; cp "$MLOG" "$PKEY.log" 2>/dev/null; }
   [ -n "$SCOPE_RE" ] && [ $RC -eq 0 ] && OUT=$(printf '%s\n' "$OUT" | grep -E "^[[:space:]]*($SCOPE_RE)\.x")
   # Match a finding, never a summary row. Stryker prints a `# survived` COLUMN
   # HEADER every run and repeats the word in its table, so a bare grep reports
@@ -458,11 +453,8 @@ if [ -n "$MISSING" ]; then
   [ "$STATUS" = 0 ] && STATUS=2
 fi
 
-if [ "$MODE" = baseline ]; then
-  echo
-  echo "ship-gate: baselines updated. No receipt written — run the gate for real."
-  exit 0
-fi
+# .mutmut-baseline is part of the key, so a baseline's receipt is keyed after it is written.
+[ "$MODE" = baseline ] && RECEIPT="/tmp/claude-shipgate-$(receipt_key)"
 
 # The receipt is written by this script and nothing else. A hand-rolled check
 # produces no receipt, which is the whole point: substituting a weaker check is

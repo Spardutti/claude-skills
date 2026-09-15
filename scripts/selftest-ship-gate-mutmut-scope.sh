@@ -108,3 +108,34 @@ rm -f apps/api/app/slugs.py apps/api/app/orders/__init__.py
 mkdir -p apps/api/src/pkg
 echo "x=1" > apps/api/src/pkg/core.py
 run_args "a src layout's glob drops the src. prefix" "run pkg.core.x*"
+
+# Accepting survivors re-ran mutmut on the tree the last run had just tested, then
+# wrote no receipt, so one PR paid for four full runs.
+echo "ship-gate --baseline reuses the last run"
+scoped_repo sg_scope_accept
+printf '    app.slugs.x_slugify__mutmut_3: survived\n' > survivors
+sg "a survivor fails the run before it is accepted" "app.slugs.x_slugify__mutmut_3" 1
+run_args "--baseline on the tree that just ran does not run mutmut" "" --baseline
+N=$((N+1))
+if grep -qx "app.slugs.x_slugify__mutmut_3" apps/api/.mutmut-baseline; then PASS=$((PASS+1)); printf '  ok   %s\n' "and still accepts that run's survivor"
+else FAIL=$((FAIL+1)); printf '  FAIL %s\n       baseline: %s\n' "and still accepts that run's survivor" "$(cat apps/api/.mutmut-baseline)"; fi
+N=$((N+1))
+if [ -f "/tmp/claude-shipgate-$(bash "$SG" --key)" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "and writes the receipt, so the gate need not run again"
+else FAIL=$((FAIL+1)); printf '  FAIL %s\n' "and writes the receipt, so the gate need not run again"; fi
+sg "the next run is clean" "nothing survived" 0
+mkdir -p apps/api/tests
+echo "def test_slug(): pass" > apps/api/tests/test_slugs.py
+run_args "--baseline after a test changed runs mutmut again" "run app.orders.__init__.x* app.slugs.x*" --baseline
+
+# The replayed log is what marks a run that matched no mutant; without it the
+# replay reads as clean and writes a PASS over a run that tested nothing.
+scoped_repo sg_scope_replay_nomatch
+touch nomatch
+sg "a scope that matched nothing is UNPROVEN" "no mutant in the changed module(s)" 2
+rm -f mutmut.args
+N=$((N+1))
+out=$(bash "$SG" --baseline 2>&1)
+case "$out" in *"no mutant in the changed module(s)"*) ok=1 ;; *) ok=0 ;; esac
+[ -f mutmut.args ] && ok=0
+if [ $ok = 1 ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "a replayed run that matched nothing is still UNPROVEN"
+else FAIL=$((FAIL+1)); printf '  FAIL %s\n%s\n' "a replayed run that matched nothing is still UNPROVEN" "$out"; fi

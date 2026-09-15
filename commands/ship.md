@@ -131,7 +131,8 @@ every function in each changed module, and a changed module's old survivors come
 with it. A `.mutmut-baseline` file holds the ones already accepted, and only a name
 outside it fails. The first run covers the whole repo, writes that file and exits 2 —
 commit it and run the gate again. After that, `--baseline` rewrites only the changed
-modules' entries. **Never run `--baseline` to
+modules' entries, reuses the last run's results when nothing changed since, and writes
+the receipt itself — do not run the gate again after it. **Never run `--baseline` to
 make a finding go away.** It accepts a survivor as permanent debt, so it is for a mutant
 that genuinely cannot be killed — an equivalent mutant, where the change alters nothing
 observable. Say which mutant and why, in the commit, or write the test instead.
