@@ -135,6 +135,9 @@ modules' entries. **Never run `--baseline` to
 make a finding go away.** It accepts a survivor as permanent debt, so it is for a mutant
 that genuinely cannot be killed — an equivalent mutant, where the change alters nothing
 observable. Say which mutant and why, in the commit, or write the test instead.
+A survivor in code that only runs at import — app setup, router registration — is
+neither: mutmut forks after import, so that mutant never runs. Call the function from a
+test, or mark it `# pragma: no mutate block, <reason>`; never baseline it as harmless.
 
 **Never substitute your own implementation of these checks.** Not a hand-rolled mutation
 script, not a `wc -l` you ran yourself, not a judgement that the changed files look too

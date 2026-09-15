@@ -52,6 +52,15 @@ mutmut_unchecked() {  # mutmut_unchecked <label> <base> <count> <run log>
   echo "      it ahead of every host-local option."
 }
 
+# mutmut forks after importing the app, so code that only runs at import survives
+# every mutant. One agent baselined 39 of those as harmless.
+survivor_list() {  # survivor_list <survivors> <tool>
+  printf '%s\n' "$1" | sed 's/^/      /'
+  [ "$2" = mutmut ] || return 0
+  echo "      Only runs at import (app setup, router registration)? Then it is unreachable,"
+  echo "      not equivalent — see testing-best-practices/MUTATION-TESTING.md."
+}
+
 # A scoped --baseline replaces only the changed modules' names. Rebuilding the whole
 # file re-mutated an entire API to accept eleven of them.
 baseline_write() {  # baseline_write <baseline file> <survivors file> <scope regex, or empty>

@@ -82,6 +82,21 @@ assert (len(body["items"]), body["total"]) == (2, 3)
 assert (await client.get("/destinos")).json()["total"] == 0
 ```
 
+**A grouped query ignores that UPDATE.** Its rows come out of the aggregate, not off the disk. On Postgres 17, three tied groups still came back in id order with the tiebreak deleted; five came back `1,3,5,4,2`.
+
+```python
+# BAD: GROUP BY hands back a few groups in key order, so a dropped tiebreak passes
+for slug in ("alaska", "caribe"):
+    await make_published_menu(db, slug=slug, confirmed_at=NOON)
+
+# GOOD: five tied groups, which hash aggregation returned scrambled
+for slug in ("alaska", "baltico", "caribe", "egeo", "fiordos"):
+    await make_published_menu(db, slug=slug, confirmed_at=NOON)
+assert await suggested_slugs(client) == ["alaska", "baltico", "caribe", "egeo", "fiordos"]
+```
+
+Delete the tiebreak once and watch the test fail. If it still passes, run `EXPLAIN`: a `GroupAggregate` keyed on the tiebreak itself sorts the ties for free, so no data can catch it. Report that; never keep a test that cannot fail.
+
 ### The side effect, not just the response
 
 ```python
@@ -285,7 +300,7 @@ test.each([
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
 11. **A green suite is not evidence** — tests written beside the code pass by construction; `/ship` proves them once with `ship-gate.sh`, before the PR. Never run the gate, Stryker or mutmut yourself mid-work; any later edit voids the run (MUTATION-TESTING.md)
 12. **Assert values, not shapes** — the exact fields and error message, never only key names or a status code
-13. **Give list tests a tie, more rows than the page, and an empty case** — two distinct rows cannot catch a dropped tiebreak or `LIMIT`
+13. **Give list tests a tie, more rows than the page, and an empty case** — two distinct rows cannot catch a dropped tiebreak or `LIMIT`, and a grouped query needs five tied groups
 14. **Assert the side effect** — the audit row, the stored file, the sent message, not only the response
 15. **Test both sides of every limit** — exactly at it, and one past it
 16. **Parametrize a mirrored domain's tests** — never copy a test folder; its gaps come with it

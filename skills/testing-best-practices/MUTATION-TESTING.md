@@ -11,6 +11,7 @@ the tests cannot accidentally pass.
 - [Stryker — JS/TS](#stryker--jsts)
 - [The Sandbox Trap](#the-sandbox-trap)
 - [mutmut — Python](#mutmut--python)
+  - [Code That Runs At Import Never Sees A Mutant](#code-that-runs-at-import-never-sees-a-mutant)
 - [Reading the Output](#reading-the-output)
 - [Silencing Noise Without Going Blind](#silencing-noise-without-going-blind)
   - [`next-line` Means The Next Line, Literally](#next-line-means-the-next-line-literally)
@@ -165,6 +166,35 @@ mutmut results          # <mutant name>: survived, one per line
 It is also installed into the project environment, not onto `PATH`. Reach it the
 way the project does — `uv run mutmut`, `poetry run mutmut`, or
 `./.venv/bin/mutmut` — or a script calling bare `mutmut` finds nothing.
+
+### Code That Runs At Import Never Sees A Mutant
+
+mutmut imports the project once to collect stats, then forks one child per mutant
+with that mutant switched on. The child inherits every module already loaded, so a
+function called only at import never runs again. In one API all 39 mutants in
+`routers.py` survived in about 0.08s each. That is **unreachable**, not equivalent:
+the same file holds `if settings.dev_tools_enabled`, the guard that keeps the admin
+endpoints out of production.
+
+```python
+# BAD — the only call is at import, so no test can reach these mutants
+app = FastAPI(lifespan=lifespan)
+register_routers(app, settings)
+
+# GOOD — the test calls it after the fork, with the mutant live
+def test_dev_routes_are_absent_when_the_flag_is_off():
+    app = FastAPI()
+    register_routers(app, Settings(dev_tools_enabled=False))
+    assert not [route for route in app.routes if "/dev/" in route.path]
+```
+
+When there is nothing worth asserting, skip it at the source. A baseline entry comes
+back every time the function is edited; the pragma does not. mutmut reads only the
+first word after `no mutate`, so the reason goes after a comma:
+
+```python
+def configure_logging() -> None:  # pragma: no mutate block, runs only at import
+```
 
 ## Reading the Output
 
@@ -347,6 +377,7 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always install the tool the way the project manages dependencies (uv, poetry, npm workspace).
 - Always match `[Survived]` for Stryker findings — the summary header contains the word `survived` on a clean run.
 - Always read mutmut's verdict from `mutmut results`; `mutmut run` exits 0 either way and prints no word to grep.
+- Never baseline a survivor in import-time code as equivalent — call the function from a test, or mark it `# pragma: no mutate block, <reason>`.
 - Always invoke mutmut through the project's environment (`uv run`, `poetry run`, `./.venv/bin/`) — it is not on PATH.
 - Always use `source_paths` / `pytest_add_cli_args_test_selection` for mutmut 3; `paths_to_mutate` and `tests_dir` are silently ignored.
 - Always ignore a mutant by where it sits (Ignore plugin, disable comment), never by disabling a whole mutator globally.

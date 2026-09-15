@@ -19,6 +19,7 @@ echo "x=1" > apps/api/app/slugs.py
 # An empty baseline accepts nothing, so every survivor is charged.
 : > apps/api/.mutmut-baseline
 sg "mutmut in the venv is found and its survivors reported" "app.slugs.x_slugify__mutmut_3" 1
+sg "a mutmut finding warns that import-time code is unreachable" "it is unreachable," 1
 
 # mutmut replays cached verdicts for any function whose source did not change,
 # so a test-only commit gets last run's survivors back. This mutmut answers

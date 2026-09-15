@@ -426,7 +426,7 @@ for owner in $OWNERS; do
 
   if [ -n "$SURVIVED" ]; then
     echo "  $label $TOOL — these lines can break and no test notices:"
-    printf '%s\n' "$SURVIVED" | sed 's/^/      /'
+    survivor_list "$SURVIVED" "$TOOL"
     if [ "$FOUND" -gt 20 ]; then
       echo "      ... $((FOUND - 20)) more not shown. Every file with findings:"
       if [ "$TOOL" = stryker ]; then
