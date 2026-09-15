@@ -29,7 +29,7 @@ Rules that always hold:
 - **Never re-do a satisfied stage** — already committed? start at pr.
 - **Never skip a required stage** — `/ship release` with uncommitted work runs commit → pr → merge → release first.
 - A merge into the **main** branch always asks for confirmation, even when a target is set.
-- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it.
+- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it. A release PR gets only the script, never the skills audit: every commit in it already passed the full gate in its own PR.
 
 ## Step 0 — Prechecks and Start Detection
 
@@ -85,9 +85,15 @@ entirely — no argument, no questions. Skip it too when there is nothing to che
 because the whole branch is what a PR ships. Running it before every commit re-mutated
 every file the branch had ever touched: a 46-file branch paid fifteen minutes on each of
 twenty commits. A commit publishes nothing, so it is not gated. If a run stops at commit,
-the gate never runs; the moment a run continues to pr, merge or release, it runs first.
+the gate never runs; the moment a run continues to pr or merge, it runs first.
 Ask for it earlier with a bare `bash .claude/hooks/ship-gate.sh` when you want the
 findings before the PR.
+
+**Not in full before a release.** A release PR (dev → main) ships only commits that
+already passed this gate in their own PRs, and auditing them again started a skills agent
+over every file in the release. Before the release PR, run only the script. It compares
+against the dev branch, so it finds nothing to check and finishes in seconds, and it
+writes the receipt the PR needs. Skip the skills audit.
 
 This is the one enforcement moment. It does not re-run the test suite: the `gauntlet.sh`
 Stop hook already ran types and tests on every turn. It checks the three things nothing
@@ -264,7 +270,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
    - **Always confirm the version with the user.**
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
 3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
-4. **Release PR** — `git checkout -b release/<version>`, push, then `gh pr create --base <main> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
+4. **Release PR** — `git checkout -b release/<version>`, push, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
 5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on.
 6. **Tag + GitHub release**:
 
@@ -294,6 +300,7 @@ gh release create <version> --title '<version>' --notes-file <file>
 - NEVER tag or create a GitHub release before the release PR is merged into main.
 - NEVER merge a PR that is a draft, has conflicts, has failing CI, or is missing required reviews — stop and report.
 - NEVER squash the release PR into main — use a merge commit so the feature history survives for future changelog/version detection.
+- NEVER run the skills audit before a release PR — its commits already passed it; run only `ship-gate.sh`.
 - NEVER interpolate a branch name, tag, version, or title containing shell metacharacters (`` ` ``, `$(`, `;`, `&&`, `|`) into a command — pass interpolated values as single-quoted literals, pass PR/release bodies via `--body-file`/stdin, and abort if such a value contains metacharacters.
 - ALWAYS run the skills audit — one `gauntlet-skills` agent per applicable skill, all launched in one message. NEVER audit a skill yourself instead: the agent reads it fresh, with no memory of having decided it did not apply.
 - NEVER skip a skill because the diff "looks fine" — skip it only when no file in the ship scope matches it, and say which you skipped.
