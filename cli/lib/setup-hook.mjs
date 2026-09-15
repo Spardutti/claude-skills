@@ -127,7 +127,7 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${APPLICATION_GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${GAUNTLET_FILENAME}`);
-  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship and /plan-feature)`);
+  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
   console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }

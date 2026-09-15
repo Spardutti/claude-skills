@@ -1,8 +1,8 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and on your go the same agent builds the plan and proves its tests with the ship gate"
+description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and on your go the same agent builds the plan"
 category: Workflow
-allowed-tools: Read, Grep, Glob, Task, Write, Edit, Bash(bash .claude/hooks/ship-gate.sh)
+allowed-tools: Read, Grep, Glob, Task, Write, Edit
 requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
 argument-hint: "<short feature description>"
 ---
@@ -80,23 +80,9 @@ If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write th
 
 When the user says go, build the plan yourself, in this conversation. Do not spawn agents to write code: parallel code-writing workers each reloaded their skills and the plan, crossed messages, and re-reported, and one feature spent 51 minutes waiting on its slowest worker. One agent gives the user one diff to review.
 
-Build the side others depend on first (schema and API before the screens that call them). Write the tests for what you write, and run each touched app's tests and type check before moving on. Do not run Stryker or mutmut yourself — a hand run mutates whole files, components included; Step 6 scopes it to the diff.
+Build the side others depend on first (schema and API before the screens that call them). Write the tests for what you write, and run each touched app's tests and type check before moving on. When they pass, report the diff.
 
-## Step 6 — Prove the Tests
-
-When the build is done and its tests pass, run the gate **once**:
-
-```bash
-bash .claude/hooks/ship-gate.sh
-```
-
-If the script is missing, say the tests are unproven and report the diff. Otherwise show its output verbatim and obey the exit code:
-
-- **0** — report the diff.
-- **2** — it could not prove the tests. Say so plainly and report what it printed; never call it a pass.
-- **1** — for each finding, write the test that kills the survivor and check that test fails without the code. A survivor that changes nothing observable (an equivalent mutant) gets a one-line reason instead of a test. Then run the gate again.
-
-Stop after **two** rounds and report what is still open, with the reason for each equivalent mutant. Accepting those into `.mutmut-baseline` is decided at `/ship`, not here.
+Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and asks for changes first, and any edit voids the gate's receipt, so an early run is always paid again. `/ship` runs it once, before the PR.
 
 ## Rules
 
@@ -106,8 +92,7 @@ Stop after **two** rounds and report what is still open, with the reason for eac
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.
 - Never spawn more than the 3 declared subagents, and never spawn one to write code — you build the plan yourself.
 - Always print the plan and stop before Step 5 — never build until the user approves it.
-- Never run Stryker or mutmut by hand — run `ship-gate.sh` once after the build, fix what it finds, and stop after two rounds.
-- Never accept a survivor into `.mutmut-baseline` here — report it with its reason and leave that call to `/ship`.
+- Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/ship`.
 - Never produce a plan that proposes building something a subagent already found as reusable, unless the user explicitly rejected reuse.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If a subagent returns nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
