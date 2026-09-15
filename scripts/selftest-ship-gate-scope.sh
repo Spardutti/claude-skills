@@ -70,3 +70,10 @@ keycmp "editing the code does invalidate it"            "$k1" "$k2" differ
 # dropped from the key the way an ignored one is.
 echo "pub fn main() {}" > main.zig
 keycmp "so does an extension the gate cannot place"     "$k2" "$(bash "$SG" --key)" differ
+
+# tsconfig.jsonc and biome.jsonc are JSON with comments. Unlisted, a config-only
+# change came back UNPROVEN, as if code had gone unchecked.
+echo "ship-gate knows config files"
+newrepo sg_jsonc
+printf '{ // strict\n  "strict": true\n}\n' > tsconfig.jsonc
+sg "a jsonc config change is a pass, not UNPROVEN" "nothing to check" 0
