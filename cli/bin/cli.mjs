@@ -2,15 +2,16 @@
 
 import { confirm } from "@inquirer/prompts";
 import chalk from "chalk";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
 import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../lib/prompt.mjs";
 import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
 import { makeLocalSource } from "../lib/local.mjs";
 import { runPostInstall } from "../lib/post-install.mjs";
-import { setupHook } from "../lib/setup-hook.mjs";
+import { runSync, runSyncAll } from "../lib/sync.mjs";
 import {
   readManifest, writeManifest, computeOrphans, computeRemovals, scanInstalled, removeArtifacts,
   MANIFEST_FILE,
@@ -20,38 +21,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 const CWD = process.cwd();
 
-// `--sync`: re-install everything the manifest records (refreshed to the latest
-// catalog), refresh hooks the project already has, and prune anything removed upstream.
-async function runSync(manifest, catalog) {
-  if (!manifest) {
-    console.log(`  ${chalk.yellow("Nothing to sync")} — no manifest in this project. Run without --sync first.\n`);
-    return;
-  }
-  const orphans = computeOrphans(manifest, catalog);
-  const orphanCount = orphans.skills.length + orphans.commands.length + orphans.agents.length;
-  if (orphanCount > 0) {
-    await removeArtifacts(CWD, orphans);
-    console.log(`  ${chalk.green("✔")} Pruned ${orphanCount} item(s) removed from the catalog.`);
-  }
-
-  const skills = catalog.skills.filter((s) => manifest.skills.includes(s.dirName));
-  const commands = catalog.commands.filter((c) => manifest.commands.includes(c.fileName));
-  if (skills.length > 0) { console.log(); await installSkills(skills); }
-  if (commands.length > 0) { console.log(); await installCommands(commands); }
-  const { installed } = await installRequiredAgents(commands, catalog.agents, CWD);
-  if (existsSync(join(CWD, ".claude", "hooks", "skill-gate.sh"))) { console.log(); await setupHook(CWD); }
-
-  await writeManifest(CWD, {
-    catalogVersion: pkg.version,
-    skills: skills.map((s) => s.dirName),
-    commands: commands.map((c) => c.fileName),
-    agents: installed.map((a) => a.fileName),
-  });
-  console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`Synced to catalog v${pkg.version}.`)}\n`);
-}
-
 async function main() {
   const isSync = process.argv.includes("--sync");
+  // --sync-all[=dir] syncs every project under dir (default: home) from one catalog fetch.
+  const syncAllArg = process.argv.find((a) => a === "--sync-all" || a.startsWith("--sync-all="));
+  const syncAllRoot = syncAllArg ? resolve(syncAllArg.split("=")[1] || homedir()) : null;
 
   // --local[=path] reads the catalog from a working copy instead of GitHub, so an
   // unreleased change can be installed and tried without publishing it first.
@@ -71,9 +45,9 @@ async function main() {
     fetchers.fetchSkills(), fetchers.fetchCommands(), fetchers.fetchAgents(),
   ]);
   const catalog = { skills, commands, agents };
+  if (syncAllRoot) return runSyncAll(syncAllRoot, catalog, pkg.version);
+  if (isSync) return runSync(CWD, catalog, pkg.version);
   const manifest = await readManifest(CWD);
-
-  if (isSync) return runSync(manifest, catalog);
 
   // --- Prune items renamed or removed from the catalog upstream ---
   const orphans = computeOrphans(manifest, catalog);

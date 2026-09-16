@@ -169,7 +169,13 @@ Every install writes a manifest at `.claude/.claude-skills.json` recording what 
 npx @spardutti/claude-skills --sync
 ```
 
-`--sync` refreshes every tracked item to the latest catalog and prunes stale ones in one shot — no menu. For a project that predates the manifest, the first normal run offers a one-time cleanup of `.claude/` content no longer in the catalog.
+`--sync` refreshes every tracked item, and any hooks the project already has, to the latest catalog and prunes stale ones in one shot — no menu. For a project that predates the manifest, the first normal run offers a one-time cleanup of `.claude/` content no longer in the catalog.
+
+`--sync-all[=dir]` does the same for every project under `dir` (default: your home folder) that has a manifest, fetching the catalog once:
+
+```bash
+npx @spardutti/claude-skills --sync-all
+```
 
 `--local[=path]` reads the catalog from a working copy instead of GitHub, so an unreleased change can be installed and tried without publishing it first:
 

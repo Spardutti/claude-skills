@@ -128,3 +128,34 @@ if [ -d "$CP/.claude/skills/gone-skill" ]; then
 else
   PASS=$((PASS+1)); printf '  ok   %s\n' "and its directory is gone"
 fi
+
+echo "cli --sync-all"
+ROOT="$TMP/cli_sync_all"; rm -rf "$ROOT"
+old_manifest() {  # old_manifest <project dir>
+  mkdir -p "$1/.claude"
+  printf '{ "catalogVersion": "0.0.0", "skills": ["sql"], "commands": [], "agents": [] }\n' > "$1/.claude/.claude-skills.json"
+}
+old_manifest "$ROOT/app-a"
+old_manifest "$ROOT/clients/app-b"
+old_manifest "$ROOT/app-c/node_modules/some-pkg"
+mkdir -p "$ROOT/not-a-project/src" "$ROOT/app-b-hooks/.claude/hooks"
+old_manifest "$ROOT/app-b-hooks"
+printf '#!/bin/sh\n# old\n' > "$ROOT/app-b-hooks/.claude/hooks/skill-gate.sh"
+
+OUT=$( cd "$TMP" && node "$CLI" --local="$REPO" --sync-all="$ROOT" 2>&1 )
+cli_case "every project under the root is synced, nested ones too" "3 of 3 project(s) synced" "$OUT"
+have_file "a top-level project gets its skill" "$ROOT/app-a/.claude/skills/sql/SKILL.md"
+have_file "a nested project gets its skill"    "$ROOT/clients/app-b/.claude/skills/sql/SKILL.md"
+N=$((N+1))
+if grep -q '"0.0.0"' "$ROOT/app-c/node_modules/some-pkg/.claude/.claude-skills.json"; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "a manifest inside node_modules is left alone"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "a manifest inside node_modules is left alone"
+fi
+N=$((N+1))
+if cmp -s "$ROOT/app-b-hooks/.claude/hooks/skill-gate.sh" "$REPO/scripts/skill-gate.sh" \
+   && [ ! -e "$ROOT/app-a/.claude/hooks" ]; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "hooks are refreshed only where they were installed"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "hooks are refreshed only where they were installed"
+fi
