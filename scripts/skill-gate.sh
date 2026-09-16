@@ -108,6 +108,7 @@ fi
 # without both fields keep the old behaviour, so this tightens nothing that was
 # not deliberately declared.
 MISSING=""
+ACKS=""
 MANIFESTS=""
 if [ -n "$TARGETS" ]; then
   MANIFESTS=$(find "$PROJECT_DIR" -maxdepth 4 \( -name node_modules -o -name .git -o -name .venv -o -name dist \) -prune -o \( -name package.json -o -name pyproject.toml -o -name requirements.txt \) -print 2>/dev/null)
@@ -168,7 +169,7 @@ if [ -n "$TARGETS" ]; then
 
     SAFE=$(printf '%s' "$SNAME" | tr -cd 'A-Za-z0-9_-')
     [ -f "/tmp/claude-skill-loaded-$KEY-$SAFE" ] && continue
-    case " $MISSING " in *" $SNAME "*) ;; *) MISSING="$MISSING $SNAME" ;; esac
+    case " $MISSING " in *" $SNAME "*) ;; *) MISSING="$MISSING $SNAME"; ACKS="$ACKS /tmp/claude-skill-acked-$KEY-$SAFE" ;; esac
   done
 fi
 
@@ -176,7 +177,7 @@ if [ -n "$MISSING" ]; then
   LIST=$(printf '%s' "$MISSING" | sed 's/^ //; s/ /, /g')
   FIRST=$(printf '%s' "$MISSING" | awk '{print $1}')
   cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: this file's stack has mandatory skills that are not loaded: $LIST.\n\nThere is no SKIP for these. The file matches each skill's declared paths AND this project depends on a package that skill tracks, so they apply as a matter of fact, not judgement. Touching the gate marker will not clear them.\n\nCall Skill($FIRST) now — then every other name in the list — and retry the edit."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: this file's stack has mandatory skills that are not loaded: $LIST.\n\nThere is no SKIP for these. The file matches each skill's declared paths AND this project depends on a package that skill tracks, so they apply as a matter of fact, not judgement. Touching the gate marker will not clear them.\n\nCall Skill($FIRST) now — then every other name in the list. Then say which of their rules bear on this file, ack them in one Bash call, and retry the edit:\n  touch$ACKS"}}
 EOF
   exit 0
 fi

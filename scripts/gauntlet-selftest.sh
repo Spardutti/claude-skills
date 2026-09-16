@@ -65,6 +65,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed
 . "$HERE/selftest-skill-gate.sh"         # deny messages, exemptions, auto mode
 . "$HERE/selftest-mandatory-skills.sh"   # which skills are not optional
+. "$HERE/selftest-skill-ack.sh"          # the ack command, before any denial
 . "$HERE/selftest-line-limit.sh"         # the 200-line ratchet
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
 . "$HERE/selftest-fetch.sh"              # the CLI talking to GitHub

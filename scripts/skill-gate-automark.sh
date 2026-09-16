@@ -26,6 +26,12 @@ if [ -n "$SKILL_NAME" ]; then
   SAFE_NAME=$(printf '%s' "$SKILL_NAME" | tr -cd 'A-Za-z0-9_-')
   if [ -n "$SAFE_NAME" ]; then
     touch "/tmp/claude-skill-loaded-$KEY-$SAFE_NAME"
+    # The ack path holds a key the model cannot know, so without this line its
+    # first write is always denied just to learn it.
+    if [ ! -f "/tmp/claude-skill-acked-$KEY-$SAFE_NAME" ]; then
+      CTX="Skill $SAFE_NAME is loaded. Before your next code write, say which of its rules bear on that file, or that it does not apply. Then run this Bash call, or the write is blocked:\\n  touch /tmp/claude-skill-acked-$KEY-$SAFE_NAME\\nLoaded several skills? Put every path in one touch."
+      printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$CTX"
+    fi
   fi
 fi
 
