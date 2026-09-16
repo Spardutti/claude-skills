@@ -131,7 +131,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 
 | Command | What it does |
 |---------|--------------|
-| `/ship` | Unified delivery pipeline — commit → gate → PR → merge → release. The gate is the one enforcement moment: it checks the diff's file lengths, audits it against the skills installed in the project, and mutation-tests the changed lines to prove the tests would catch a break — **fixing what it finds** rather than handing you a list. It runs before the **PR**, not before every commit: its scope is the whole branch, so gating each commit re-mutated every file the branch had ever touched. `--force` skips it. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
+| `/ship` | Unified delivery pipeline — commit → gate → PR → merge → release. The gate is the one enforcement moment: it checks the diff's file lengths and that new files sit in their kind folder, audits it against the skills installed in the project, and mutation-tests the changed lines to prove the tests would catch a break — **fixing what it finds** rather than handing you a list. It runs before the **PR**, not before every commit: its scope is the whole branch, so gating each commit re-mutated every file the branch had ever touched. `--force` skips it. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
 | `/discover` | Find the right problem before deciding what to build — diverges first: generates competing framings through blind subagents under forced constraints, stress-tests the winner with a blind critic, and refuses to converge until every open question is answered or deferred, then drafts scope, non-goals, edge cases and success criteria for you to correct. Run before `/plan-feature` |
 | `/plan-feature` | Integration-first feature planning, then building — 3 parallel subagents scan for reusable code, patterns and touch points, grounded clarifying questions follow, and on your go the same agent builds the plan |
 | `/refactor` | Detect size / complexity / duplication / coupling issues via 4 parallel subagents, then refactor |
@@ -191,7 +191,7 @@ commands/      Slash commands installed to .claude/commands/
 agents/        Subagent definitions — commands declare which they need via requires-agents
 scripts/       validate-skills.mjs — checks skill length caps and reference integrity
                gauntlet.sh — the Stop-hook verification gates, embedded by the CLI
-               ship-gate.sh — /ship's file-length and mutation checks, behind an exit code
+               ship-gate.sh — /ship's file-length, folder-structure and mutation checks, behind an exit code
                ship-gate-hook.sh — refuses gh pr create/merge without a ship-gate receipt
                version-check.sh — SessionStart nudge when a newer catalog is published
                gauntlet-selftest.sh — behavioural tests for the hooks (runs on pre-push)

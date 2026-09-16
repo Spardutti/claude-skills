@@ -305,25 +305,26 @@ const getStatus = (mission: Mission) => {
 
 ## File Organization
 
-One export focus per file. Colocate related code, separate concerns.
+One export focus per file. The folder tree is in SKILL.md → Project Structure; this is how files split inside it.
 
 ```
 features/missions/
   components/
     mission-card.tsx          # MissionCard only
+    mission-card.test.tsx     # its test, beside it
     mission-list.tsx          # MissionList only
-    mission-filters.tsx       # MissionFilters only
-  hooks/
+  queries/
     use-get-missions.ts       # useGetMissions only
     use-delete-mission.ts     # useDeleteMission only
   schemas/
     mission-schema.ts         # mission zod schema only
-  types.ts                    # mission types shared across the feature
+  types/
+    mission.ts                # mission types shared across the feature
 ```
 
-- Types shared across a feature → `types.ts`. Types used in one file → define inline.
+- Types shared across a feature → `types/`. Types used in one file → define inline.
 - Utility used once → inline it. Used 2+ times in a feature → `features/{feature}/utils/`.
-- Utility used across features → `@/lib/`.
+- Utility used across features → `shared/utils/`.
 
 ## Server vs Client Boundaries
 

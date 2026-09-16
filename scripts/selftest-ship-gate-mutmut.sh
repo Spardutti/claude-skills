@@ -135,7 +135,7 @@ sg "--baseline accepts the new survivor" "nothing survived" 0
 echo "ship-gate receipt"
 newrepo sg2
 mkdir -p .claude/hooks
-cp "$SG" "$SGH" "$HERE/ship-gate-projects.sh" .claude/hooks/
+cp "$SG" "$SGH" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" .claude/hooks/
 chmod +x .claude/hooks/*.sh
 H=".claude/hooks/ship-gate-hook.sh"
 echo "const a=1" > a.ts

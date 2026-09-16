@@ -109,7 +109,7 @@ check below is scoped to those files and ranges. Never scan the whole repo.
 
 Print the scope, then run the checks cheapest first, stopping at the first that stops you.
 
-### 1 and 3 — file length and mutation: run the script, obey the exit code
+### 1 and 3 — file length, folder structure and mutation: run the script, obey the exit code
 
 ```bash
 bash .claude/hooks/ship-gate.sh
@@ -123,7 +123,8 @@ So: run that command. Show its output verbatim. Obey its exit code.
 
 - **0** — clean, continue.
 - **1** — findings. A file over the limit stops you: splitting a file is a design
-  decision, not something to do silently mid-ship. Surviving mutants are a gap in the
+  decision, not something to do silently mid-ship. A new file outside its kind folder
+  (`components/`, `hooks/`, `routers/` …) stops you too: move it. Surviving mutants are a gap in the
   tests, not in the code — write the test that closes each one (see below), then re-run
   the script.
 - **2** — it ran but could not prove the tests, almost always because no mutation tool

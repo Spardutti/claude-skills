@@ -19,6 +19,33 @@ Express 5 (5.2.x current; 5.1 is fine, Node 18+ required). If a file still uses
 |---|---|
 | tRPC routers, procedures, context, TRPCError, errorFormatter | TRPC.md |
 
+## Project Structure
+
+One folder per domain. Inside it, every module lives in the folder named for its
+kind. The only file at a domain's root is `index.ts`, which exports its router.
+
+```
+src/
+  expenses/
+    routes/     admin.ts  public.ts          # one Router per audience, HTTP only
+    services/   expenses.ts  expenses.test.ts
+    schemas/    expense.ts                   # zod schemas + their z.infer types
+    types/      expense.ts                   # types with no schema
+    index.ts
+  shared/       same kind folders, plus middleware/, for code 2+ domains use
+  app.ts        mounts every domain router, then the error handler
+  server.ts     listen + shutdown
+```
+
+```
+BAD  src/routes/expenses.ts  src/services/expenses.ts     sorted by kind first
+BAD  src/expenses/expenseSchemas.ts                        kind as a filename prefix
+GOOD src/expenses/schemas/expense.ts
+```
+
+A test sits next to the file it tests and carries its name; a test of a whole
+flow goes in `tests/`. Create a kind folder when its first file arrives, not before. Import another domain through its `index.ts` only.
+
 ## 1. Async Errors Forward Themselves — Stop Wrapping
 
 Express 5 catches a rejected promise from a handler and sends it to the error
@@ -235,6 +262,7 @@ Without this a deploy kills in-flight requests mid-write.
 8. **Always keep business logic out of the route** — a route reads input, calls one thing, shapes a response.
 9. **Always run helmet, CORS with an explicit origin, a rate limiter, and a body limit** in production.
 10. **Always close the server and drain connections on SIGTERM.**
+11. **Always put a module in its domain's kind folder** (`routes/ services/ schemas/ types/`) — never a top-level `src/routes/`, never a kind as a filename prefix.
 
 ## Reference Files
 

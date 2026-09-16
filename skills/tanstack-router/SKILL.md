@@ -115,7 +115,7 @@ function PostDetail() {
 ### TanStack Query Integration (ensureQueryData)
 
 ```tsx
-// src/queries/posts.ts — reusable query options
+// src/features/posts/queries/posts.ts — reusable query options
 export const postQueryOptions = (postId: string) =>
   queryOptions({ queryKey: ['post', postId], queryFn: () => fetchPost(postId) })
 

@@ -154,7 +154,7 @@ lib/utils.ts         cn()
 }
 ```
 
-A feature component belongs in `components/`, not `components/ui/`. Putting it in
+A feature component belongs in its feature's `components/`, not `components/ui/`. Putting it in
 `ui/` means the next `shadcn add` can offer to overwrite it, and it blurs the one
 line that makes the copy-in model legible: `ui/` came from upstream, the rest
 did not.

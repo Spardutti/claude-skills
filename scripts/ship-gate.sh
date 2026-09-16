@@ -46,7 +46,7 @@
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-. "$HERE/ship-gate-projects.sh" || { echo "ship-gate: cannot read $HERE/ship-gate-projects.sh"; exit 1; }
+. "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
 
 MODE=""
 case "${1:-}" in
@@ -76,7 +76,7 @@ GAUNTLET_MAX_LINES=200
 GAUNTLET_MUTATE=""
 GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
 GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|jsonc?|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"
-GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alembic/versions/*.py */components/ui/*.tsx */*.config.*"
+GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alembic/versions/*.py */components/ui/*.tsx */hooks/use-mobile.ts */*.config.*"
 # Length-checked and skill-audited like everything else, but not mutated.
 # Mutation pays on logic and burns time on presentation: a component's mutants
 # are class names, copy and JSX shape, none of which is behaviour, and one
@@ -159,6 +159,8 @@ if [ -n "$IGNORED" ]; then
   printf '%s\n' "$IGNORED" | sed 's/^/  /'
 fi
 
+[ -n "$FILES" ] && echo "ship-gate: $(printf '%s\n' "$FILES" | wc -l) changed code file(s), base $(git rev-parse --short "$BASE")"
+STATUS=0; structure_check || { STATUS=1; [ -z "$FILES" ] && structure_fail; }
 if [ -z "$FILES" ]; then
   # "I recognised nothing" is not "there is nothing", and the gate used to report
   # both as a PASS. A Godot repo changed only .gd files, which no extension in
@@ -182,10 +184,6 @@ if [ -z "$FILES" ]; then
   printf 'PASS %s no-code-changes\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
   exit 0
 fi
-
-echo "ship-gate: $(printf '%s\n' "$FILES" | wc -l) changed code file(s), base $(git rev-parse --short "$BASE")"
-echo
-STATUS=0
 
 # ------------------------------------------------- check 1: file length (hard)
 OVER=""

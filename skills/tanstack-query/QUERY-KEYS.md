@@ -66,7 +66,7 @@ invalidation.
 
 ```ts
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { api } from '~/api';
+import { api } from '../api/todos';
 
 export const todos = createQueryKeys('todos', {
   all: null,
@@ -100,9 +100,9 @@ performance.
 `mergeQueryKeys`.
 
 ```ts
-// src/queries/users.ts
+// src/features/users/queries/users.ts
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { api } from '~/api';
+import { api } from '../api/users';
 
 export const usersKeys = createQueryKeys('users', {
   all: null,
@@ -120,10 +120,10 @@ export const usersKeys = createQueryKeys('users', {
 ```
 
 ```ts
-// src/queries/todos.ts
+// src/features/todos/queries/todos.ts
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { api } from '~/api';
-import type { TodoFilters } from '~/types';
+import { api } from '../api/todos';
+import type { TodoFilters } from '../types/todo';
 
 export const todosKeys = createQueryKeys('todos', {
   list: (filters: TodoFilters) => ({
@@ -138,9 +138,9 @@ export const todosKeys = createQueryKeys('todos', {
 ```
 
 ```ts
-// src/queries/products.ts
+// src/features/products/queries/products.ts
 import { createQueryKeys } from '@lukemorales/query-key-factory';
-import { api } from '~/api';
+import { api } from '../api/products';
 
 export const productsKeys = createQueryKeys('products', {
   all: { queryKey: null, queryFn: () => api.getProducts() },
@@ -152,11 +152,12 @@ export const productsKeys = createQueryKeys('products', {
 ```
 
 ```ts
-// src/queries/index.ts
+// src/queries.ts — app level, the one file that reaches into every feature
 import { mergeQueryKeys } from '@lukemorales/query-key-factory';
-import { usersKeys } from './users';
-import { todosKeys } from './todos';
-import { productsKeys } from './products';
+// Not via the feature's index.ts: it re-exports components, which import this file.
+import { usersKeys } from '~/features/users/queries/users';
+import { todosKeys } from '~/features/todos/queries/todos';
+import { productsKeys } from '~/features/products/queries/products';
 
 export const queries = mergeQueryKeys(usersKeys, todosKeys, productsKeys);
 ```
@@ -173,7 +174,7 @@ useQuery(queries.products.all);
 ```
 
 Each domain file stays small (target under 150 lines). Removing a feature is
-one file deletion plus one line in `index.ts`. Autocomplete narrows per domain:
+one folder deletion plus one line in `src/queries.ts`. Autocomplete narrows per domain:
 `queries.users.` shows only user leaves.
 
 ## Invalidation Strategies
@@ -275,7 +276,7 @@ Pick `@lukemorales/query-key-factory` for hierarchical fuzzy invalidation (`_def
 1. **Prefer a typed key source** — either this factory or v5's built-in `queryOptions(...)` helper. Never inline ad-hoc `queryKey` arrays scattered across components.
 2. **Split factories by domain, one file each.** Target under 150 lines per domain.
 3. **Compose with `mergeQueryKeys`.** Never write a single god factory.
-4. **Export one `queries` root** from `queries/index.ts` and import it everywhere.
+4. **Export one `queries` root** from `src/queries.ts` and import it everywhere. Each domain factory lives in its feature's `queries/` folder.
 5. **Use `_def` for fuzzy invalidation**, full `.queryKey` with `exact: true` for surgical.
 6. **Co-locate `queryFn` with the key** inside the factory leaf — hooks become one-liners.
 7. **Use `contextQueries` for parent-owned sub-data**, sibling leaves for flat relationships.

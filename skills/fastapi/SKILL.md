@@ -22,18 +22,18 @@ Modern FastAPI application patterns: routing, async correctness, dependency inje
 
 ## Project Structure
 
-Organize by domain. Each domain owns its routes, schemas, models, and services.
+One folder per domain. Inside it, every module lives in the folder named for its kind.
 
 ```
-src/
-├── <domain>/      # one folder per domain (auth, posts, …)
-│   router.py  schemas.py  models.py  service.py  dependencies.py  exceptions.py
-├── config.py
-├── database.py
-└── main.py
+src/destinos/
+  routers/    admin.py  public.py     # one APIRouter per audience; main.py includes each
+  services/   destinos.py  seasons.py
+  schemas/    destino.py  season.py
+  models/     destino.py              # models/__init__.py imports each, so Alembic sees them
+  dependencies.py  exceptions.py  __init__.py
 ```
 
-Each domain exposes an `APIRouter(prefix="/posts", tags=["posts"])`; `main.py` mounts them with `app.include_router(posts_router)`.
+`BAD destinos/public_router.py` → `GOOD destinos/routers/public.py`: a kind is a folder, never a filename prefix. Code 2+ domains use goes in `src/shared/` with the same kind folders. Tests mirror the tree under `tests/destinos/routers/`, never inside `src/`. Give every test folder an `__init__.py` — pytest's default import mode fails on two `test_public.py` files otherwise.
 
 ## Package Management — uv
 
@@ -324,7 +324,7 @@ Use `ASGITransport` + `AsyncClient` for `async def` routes (the sync `TestClient
 
 ## Rules
 
-1. **Organize by domain** — each feature owns its router, schemas, models, service, exceptions. Manage dependencies with **uv**; commit `uv.lock`.
+1. **Organize by domain, then by kind** — `routers/ services/ schemas/ models/` inside each domain, tests mirrored under `tests/`. Manage dependencies with **uv**; commit `uv.lock`.
 2. **Never block the event loop** — `def` for sync I/O, `async def` only with `await`-able calls.
 3. **Wrap sync SDKs** with `anyio.to_thread.run_sync` — not `loop.run_in_executor`.
 4. **Use `lifespan`** for process-scoped resources — never the deprecated `@app.on_event`.

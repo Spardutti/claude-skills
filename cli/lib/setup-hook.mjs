@@ -27,6 +27,7 @@ const APPLICATION_GATE_FILENAME = "skill-application-gate.sh";
 const GAUNTLET_FILENAME = "gauntlet.sh";
 const SHIP_GATE_FILENAME = "ship-gate.sh";
 const SHIP_GATE_PROJECTS_FILENAME = "ship-gate-projects.sh";
+const SHIP_GATE_STRUCTURE_FILENAME = "ship-gate-structure.sh";
 const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
@@ -106,6 +107,7 @@ export async function setupHook(targetDir = process.cwd()) {
     GAUNTLET_FILENAME,
     SHIP_GATE_FILENAME,
     SHIP_GATE_PROJECTS_FILENAME,
+    SHIP_GATE_STRUCTURE_FILENAME,
     SHIP_GATE_HOOK_FILENAME,
     VERSION_CHECK_FILENAME,
   ]) {

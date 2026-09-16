@@ -281,23 +281,33 @@ function Dashboard() {
 
 ## Project Structure
 
+One folder per domain. Inside it, every file lives in the folder named for its kind. The only file at a feature's root is `index.ts`.
+
 ```
 src/
-  features/
-    auth/
-      components/
-      hooks/
-      types.ts
-      index.ts          # Public API only
-  shared/
-    components/
-    hooks/
-  app/
-    routes.tsx
-    providers.tsx
+  features/destinos/
+    components/   DestinoCard.tsx  DestinoCard.test.tsx
+    hooks/        useGlobe.ts  useGlobe.test.ts       # not query hooks
+    api/          destinos.ts  destinos.test.ts       # fetch + parse, no React
+    queries/      destinos.ts                         # queryOptions, useQuery, useMutation
+    schemas/      destino.ts                          # zod schemas + their z.infer types
+    types/        destino.ts                          # types with no schema
+    utils/        monthFromUrl.ts  monthFromUrl.test.ts
+    test/         fixtures.ts                         # fixtures shared by this feature's tests
+    index.ts                                          # public API only
+  shared/         same kind folders, for code 2+ features use
+  routes/ or pages/                                   # wherever the router wants them; thin
 ```
 
-Barrel exports at feature boundaries only. Colocate first; extract to `shared/` when 2+ features need it.
+```
+BAD  features/search/useDismiss.ts            hook at the feature root
+BAD  features/legal/components.test.ts        one test file for many components
+BAD  src/components/DestinoTable.tsx          domain component outside its feature
+GOOD features/search/hooks/useDismiss.ts
+GOOD features/legal/components/LegalPage.test.tsx
+```
+
+A test sits next to the file it tests and carries its name; a test of a whole flow goes in `src/test/`. Create a kind folder when its first file arrives, not before. Import another feature through its `index.ts` only. Colocate first; move to `shared/` when 2+ features need it.
 
 ## Rules
 
@@ -314,6 +324,7 @@ Barrel exports at feature boundaries only. Colocate first; extract to `shared/` 
 11. **Prefer** `children` / slot props over Context to avoid prop drilling.
 12. **Prefer** granular per-section error boundaries; never rely on data-fetching Effects.
 13. **Always** handle the loading / error / empty trio in data-driven components — see LOADING-STATES.md.
+14. **Always** put a feature file in its kind folder (`components/ hooks/ api/ queries/ schemas/ types/ utils/`); never at the feature root, never in a top-level `src/components/`.
 
 ## Reference Files
 
