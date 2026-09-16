@@ -10,6 +10,7 @@ the tests cannot accidentally pass.
 - [What It Catches That Review Does Not](#what-it-catches-that-review-does-not)
 - [Stryker — JS/TS](#stryker--jsts)
 - [The Sandbox Trap](#the-sandbox-trap)
+- [Vitest Browser Mode — Stryker Cannot Run](#vitest-browser-mode--stryker-cannot-run)
 - [mutmut — Python](#mutmut--python)
   - [Code That Runs At Import Never Sees A Mutant](#code-that-runs-at-import-never-sees-a-mutant)
 - [Reading the Output](#reading-the-output)
@@ -57,9 +58,9 @@ npm i -D @stryker-mutator/core @stryker-mutator/vitest-runner
 }
 ```
 
-`coverageAnalysis: "perTest"` is the line that makes this usable: Stryker maps
-which test covers which line and runs only those per mutant, instead of the whole
-suite every time.
+Stryker maps which test covers which line and runs only those per mutant, instead
+of the whole suite every time. The vitest runner **forces** `perTest` and ignores
+whatever `coverageAnalysis` says; the key matters only if the runner changes.
 
 Scope it to what changed with **one** comma-joined `--mutate`, repeating the
 file name on every range:
@@ -104,6 +105,32 @@ export default defineConfig({
 
 Add `.stryker-tmp/` to `.gitignore` too, or a crashed run leaves a full second
 copy of the project in `git status`.
+
+## Vitest Browser Mode — Stryker Cannot Run
+
+Stryker's vitest runner does not support browser mode. Check for
+`test.browser.enabled: true` before installing anything. When it is set, mutate
+by hand, one mutant per test run:
+
+1. Pick one operator on one changed line: `<`→`<=`, `&&`→`||`, `!x`→`x`,
+   `return x`→`return null`, delete an early `return`, delete an `emit`/`save`/`push`.
+2. Apply that single edit and run only the test files that cover it.
+3. Record **killed** (a test failed) or **survived** (all passed).
+4. Put the line back before the next mutant.
+
+```bash
+# BAD — also throws away the uncommitted change you are testing
+git checkout -- src/settings.ts
+
+# GOOD — undo the one edit you made, exactly as you made it
+```
+
+A mutant that does not parse is not a kill. Vitest does not typecheck, so a
+broken edit fails the file on load and reads as killed — mutate valid code only.
+
+Boundaries and removed side effects survive most. A settings test that asserted
+the stored preference passed with `newMode === 'dark'` negated, because nothing
+checked `document.documentElement.classList` — the thing browser mode exists to see.
 
 ## mutmut — Python
 
@@ -372,7 +399,8 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always run mutation scoped to the changed lines, never the whole repo.
 - Always pass one comma-joined `--mutate`; a repeated flag overrides, it does not append.
 - Always repeat the file name on every range inside that value.
-- Always set `coverageAnalysis: "perTest"` — without it every mutant runs the whole suite.
+- Always check for Vitest browser mode first — Stryker cannot run it; mutate by hand, one edit per run, restoring before the next.
+- Never count a mutant that fails to parse as killed.
 - Always spread `configDefaults.exclude` when adding `.stryker-tmp`, and gitignore it.
 - Always install the tool the way the project manages dependencies (uv, poetry, npm workspace).
 - Always match `[Survived]` for Stryker findings — the summary header contains the word `survived` on a clean run.
