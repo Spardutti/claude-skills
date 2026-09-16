@@ -2,7 +2,7 @@
 
 import { confirm } from "@inquirer/prompts";
 import chalk from "chalk";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
@@ -10,6 +10,7 @@ import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../
 import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
 import { makeLocalSource } from "../lib/local.mjs";
 import { runPostInstall } from "../lib/post-install.mjs";
+import { setupHook } from "../lib/setup-hook.mjs";
 import {
   readManifest, writeManifest, computeOrphans, computeRemovals, scanInstalled, removeArtifacts,
   MANIFEST_FILE,
@@ -20,7 +21,7 @@ const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-
 const CWD = process.cwd();
 
 // `--sync`: re-install everything the manifest records (refreshed to the latest
-// catalog) and prune anything removed upstream — no interactive menu.
+// catalog), refresh hooks the project already has, and prune anything removed upstream.
 async function runSync(manifest, catalog) {
   if (!manifest) {
     console.log(`  ${chalk.yellow("Nothing to sync")} — no manifest in this project. Run without --sync first.\n`);
@@ -38,6 +39,7 @@ async function runSync(manifest, catalog) {
   if (skills.length > 0) { console.log(); await installSkills(skills); }
   if (commands.length > 0) { console.log(); await installCommands(commands); }
   const { installed } = await installRequiredAgents(commands, catalog.agents, CWD);
+  if (existsSync(join(CWD, ".claude", "hooks", "skill-gate.sh"))) { console.log(); await setupHook(CWD); }
 
   await writeManifest(CWD, {
     catalogVersion: pkg.version,

@@ -81,16 +81,27 @@ have_file "the named command is installed"  "$CP/.claude/commands/ship.md"
 # has to bring it, or /ship launches an agent that is not there.
 have_file "the agents it requires arrive"   "$CP/.claude/agents/gauntlet-skills.md"
 
-# --sync does NOT install or refresh the hooks — only the interactive path calls
-# setupHook. Asserted so the boundary is deliberate rather than assumed: a
-# session that "just syncs" after a hook fix keeps the old hooks, and the fix
-# reaches it on the next full run instead.
+# A project that declined the hooks must not get them from a sync.
 N=$((N+1))
 if [ -e "$CP/.claude/hooks/ship-gate.sh" ]; then
-  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "--sync leaves the hooks alone"
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "--sync installs no hooks where there were none"
 else
-  PASS=$((PASS+1)); printf '  ok   %s\n' "--sync leaves the hooks alone"
+  PASS=$((PASS+1)); printf '  ok   %s\n' "--sync installs no hooks where there were none"
 fi
+
+# A sync that kept old hooks shipped the skill-gate ack fix to nobody who synced.
+mkdir -p "$CP/.claude/hooks"
+printf '#!/bin/sh\n# old\n' > "$CP/.claude/hooks/skill-gate.sh"
+printf '#!/bin/sh\n# old\n' > "$CP/.claude/hooks/skill-gate-automark.sh"
+cli_run "$CP" --sync >/dev/null
+N=$((N+1))
+if cmp -s "$CP/.claude/hooks/skill-gate-automark.sh" "$REPO/scripts/skill-gate-automark.sh" \
+   && cmp -s "$CP/.claude/hooks/skill-gate.sh" "$REPO/scripts/skill-gate.sh"; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "--sync refreshes hooks that are already installed"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "--sync refreshes hooks that are already installed"
+fi
+rm -rf "$CP/.claude/hooks"
 
 N=$((N+1))
 if grep -q '"catalogVersion"' "$CP/.claude/.claude-skills.json" \
