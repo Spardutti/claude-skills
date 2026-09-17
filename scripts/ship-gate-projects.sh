@@ -36,12 +36,16 @@ owner_of() {
 # Blaming an unreachable database for that sent one agent chasing Docker for 20 minutes.
 mutmut_unchecked() {  # mutmut_unchecked <label> <base> <count> <run log>
   echo "  $1 mutmut — UNPROVEN: $3 mutant(s) were never run."
-  stop='Failed to run clean test|failed to collect stats|Failed to collect list of tests|Stopping early'
+  # "Failed to run pytest with args" is one line carrying every selected test id — 20KB of
+  # them on one repo — so the line is cut. Unlisted, the gate blamed a database instead.
+  stop='Failed to run clean test|failed to collect stats|Failed to collect list of tests|Stopping early|Failed to run pytest with args|BadTestExecutionCommandsException'
   if grep -aqsE "$stop" "$4"; then
     echo "      mutmut stopped before testing a single mutant:"
-    grep -aE "^(FAILED|ERROR) |^[A-Za-z]*Error: |$stop" "$4" | tail -8 | sed 's/^/        /'
+    grep -aE "^(FAILED|ERROR) |^[A-Za-z]*Error: |$stop" "$4" | tail -8 | cut -c1-200 | sed 's/^/        /'
     echo "      It runs the whole suite, then these tests again in one process, so a"
     echo "      test that passes alone can fail here on state an earlier test left."
+    echo "      mutmut hides pytest's own error: set debug = true under [tool.mutmut]"
+    echo "      and run it again to read it."
     return
   fi
   echo "      They are recorded \"not checked\", so the suite proved nothing"

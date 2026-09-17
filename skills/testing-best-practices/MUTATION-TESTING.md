@@ -13,6 +13,7 @@ the tests cannot accidentally pass.
 - [Keep Page Tests Out Of The Run](#keep-page-tests-out-of-the-run)
 - [Vitest Browser Mode — Stryker Cannot Run](#vitest-browser-mode--stryker-cannot-run)
 - [mutmut — Python](#mutmut--python)
+  - [A Parametrize Id With An Accent Aborts The Whole Run](#a-parametrize-id-with-an-accent-aborts-the-whole-run)
   - [Code That Runs At Import Never Sees A Mutant](#code-that-runs-at-import-never-sees-a-mutant)
 - [Reading the Output](#reading-the-output)
 - [Silencing Noise Without Going Blind](#silencing-noise-without-going-blind)
@@ -245,6 +246,24 @@ It is also installed into the project environment, not onto `PATH`. Reach it the
 way the project does — `uv run mutmut`, `poetry run mutmut`, or
 `./.venv/bin/mutmut` — or a script calling bare `mutmut` finds nothing.
 
+### A Parametrize Id With An Accent Aborts The Whole Run
+
+mutmut records the test ids covering each function and hands them back to pytest.
+pytest escapes a non-ASCII id, so the one it gets back matches nothing:
+
+```python
+# BAD — pytest writes this id as `la m\xe1s pedida`; mutmut's rerun answers
+# "ERROR: not found", exit code 4, and the run dies before one mutant is tested
+ids=["renamed", "price moved", "la más pedida"]
+
+# GOOD
+ids=["renamed", "price moved", "la mas pedida"]
+```
+
+One accent in one id left 786 mutants "not checked" on a real API, which reads
+exactly like a database the run could not reach. It only bites a scoped run —
+the ids are collected per function — so mutating the whole repo hides it.
+
 ### Code That Runs At Import Never Sees A Mutant
 
 mutmut imports the project once to collect stats, then forks one child per mutant
@@ -457,6 +476,7 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always match `[Survived]` for Stryker findings — the summary header contains the word `survived` on a clean run.
 - Always read mutmut's verdict from `mutmut results`; `mutmut run` exits 0 either way and prints no word to grep.
 - Never baseline a survivor in import-time code as equivalent — call the function from a test, or mark it `# pragma: no mutate block, <reason>`.
+- Never put a non-ASCII character in a `parametrize` id — mutmut hands the escaped id back to pytest, which finds nothing, and the run dies with every mutant "not checked".
 - Always invoke mutmut through the project's environment (`uv run`, `poetry run`, `./.venv/bin/`) — it is not on PATH.
 - Always use `source_paths` / `pytest_add_cli_args_test_selection` for mutmut 3; `paths_to_mutate` and `tests_dir` are silently ignored.
 - Always ignore a mutant by where it sits (Ignore plugin, disable comment), never by disabling a whole mutator globally.

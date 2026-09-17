@@ -16,6 +16,7 @@ scoped_repo() {
 echo "$*" >> ../../mutmut.args
 [ "$1" = run ] && [ -f ../../nomatch ] && { echo "AssertionError: Filtered for specific mutants, but nothing matches"; exit 1; }
 [ "$1" = run ] && [ -f ../../cleanfail ] && { printf 'FAILED tests/test_log.py::test_logs\nAssertionError: assert [] == [1]\nFailed to run clean test\n'; exit 1; }
+[ "$1" = run ] && [ -f ../../pytestfail ] && { printf 'mutmut.__main__.BadTestExecutionCommandsException: Failed to run pytest with args: %s\n' "$(head -c 900 /dev/zero | tr '\0' 'a')"; exit 1; }
 [ "$1" = results ] && cat ../../survivors
 exit 0
 M
@@ -83,6 +84,17 @@ printf '    app.slugs.x_slugify__mutmut_1: not checked\n' > survivors
 sg "mutmut stopping early shows the test that stopped it" "FAILED tests/test_log.py::test_logs" 2
 lacks "and does not blame a database" "a database, a queue" "Failed to run clean test"
 rm -f cleanfail
+
+# mutmut's pytest command failing is not in its four "stopped" messages, so the gate
+# printed the database advice instead — and 786 unrun mutants read as a missing service.
+touch pytestfail
+sg "a failed pytest command is shown, not guessed at" "Failed to run pytest with args" 2
+sg "and the way to read pytest's own error is named" "debug = true under [tool.mutmut]" 2
+N=$((N+1))
+longest=$(bash "$SG" 2>&1 | awk '{ print length }' | sort -rn | head -1)
+if [ "$longest" -le 210 ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "and its list of every test id is cut, not dumped"
+else FAIL=$((FAIL+1)); printf '  FAIL a line of %s characters reached the output\n' "$longest"; fi
+rm -f pytestfail
 : > survivors
 
 # Rebuilding the whole baseline re-mutated an entire API to accept eleven names.
