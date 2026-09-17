@@ -25,8 +25,8 @@
 # Exit codes:
 #   0  clean — nothing over the line limit, nothing survived, nothing uncovered
 #   1  findings that must be dealt with before shipping
-#   2  ran, but could not prove the tests (a mutation tool is missing) — report,
-#      don't block; the output names exactly what to install and where
+#   2  ran, but could not prove the tests (a mutation tool is missing, or page tests
+#      count as proof) — report, don't block; the output names the fix and where
 #
 # Config: the same .claude/gauntlet.conf as the Stop hook.
 #   GAUNTLET_MAX_LINES=200   the per-file limit; 0 turns the check off
@@ -271,7 +271,7 @@ for owner in $OWNERS; do
     # 8 of them on one commit, all long since killed. --mutate already scopes
     # the run to the changed hunks, so incremental buys nothing here and costs
     # a cache that goes stale exactly the way mutmut's did.
-    CMD="${RUN}npx --no-install stryker run --mutate '${FLAGS#,}'"
+    CMD="${RUN}npx --no-install stryker run --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
   elif [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix ${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner

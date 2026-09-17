@@ -105,3 +105,17 @@ project_key() {  # project_key <owner> <tool>
       case "$(family_of "$f")" in "$fam"|any) printf '%s\n' "$f"; [ -f "$f" ] && cat "$f" ;; esac
     done; } | git hash-object --stdin
 }
+
+# A page test renders a whole screen, so it "kills" mutants in every util that screen calls.
+# Backoffice ran 23 minutes that way, and hid 104 mutants no logic test checked.
+stryker_page_tests() {  # stryker_page_tests <base> <label>
+  grep -qs configFile "$1"stryker.conf* && return 0
+  pages=$(git ls-files -co --exclude-standard -- "${1:-.}" | grep -E '\.test\.[jt]sx$' \
+          | grep -vE '/(hooks|queries)/|(^|/)\.stryker-tmp/' | head -3)
+  [ -n "$pages" ] || return 0
+  echo "  $2 stryker — UNPROVEN: page tests count as proof for logic, e.g."
+  printf '%s\n' "$pages" | sed 's/^/        /'
+  echo "      Give Stryker a Vitest config that runs logic tests only — see"
+  echo "      testing-best-practices/MUTATION-TESTING.md, \"Keep Page Tests Out Of The Run\"."
+  [ "$STATUS" = 0 ] && STATUS=2
+}

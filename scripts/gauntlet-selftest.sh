@@ -60,6 +60,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 # Adding a case means editing the file that owns the subject, not this one.
 . "$HERE/selftest-gauntlet-hook.sh"      # the Stop hook: skips, detection, runners
 . "$HERE/selftest-ship-gate-stryker.sh"  # the JS half of the ship gate
+. "$HERE/selftest-ship-gate-page-tests.sh"  # page tests passed off as proof for logic
 . "$HERE/selftest-ship-gate-mutmut.sh"   # the Python half, and the git receipt
 . "$HERE/selftest-ship-gate-mutmut-scope.sh"  # the Python half scoped to changed modules
 . "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed

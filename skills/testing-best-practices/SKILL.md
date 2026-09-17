@@ -235,6 +235,21 @@ def test_add_item(cart):
 - Never rely on test execution order
 - Reset singletons and caches in `beforeEach`/`setUp`
 
+### A wait that swallows its timeout is a sleep
+
+```ts
+// BAD — a page with no heading waits the full 3s, then carries on as if it loaded.
+// One helper did this in every page test: 41 tests, 80% of the suite's time.
+await screen.findByRole("heading", undefined, { timeout: 3000 }).catch(() => undefined);
+
+// GOOD — wait for what means ready, and let a timeout fail the test.
+// status starts "idle" before the first load, so resolvedLocation is checked too.
+await waitFor(() => {
+  expect(router.state.status).toBe("idle");
+  expect(router.state.resolvedLocation).toBeDefined();
+});
+```
+
 ## Mocking — Only at the Boundary
 
 **Mock:** external HTTP APIs, file/network I/O, time, non-deterministic values.
@@ -304,10 +319,11 @@ test.each([
 14. **Assert the side effect** — the audit row, the stored file, the sent message, not only the response
 15. **Test both sides of every limit** — exactly at it, and one past it
 16. **Parametrize a mirrored domain's tests** — never copy a test folder; its gaps come with it
+17. **Never swallow a wait's timeout** — a caught timeout is a silent sleep that every test, and every mutant, pays
 
 ## Reference Files
 
-- **MUTATION-TESTING.md** — read when setting up or reading mutation testing. Covers what it catches that review cannot (an assertion importing the constant it asserts on), Stryker setup with `coverageAnalysis: "perTest"` and diff-scoped `--mutate` ranges, the `.stryker-tmp` sandbox that silently doubles the test count, mutmut 3's renamed config keys and mutant-name globs, why grepping for the word `survived` false-positives on Stryker's own summary header, the Ignore plugin for class-name noise, and working score thresholds.
+- **MUTATION-TESTING.md** — read when setting up or reading mutation testing. Covers what it catches that review cannot (an assertion importing the constant it asserts on), Stryker setup with `coverageAnalysis: "perTest"` and diff-scoped `--mutate` ranges, the `.stryker-tmp` sandbox that silently doubles the test count, keeping page tests out of the Stryker run, mutmut 3's renamed config keys and mutant-name globs, why grepping for the word `survived` false-positives on Stryker's own summary header, the Ignore plugin for class-name noise, and working score thresholds.
 
 ## Anti-Rationalizations
 

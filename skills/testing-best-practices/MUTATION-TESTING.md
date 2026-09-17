@@ -10,6 +10,7 @@ the tests cannot accidentally pass.
 - [What It Catches That Review Does Not](#what-it-catches-that-review-does-not)
 - [Stryker — JS/TS](#stryker--jsts)
 - [The Sandbox Trap](#the-sandbox-trap)
+- [Keep Page Tests Out Of The Run](#keep-page-tests-out-of-the-run)
 - [Vitest Browser Mode — Stryker Cannot Run](#vitest-browser-mode--stryker-cannot-run)
 - [mutmut — Python](#mutmut--python)
   - [Code That Runs At Import Never Sees A Mutant](#code-that-runs-at-import-never-sees-a-mutant)
@@ -105,6 +106,56 @@ export default defineConfig({
 
 Add `.stryker-tmp/` to `.gitignore` too, or a crashed run leaves a full second
 copy of the project in `git status`.
+
+## Keep Page Tests Out Of The Run
+
+A test that renders a page calls every util the page uses, so Stryker counts it as
+covering them. Every mutant in those utils reruns slow render tests, and a util no
+logic test checks reads as killed. On one back office: 23 minutes and 0 findings
+with every test, 2 minutes and 104 findings with logic tests only.
+
+```ts
+// Survived once page tests were out — only a page test had checked the type
+if (!PHOTO_TYPES.includes(file.type)) return wrongType(file);
+```
+
+Give Stryker its own Vitest config that runs logic tests only:
+
+```ts
+// vitest.stryker.config.ts
+import { defineConfig } from "vitest/config";
+import base from "./vitest.config"; // or ./vite.config, wherever `test` lives
+
+export default defineConfig(async (env) => {
+  const resolved = typeof base === "function" ? await base(env) : base;
+  return {
+    ...resolved,
+    test: {
+      ...resolved.test,
+      include: ["src/**/*.test.ts", "src/**/{hooks,queries}/**/*.test.tsx"],
+    },
+  };
+});
+```
+
+```json
+{ "vitest": { "configFile": "vitest.stryker.config.ts" } }
+```
+
+```ts
+// BAD — mergeConfig appends arrays, so a base that sets `include` keeps it and
+// every page test is still collected; a base exported as a function cannot merge
+export default mergeConfig(base, defineConfig({ test: { include: ["src/**/*.test.ts"] } }));
+```
+
+A hook test is logic even in `.tsx`. Keep it in `hooks/` or `queries/`, where the
+include finds it; a `renderHook` test in `lib/` drops out and its hook reads
+`NoCoverage`. Page tests still run in the normal suite — they prove wiring once,
+not once per mutant. The ship gate reports UNPROVEN for a Stryker project with
+`.test.tsx` files outside those folders and no `vitest.configFile`.
+
+The first run after the split lists the logic only page tests were covering. That
+is the debt the split exposed: write the logic test, never put the page back.
 
 ## Vitest Browser Mode — Stryker Cannot Run
 
@@ -415,6 +466,8 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Always re-run the gate after adding a disable comment; one that missed looks exactly like one that worked.
 - Never write a threshold test (`expect(TERMS.length).toBeGreaterThan(10)`) to kill a mutant — that is a test written for the gate, not for the code.
 - Always prefer mutating logic modules over presentation; component mutants are class names, copy and JSX shape, and none of it is behaviour.
+- Always give Stryker a Vitest config that runs logic tests only; page tests make every mutant slow and pass off untested logic as killed.
+- Always keep a hook test in `hooks/` or `queries/`, even as `.tsx`, so that config still runs it.
 - Always add `@stryker-mutator/api` as a direct dependency on pnpm, or the Ignore plugin silently does not load.
 - Never mutate test files — that only asks whether the tests test the tests.
 - Never treat a surviving mutant as a fact about the code; it is a fact about the tests.
