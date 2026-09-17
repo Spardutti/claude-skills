@@ -307,7 +307,7 @@ GOOD features/search/hooks/useDismiss.ts
 GOOD features/legal/components/LegalPage.test.tsx
 ```
 
-A test sits next to the file it tests and carries its name; a test of a whole flow goes in `src/test/`. Create a kind folder when its first file arrives, not before. Import another feature through its `index.ts` only. Colocate first; move to `shared/` when 2+ features need it.
+A test sits next to the file it tests and carries its name; in a project that already keeps tests in `__tests__/`, follow it. A test of a whole flow goes in `src/test/`. Create a kind folder when its first file arrives, not before. Import another feature through its `index.ts` only. Colocate first; move to `shared/` when 2+ features need it.
 
 ## Rules
 

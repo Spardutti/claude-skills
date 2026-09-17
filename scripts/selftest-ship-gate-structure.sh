@@ -122,3 +122,15 @@ rm src/features/legal/ProbeLoose.astro
 mkdir -p src/test
 echo "export const x = 1" > src/test/flow.test.ts
 structure "a well-placed test alone passes" ok 0
+
+# Shadowhawk keeps every test in __tests__/, one folder below the file it tests.
+# Judging only the test's own folder failed each new test there and taught --force.
+echo "ship-gate structure: __tests__ folders"
+structrepo sg_struct_dunder package.json '{}'
+git add -A; git commit -qm manifest; git branch develop
+mkdir -p src/features/map/utils/__tests__ src/features/map/stores/__tests__
+echo "export const x = 1" > src/features/map/utils/place-types.ts
+echo "export const x = 1" > src/features/map/utils/__tests__/place-types.test.ts
+echo "export const x = 1" > src/features/map/stores/__tests__/gone-store.test.ts
+structure "a __tests__ test is judged against the folder above it" \
+"  src/features/map/stores/__tests__/gone-store.test.ts — a test sits beside the file it tests, and nothing here is named gone-store" 1

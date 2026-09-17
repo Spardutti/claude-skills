@@ -12,8 +12,9 @@ added_files() {
     git ls-files --others --exclude-standard 2>/dev/null; } | sort -u
 }
 
-has_subject() {  # has_subject <test path>: a file the test is named for, in the same folder
+has_subject() {  # has_subject <test path>: a file the test is named for, beside it or above its __tests__/
   d=$(dirname "$1")
+  [ "${d##*/}" = __tests__ ] && d=$(dirname "$d")
   stem=$(basename "$1" | sed -E 's/\.(test|spec)\.[^.]+$//')
   while :; do
     for e in ts tsx js jsx mjs cjs astro; do [ -f "$d/$stem.$e" ] && return 0; done
