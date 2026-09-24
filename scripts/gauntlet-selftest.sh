@@ -65,6 +65,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-mutmut-scope.sh"  # the Python half scoped to changed modules
 . "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed
 . "$HERE/selftest-ship-gate-structure.sh"  # where a new file may live
+. "$HERE/selftest-ship-gate-fail-fast.sh"  # no mutation run after a cheap check fails
 . "$HERE/selftest-skill-gate.sh"         # deny messages, exemptions, auto mode
 . "$HERE/selftest-mandatory-skills.sh"   # which skills are not optional
 . "$HERE/selftest-skill-ack.sh"          # the ack command, before any denial

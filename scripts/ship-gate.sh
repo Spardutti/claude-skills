@@ -207,7 +207,7 @@ elif [ -n "$OVER" ]; then
 else
   echo "FILE LENGTH — ok, largest is $LARGEST lines"
 fi
-
+[ "$STATUS" = 1 ] && { echo; echo "MUTATION — skipped: the fix changes the files, so it would run again"; structure_fail; }
 # ---------------------------------------------------------- which project owns
 # A monorepo holds several projects, each with its own runner and its own
 # mutation tool. Walk up from each changed file to the nearest manifest.
