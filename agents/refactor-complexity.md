@@ -18,7 +18,7 @@ Same extension set and excludes as other refactor agents:
 **/*.ts **/*.tsx **/*.js **/*.jsx **/*.py **/*.go **/*.rs
 **/*.java **/*.rb **/*.php **/*.vue **/*.svelte
 ```
-Exclude: `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files, tests.
+Exclude: `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `.claude`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files, tests.
 
 If a single file path was passed, scan only that file.
 

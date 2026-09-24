@@ -16,7 +16,7 @@ Scan these extensions:
 **/*.rb  **/*.php  **/*.vue **/*.svelte
 ```
 
-Exclude: `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files, test files (unless the user explicitly includes them).
+Exclude: `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `.claude`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files, test files (unless the user explicitly includes them).
 
 If the caller passed a single file path as the task input, check only that file.
 

@@ -17,7 +17,7 @@ Extensions + excludes:
 **/*.ts **/*.tsx **/*.js **/*.jsx **/*.py **/*.go **/*.rs
 **/*.java **/*.rb **/*.php **/*.vue **/*.svelte
 ```
-Skip `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files, tests.
+Skip `node_modules`, `dist`, `build`, `.next`, `__pycache__`, `vendor`, `target`, `.git`, `.claude`, `*.d.ts`, `*.min.*`, `*.gen.*`, lock files, tests.
 
 ## Procedure
 
