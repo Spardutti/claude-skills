@@ -136,8 +136,8 @@ changes: fixing API tests does not re-run Stryker on the JS apps.
 Python cannot be scoped to lines: mutmut has no per-line scoping, so the gate mutates
 every function in each changed module, and a changed module's old survivors come back
 with it. A `.mutmut-baseline` file holds the ones already accepted, and only a name
-outside it fails. The first run covers the whole repo, writes that file and exits 2 —
-commit it and run the gate again. After that, `--baseline` rewrites only the changed
+outside it fails. A module's first run records its survivors there and exits 2 —
+commit the file and run the gate again. After that, `--baseline` rewrites only the changed
 modules' entries, reuses the last run's results when nothing changed since, and writes
 the receipt itself — do not run the gate again after it. **Never run `--baseline` to
 make a finding go away.** It accepts a survivor as permanent debt, so it is for a mutant
@@ -177,7 +177,9 @@ met a skill. The ship scope is where that is caught, or nowhere.
 
 1. List the installed skills: `ls .claude/skills/*/SKILL.md`. If there are none, say so
    and skip to Result.
-2. For each skill, decide whether the ship scope contains a file it applies to. A skill's
+2. Drop every path under `.claude/` from the scope first. That is this tooling, installed
+   into the repo, not the project's code, and no skill audits it.
+   For each skill, decide whether the ship scope contains a file it applies to. A skill's
    `metadata.gate-paths` names its globs when it has them; otherwise use its
    `description`. A skill with no file in scope is not run — say which you skipped and
    why, in one line.

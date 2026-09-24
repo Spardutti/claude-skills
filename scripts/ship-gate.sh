@@ -256,9 +256,9 @@ for owner in $OWNERS; do
 
   base=""; RUN=""; SCOPE_RE=""; GLOBS=""; MODS=""; MLOG="${TMPDIR:-/tmp}/ship-gate-mutmut.$$"
   if [ "$owner" != "." ]; then base="$owner/"; RUN="cd '$owner' && "; fi
-  if [ -n "$GAUNTLET_MUTATE" ]; then
-    CMD="$GAUNTLET_MUTATE"; TOOL="config"
-  elif [ -f "$base"package.json ] && grep -qs '@stryker-mutator/core' "$base"package.json; then
+  PY=$(printf '%s\n' "$OWNED" | grep '\.py$' || true)  # a husky-only package.json must not claim a Python diff
+  if [ -n "$GAUNTLET_MUTATE" ]; then CMD="$GAUNTLET_MUTATE"; TOOL="config"
+  elif [ -z "$PY" ] && grep -qs '@stryker-mutator/core' "$base"package.json; then
     TOOL="stryker"
     # From inside the owning package: npx resolves against ITS node_modules, and
     # stryker.config.json lives there too. A monorepo root usually has neither.
@@ -272,7 +272,7 @@ for owner in $OWNERS; do
     # the run to the changed hunks, so incremental buys nothing here and costs
     # a cache that goes stale exactly the way mutmut's did.
     CMD="${RUN}npx --no-install stryker run --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
-  elif [ -f "$base"package.json ]; then
+  elif [ -z "$PY" ] && [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix ${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner
       then ${base}stryker.config.json:
@@ -281,15 +281,14 @@ for owner in $OWNERS; do
     continue
   elif [ -n "$(py_mutmut "$base")" ]; then
     TOOL="mutmut"
-    # 3.x has no per-line scoping, only fnmatch globs over mutant NAMES, so once a
-    # baseline exists every run, --baseline included, is scoped to the changed modules.
+    # 3.x scopes only by fnmatch globs over mutant NAMES, so every run is scoped to the changed modules.
     #
     # `mutmut run` prints 🙁 for a survivor and exits 0 either way — parsing it
     # reports clean with survivors sitting there, which is a false green and
     # worse than reporting nothing. `mutmut results` is the readable source:
     # it prints "<mutant name>: survived" per survivor.
     M="$(py_mutmut "$base")"
-    [ -f "$base.mutmut-baseline" ] && MODS=$(printf '%s\n' "$OWNED" \
+    MODS=$(printf '%s\n' "$OWNED" \
       | sed -n "s#^$base\(.*\)\.py\$#\1#p" | tr / . | sed 's#^src\.##' | sort -u)
     [ -n "$MODS" ] && GLOBS=$(printf " '%s.x*'" $MODS) \
       && SCOPE_RE=$(printf '%s\n' "$MODS" | sed 's/\./\\./g' | paste -sd'|' -)
@@ -322,7 +321,7 @@ for owner in $OWNERS; do
     continue
   fi
   [ "$TOOL" = mutmut ] && [ "$MODE" = baseline ] && [ -f "$PKEY.out" ] && CMD="cp '$PKEY.log' '$MLOG' 2>/dev/null; cat '$PKEY.out'"
-  OUT=$(eval "$CMD" 2>&1); RC=$?
+  T0=$SECONDS; OUT=$(export FILES="$(printf '%s' "$OWNED" | tr '\n' ' ')" MUTATE_FLAGS="--mutate ${FLAGS#,}"; eval "$CMD" 2>&1); RC=$?; T=$((SECONDS - T0))
   [ "$TOOL" = mutmut ] && [ $RC -eq 0 ] && { printf '%s\n' "$OUT" > "$PKEY.out"; cp "$MLOG" "$PKEY.log" 2>/dev/null; }
   [ -n "$SCOPE_RE" ] && [ $RC -eq 0 ] && OUT=$(printf '%s\n' "$OUT" | grep -E "^[[:space:]]*($SCOPE_RE)\.x")
   # Match a finding, never a summary row. Stryker prints a `# survived` COLUMN
@@ -397,8 +396,9 @@ for owner in $OWNERS; do
       continue
     fi
 
+    [ "$MODE" != baseline ] && baseline_first "$BL" "$NOWF" "$MODS" "$label" && [ "$STATUS" = 0 ] && STATUS=2
     if [ "$MODE" = baseline ]; then
-      baseline_write "$BL" "$NOWF" "$SCOPE_RE"
+      baseline_write "$BL" "$NOWF" "$SCOPE_RE" "$MODS"
       NOTE="  $label mutmut — baseline set: $(wc -l < "$BL") survivor(s) accepted. Commit $BL."
       SURVIVED=""
     elif [ -f "$BL" ]; then
@@ -418,7 +418,7 @@ for owner in $OWNERS; do
   fi
 
   if [ -n "$SURVIVED" ]; then
-    echo "  $label $TOOL — these lines can break and no test notices:"
+    echo "  $label $TOOL (${T}s) — these lines can break and no test notices:"
     survivor_list "$SURVIVED" "$TOOL"
     if [ "$FOUND" -gt 20 ]; then
       echo "      ... $((FOUND - 20)) more not shown. Every file with findings:"
@@ -432,13 +432,13 @@ for owner in $OWNERS; do
     [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
     STATUS=1
   elif [ $RC -ne 0 ]; then
-    echo "  $label $TOOL — the run failed:"
+    echo "  $label $TOOL (${T}s) — the run failed:"
     printf '%s\n' "$OUT" | tail -12 | sed 's/^/      /'
     [ "$STATUS" = 0 ] && STATUS=2
   elif [ -n "$NOTE" ]; then
     printf '%s\n' "$NOTE"
   else
-    echo "  $label $TOOL — ok, nothing survived and nothing was uncovered"
+    echo "  $label $TOOL (${T}s) — ok, nothing survived and nothing was uncovered"
     [ -n "$PKEY" ] && touch "$PKEY"
     [ "$FIXED" -gt 0 ] && echo "      ($FIXED baselined survivor(s) now killed — --baseline banks them)"
   fi
@@ -459,12 +459,12 @@ fi
 # a choice that can be argued for, but it cannot be passed off as this one.
 echo
 case $STATUS in
-  0) echo "ship-gate: PASS"
+  0) echo "ship-gate: PASS in ${SECONDS}s"
      printf 'PASS %s\n' "$(date -u +%FT%TZ)" > "$RECEIPT" ;;
-  1) echo "ship-gate: FAIL — deal with the findings above, then run this again."
+  1) echo "ship-gate: FAIL in ${SECONDS}s — deal with the findings above, then run this again."
      echo "           To ship anyway: bash .claude/hooks/ship-gate.sh --force"
      rm -f "$RECEIPT" ;;
-  2) echo "ship-gate: UNPROVEN — nothing is wrong, but nothing was proven either"
+  2) echo "ship-gate: UNPROVEN in ${SECONDS}s — nothing is wrong, but nothing was proven either"
      printf 'UNPROVEN %s\n' "$(date -u +%FT%TZ)" > "$RECEIPT" ;;
 esac
 exit $STATUS

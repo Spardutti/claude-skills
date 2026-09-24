@@ -96,7 +96,7 @@ structure_check() {
 
 # Called when nothing else in the diff is gated, so the gate would otherwise pass it.
 structure_fail() {
-  echo "ship-gate: FAIL — deal with the findings above, then run this again."
+  echo "ship-gate: FAIL in ${SECONDS}s — deal with the findings above, then run this again."
   echo "           To ship anyway: bash .claude/hooks/ship-gate.sh --force"
   rm -f "$RECEIPT"
   exit 1

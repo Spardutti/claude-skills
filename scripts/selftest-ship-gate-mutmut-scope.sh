@@ -112,7 +112,7 @@ if [ "$got" = "$want" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "a scoped -
 else FAIL=$((FAIL+1)); printf '  FAIL %s\n       want: %s\n       got:  %s\n' "a scoped --baseline keeps other modules and replaces the changed ones" "$want" "$got"; fi
 : > survivors
 rm -f apps/api/.mutmut-baseline
-run_args "with no baseline the whole repo is recorded" "run"
+run_args "with no baseline the first run is scoped too" "run app.orders.__init__.x* app.slugs.x*"
 
 # mutmut strips a leading src. from module names.
 scoped_repo sg_scope_src
@@ -151,3 +151,15 @@ case "$out" in *"no mutant in the changed module(s)"*) ok=1 ;; *) ok=0 ;; esac
 [ -f mutmut.args ] && ok=0
 if [ $ok = 1 ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "a replayed run that matched nothing is still UNPROVEN"
 else FAIL=$((FAIL+1)); printf '  FAIL %s\n%s\n' "a replayed run that matched nothing is still UNPROVEN" "$out"; fi
+
+# A Django repo keeps a package.json at its root only for husky. That made the
+# whole backend a JS project, so it was sent to Stryker and never mutated.
+newrepo sg_py_husky
+mkdir -p .venv/bin api
+printf '{"devDependencies":{"husky":"^9"}}\n' > package.json
+printf '[project]\nname="api"\n[tool.mutmut]\nsource_paths=["api/"]\n' > pyproject.toml
+printf '#!/bin/sh\n[ "$1" = results ] && echo "api.views.x_list__mutmut_1: survived"\nexit 0\n' > .venv/bin/mutmut
+chmod +x .venv/bin/mutmut
+echo "x=1" > api/views.py
+: > .mutmut-baseline
+sg "a Python diff under a husky-only package.json runs mutmut" "api.views.x_list__mutmut_1" 1

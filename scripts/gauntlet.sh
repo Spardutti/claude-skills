@@ -28,6 +28,7 @@
 #   GAUNTLET_CODE_EXT="ts|tsx|py"  override which extensions count as code
 #   GAUNTLET_DEBUG=1               print the outcome to stderr on every run
 #   GAUNTLET_REQUIRE_TESTS=1       block when a runner matched 0 test files
+#   GAUNTLET_SLOW=30               warn the user when a run takes this many seconds
 #
 # Setting either command switches the whole repo to explicit mode — auto-detection
 # is off, and only what you set runs.
@@ -64,8 +65,9 @@ WHY="$MARKER.why"
 
 # Records why this run ended, so "green" and "never ran" stop looking identical.
 quit() {
-  printf '%s\n' "$1" > "$WHY" 2>/dev/null
+  printf '%s (%ss)\n' "$1" "$SECONDS" > "$WHY" 2>/dev/null
   if [ -n "${GAUNTLET_DEBUG:-}" ]; then printf 'gauntlet: %s\n' "$1" >&2; fi
+  [ "$SECONDS" -ge "${GAUNTLET_SLOW:-30}" ] && printf '{"systemMessage":"gauntlet took %ss, target %ss: %s"}\n' "$SECONDS" "${GAUNTLET_SLOW:-30}" "$1"
   exit 0
 }
 
@@ -119,13 +121,8 @@ SKIP_NOTE=""
 
 add_gate() {  # kind (typecheck|tests), file regex, command
   LINE=$(printf '%s\t%s\t%s' "$1" "$2" "$3")
-  if [ "$1" = "typecheck" ]; then
-    TC_GATES="$TC_GATES$LINE
-"
-  else
-    TEST_GATES="$TEST_GATES$LINE
-"
-  fi
+  if [ "$1" = "typecheck" ]; then TC_GATES="$TC_GATES$LINE"$'\n'
+  else TEST_GATES="$TEST_GATES$LINE"$'\n'; fi
 }
 
 JS_EXT='(ts|tsx|js|jsx|mjs|cjs)'
@@ -318,7 +315,7 @@ $FILES
 --- $FAILED output (last 60 lines) ---
 $TAIL"
 
-printf '%s\n' "red: the $FAILED gate failed" > "$WHY" 2>/dev/null
+printf '%s\n' "red: the $FAILED gate failed (${SECONDS}s)" > "$WHY" 2>/dev/null
 
 # Exit 2 is the only path where a red is visible to the user: its stderr is shown
 # to them as the reason the turn is continuing. Exit 0 with {"decision":"continue"}

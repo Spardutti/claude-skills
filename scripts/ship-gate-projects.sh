@@ -83,10 +83,28 @@ receipt_key() {
 
 # A scoped --baseline replaces only the changed modules' names. Rebuilding the whole
 # file re-mutated an entire API to accept eleven of them.
-baseline_write() {  # baseline_write <baseline file> <survivors file> <scope regex, or empty>
+baseline_write() {  # baseline_write <baseline file> <survivors file> <scope regex, or empty> [modules]
   if [ -z "$3" ]; then cp "$2" "$1"; return; fi
-  grep -vE "^($3)\.x" "$1" | cat - "$2" | sort -u > "$1.new"
+  { grep -vE "^($3)\.x" "$1"; cat "$2"; baseline_marked "$1" && printf '# module %s\n' $4; } | sort -u > "$1.new"
   mv "$1.new" "$1"
+}
+
+# A baseline names each module it has run as "# module <name>", so a first run tests only the diff.
+# One with no such line predates them and came from a whole-repo run, so it covers every module.
+baseline_marked() { [ ! -f "$1" ] || grep -q '^# module ' "$1"; }
+baseline_uncovered() {  # baseline_uncovered <baseline> <modules>: the ones it has never run
+  for m in $2; do baseline_marked "$1" && ! grep -qsx "# module $m" "$1" && echo "$m"; done
+}
+
+# A module's survivors on its first run predate this gate, so they are recorded, not charged.
+baseline_first() {  # baseline_first <baseline> <survivors file> <modules> <label>; false when none are new
+  new=$(baseline_uncovered "$1" "$3"); [ -n "$new" ] || return 1
+  re=$(printf '%s\n' $new | sed 's/\./\\./g' | paste -sd'|' -)
+  n=$(grep -cE "^($re)\.x" "$2")
+  { cat "$1" 2>/dev/null; grep -E "^($re)\.x" "$2"; printf '# module %s\n' $new; } | sort -u > "$1.new"
+  mv "$1.new" "$1"
+  echo "  $4 mutmut — first run for $(echo $new): $n existing survivor(s) recorded in $1."
+  echo "      Commit it. From here only NEW survivors in these modules fail."
 }
 
 family_of() {  # js, py, or any when no manifest says
