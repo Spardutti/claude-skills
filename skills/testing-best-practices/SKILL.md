@@ -235,6 +235,16 @@ def test_add_item(cart):
 - Never rely on test execution order
 - Reset singletons and caches in `beforeEach`/`setUp`
 
+### Unique test data, or parallel tests queue
+
+A rolled-back test holds every row it wrote or deleted until it ends. A fixed value in a unique column, or a `DELETE FROM` a whole table at test start, makes every parallel worker (mutmut, xdist) wait for the one before it. One API's mutation run went 2.1× faster from unique values alone; xdist can instead give each worker its own database.
+```python
+# BAD — every test inserts the same email; workers queue on the unique index
+return await make_user(session, "test@example.com")
+# GOOD — a value no other running test can hold
+return await make_user(session, f"test-{uuid4()}@example.com")
+```
+
 ### A wait that swallows its timeout is a sleep
 
 ```ts
@@ -309,7 +319,7 @@ test.each([
 4. **Descriptive names** — `test_[what]_[scenario]_[expected]`
 5. **Factories for test data** — minimal defaults, override only what matters
 6. **Mock at the boundary** — external services and I/O only
-7. **Isolate every test** — no shared mutable state, transaction rollback
+7. **Isolate every test** — no shared mutable state, transaction rollback, a fresh value in every unique column
 8. **Follow the pyramid** — ~70% unit, ~20% integration, ~10% E2E
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
