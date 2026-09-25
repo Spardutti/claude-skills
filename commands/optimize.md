@@ -50,6 +50,7 @@ printf '%s\t%ss\t%s items\t%s\t%s\n' "$ROUND" "$T" "$N" "$H" "$(cat "$P")" | tee
 - **An empty invariant is refused,** with exit 4 and nothing logged.
 - **`rounds.log` is the record.** One line per run: round, seconds, item count, invariant hash, prediction. The report copies it; nothing is written from memory.
 
+- **Check it is worth it first.** Time the real job once, as it runs for real. If it takes under a minute, the target saves seconds per run: say so and stop, unless the user asks to go on. One run spent an hour taking an 11-second job to 10.
 - **Keep it short: 2–5 minutes a run.** Every round costs one run, so a 15-minute benchmark makes a four-round session an hour of waiting. When the whole job is longer, benchmark a fixed slice of it that shows the same slowness — a handful of modules, one test directory.
 - **Fix the input.** A benchmark over "whatever changed" measures a different job each round.
 - **Clear what the real job would not have.** A leftover cache (`mutants/`, `.pytest_cache`, a warm build) turns a run into a replay that tests nothing.
@@ -66,7 +67,7 @@ A faster run with a different invariant is not faster — it does less. Revert i
 
 ## Step 3 — Where the time goes
 
-Two views, gathered together while baseline run 2 is going:
+Two views. The suspect agents only read files, so send them while baseline run 2 goes. The profile runs the job itself, so it waits until the baselines are done: profiling beside a baseline slowed that run by 10% and hid the real noise.
 
 1. **Suspects (parallel, read-only).** Spawn the `optimize-suspect` agent **four times in one message**, one lens each: `contention`, `parallelism`, `repeated setup`, `scope`. Give each the job, the benchmark command and the baseline numbers. Merge their JSON, most likely first. Drop any suspect without a file and line, and any change that tests less.
 2. **A profile.** Suspects are guesses; a profile is a measurement. Sample once during a short run of the job: CPU per process (`docker stats --no-stream`, `top`), what the database waits on (`pg_stat_activity` in Postgres), and a plain run of the suite under the language's profiler (`python -m cProfile -s tottime -m pytest`, `node --cpu-prof`).
@@ -79,7 +80,7 @@ Never run two rounds, or a round beside anything else heavy: parallel benchmarks
 
 For each round:
 
-1. **Predict — before anything runs.** Write one line to `$OUT/<round>.prediction`: a range the benchmark can prove wrong, and why: "10–25% faster: the DELETE queue goes, the fixed admin email becomes the next one."
+1. **Predict — before anything runs.** Write one line to `$OUT/<round>.prediction`: a range the benchmark can prove wrong, and why: "10–25% faster: the DELETE queue goes, the fixed admin email becomes the next one." The low end must clear the noise from Step 1. A range that starts at 0% is also right if the change does nothing, so it proves nothing.
 2. **Change one thing.** Two changes in one round cannot be told apart.
 3. **Run the benchmark:** `bash $OUT/bench.sh <round>`. Without the prediction file it will not start.
 4. **Judge.** Keep the change only if the time beats the baseline by more than the noise from Step 1 **and** the invariant is identical.
@@ -126,6 +127,8 @@ If the cause is a **pattern**, not a one-off, write it as one rule the way a ski
 - NEVER change two things in one round.
 - NEVER run a benchmark beside another benchmark or a full test run.
 - NEVER write or change a prediction after its run, or chmod its file back to writable.
+- NEVER write a prediction whose range includes no change.
+- NEVER profile beside a benchmark run.
 - NEVER read into or change another project.
 - ALWAYS run a round through `bench.sh <round>`, never the job by hand.
 - ALWAYS profile after a wrong prediction, before the next round.
