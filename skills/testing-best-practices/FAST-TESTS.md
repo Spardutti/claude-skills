@@ -92,6 +92,21 @@ const passwordHash = await bcrypt.hash(TEST_PASSWORD, 4);
 
 Prefer the form that covers every hash the tests make (the bcrypt patch, Django's setting) over one that covers only the fixture: a test that registers a user through the API hashes too.
 
+Set it where every test runner reads it, not inside one runner:
+
+```python
+# BAD — only `manage.py test` runs this; pytest and mutmut keep the slow hasher
+class ProjectTestRunner(DiscoverRunner):
+    def setup_test_environment(self, **kwargs):
+        settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+# GOOD — api/conftest.py, loaded by pytest and by mutmut through pytest
+def pytest_configure():
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+```
+
+On one API this took a mutation run from 870s to 186s. Keep the runner line too if `manage.py test` is still used.
+
 ## Stop Cloud Clients Probing The Network
 
 A cloud SDK with no credentials goes looking for them. boto3 asks the EC2 metadata server at `169.254.169.254`, which only answers on AWS, so on a laptop or a CI runner it waits out two 1-second timeouts. An app that builds its client at import pays that every time a process loads it — once per test run, and once more for every process mutation testing starts.
