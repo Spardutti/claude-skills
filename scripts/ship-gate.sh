@@ -167,7 +167,7 @@ if [ -z "$FILES" ]; then
   # the list named, so zero source files were found and a PASS receipt was
   # written over work nothing had checked. An extension this gate cannot place is
   # UNPROVEN: it does not block, but it never claims a pass either.
-  UNKNOWN=$(printf '%s\n' "$CHANGED" | grep -E '\.[A-Za-z0-9]+$' \
+  UNKNOWN=$(printf '%s\n' "$CHANGED" | while IFS= read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done | grep -E '\.[A-Za-z0-9]+$' \
             | grep -viE "\.($GAUNTLET_SOURCE_EXT)$" \
             | grep -viE "\.($GAUNTLET_IGNORE_EXT)$" \
             | sed 's/.*\.//' | sort -u | tr '\n' ' ')

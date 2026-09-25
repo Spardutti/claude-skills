@@ -65,10 +65,11 @@ survivor_list() {  # survivor_list <survivors> <tool>
   echo "      not equivalent — see testing-best-practices/MUTATION-TESTING.md."
 }
 
+# .claude/ is this tooling, installed: gating it made a diff that only removed its hooks UNPROVEN.
 changed_files() {
   { git diff "$BASE"...HEAD --name-only 2>/dev/null
     git diff HEAD --name-only 2>/dev/null
-    git ls-files --others --exclude-standard 2>/dev/null; } | sort -u
+    git ls-files --others --exclude-standard 2>/dev/null; } | sort -u | grep -vE '(^|/)\.claude/'
 }
 
 # Ignored extensions are left out; see the comment where ship-gate.sh first calls this.
