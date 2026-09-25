@@ -61,6 +61,8 @@ if [ "$TOOL" != "Bash" ]; then
     # matters: a skill claiming **/* gated it, and nothing could re-open it.
     .claude/settings.json|.claude/settings.local.json) exit 0 ;;
     */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
+    # /optimize's benchmark lives outside the repo so no round can edit it; it is not project code.
+    /tmp/claude-optimize-*) exit 0 ;;
     *.*) printf '%s' "$TARGET" | grep -qiE ".($PROSE_EXT)$" && exit 0 ;;
   esac
   TARGETS="$TARGET"

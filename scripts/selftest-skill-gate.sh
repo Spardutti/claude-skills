@@ -91,6 +91,8 @@ esc "and settings.local.json too" allow skill-application-gate.sh \
   '"tool_name":"Edit","tool_input":{"file_path":"/home/u/.claude/settings.local.json"}'
 esc "and a heredoc writing the settings file" allow skill-application-gate.sh \
   '"tool_name":"Bash","tool_input":{"command":"cat > /home/u/.claude/settings.json <<EOF"}'
+esc "application gate lets an /optimize benchmark through" allow skill-application-gate.sh \
+  '"tool_name":"Write","tool_input":{"file_path":"/tmp/claude-optimize-api/bench.sh"}'
 esc "application gate still stops a source edit" deny skill-application-gate.sh \
   '"tool_name":"Edit","tool_input":{"file_path":"/home/u/src/a.ts"}'
 rm -f "/tmp/claude-skill-gate-$SSID" "/tmp/claude-skill-loaded-$SSID-demo"
@@ -191,5 +193,7 @@ gatef() {  # gatef <label> <deny|allow> <file_path>
 gatef "writing a plan document is not gated" allow "PLAN_notas.md"
 gatef "writing a source file is gated" deny "src/lib/expenses.ts"
 gatef "config files stay gated" deny "tsconfig.json"
+gatef "an /optimize benchmark script is not gated" allow "/tmp/claude-optimize-api/bench.sh"
+gatef "other scratch code in /tmp stays gated" deny "/tmp/scratch/bench.sh"
 gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
 gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"

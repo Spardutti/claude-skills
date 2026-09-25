@@ -43,6 +43,8 @@ if [ "$TOOL" != "Bash" ]; then
     # The settings file that configures the escape hatch cannot sit behind the
     # gate, or a denied ack has no way to be un-denied.
     */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
+    # /optimize's benchmark lives outside the repo so no round can edit it; it is not project code.
+    /tmp/claude-optimize-*) exit 0 ;;
     *.*) printf '%s' "$TARGET" | grep -qiE ".($PROSE_EXT)$" && exit 0 ;;
   esac
 fi
