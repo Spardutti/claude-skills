@@ -14,15 +14,15 @@ ROOT="${1:-$HOME/projects}"
 G="$(cd "$(dirname "$0")" && pwd)/gauntlet.sh"
 i=0
 
-printf '%-26s %s\n' "PROJECT" "WOULD RUN"
-printf '%-26s %s\n' "--------------------------" "---------"
+printf '%-40s %s\n' "PROJECT" "WOULD RUN"
+printf '%-40s %s\n' "----------------------------------------" "---------"
 
-for d in "$ROOT"/*/; do
-  p="${d%/}"
-  [ -d "$p/.git" ] || continue
+# Two levels: repos grouped into folders (personal/, work/) were skipped, and a survey of nothing passed.
+for g in $(find "$ROOT" -mindepth 2 -maxdepth 3 -name .git -type d -not -path '*/node_modules/*' 2>/dev/null | sort); do
+  p=$(dirname "$g")
   i=$((i+1))
   out=$(cd "$p" && CLAUDE_PROJECT_DIR="$p" GAUNTLET_DEBUG=1 GAUNTLET_DRYRUN=1 \
         bash "$G" <<< "{\"session_id\":\"survey-$$-$i\"}" 2>&1 >/dev/null | head -1)
   out=${out#gauntlet: }
-  printf '%-26s %s\n' "$(basename "$p")" "${out#would run: }"
+  printf '%-40s %s\n' "${p#"$ROOT"/}" "${out#would run: }"
 done

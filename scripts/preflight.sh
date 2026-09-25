@@ -78,7 +78,8 @@ if [ -d "$HOME/projects" ]; then
   NONE=$(printf '%s\n' "$OUT" | grep -c 'nothing')
   printf '  %s repo(s) surveyed, %s with no gates\n' "$TOTAL" "$NONE"
   printf '%s\n' "$OUT" | grep 'nothing' | sed 's/^/    /'
-  ok "survey ran — read the rows above and confirm each is genuinely empty"
+  if [ "$TOTAL" -gt 0 ]; then ok "survey ran — read the rows above and confirm each is genuinely empty"
+  else bad "the survey found no repositories under ~/projects, so it checked nothing"; fi
 else
   printf '  skipped — no ~/projects to survey\n'
 fi

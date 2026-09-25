@@ -69,6 +69,8 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-fail-fast.sh"  # no mutation run after a cheap check fails
 . "$HERE/selftest-timing.sh"             # how long the Stop hook and the ship gate took
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
+. "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
+. "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders
 . "$HERE/selftest-skill-gate.sh"         # deny messages, exemptions, auto mode
 . "$HERE/selftest-mandatory-skills.sh"   # which skills are not optional
 . "$HERE/selftest-skill-ack.sh"          # the ack command, before any denial

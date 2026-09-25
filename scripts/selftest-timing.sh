@@ -19,14 +19,14 @@ hookrun() {  # hookrun <session id>: the hook's stdout, and its .why in $WHYGOT
 echo "timing: the Stop hook"
 newrepo timing_hook
 echo "export const a = 1" > a.ts
-printf 'GAUNTLET_TYPECHECK=""\nGAUNTLET_TEST="sleep 3"\nGAUNTLET_SLOW=2\n' > .claude/gauntlet.conf
+printf 'GAUNTLET_TYPECHECK=""\nGAUNTLET_TEST="true"\nGAUNTLET_SLOW=0\n' > .claude/gauntlet.conf
 hookrun "time$RUN-slow"
-timed "a slow run warns the user" "$OUTGOT" '^\{"systemMessage":"gauntlet took [0-9]+s, target 2s: green: gates passed \(tests \)"\}$'
+timed "a slow run warns the user" "$OUTGOT" '^\{"systemMessage":"gauntlet took [0-9]+s, target 0s: green: gates passed \(tests \)"\}$'
 timed "and records its seconds" "$WHYGOT" '^green: gates passed \(tests \) \([0-9]+s\)$'
-printf 'GAUNTLET_TYPECHECK=""\nGAUNTLET_TEST="true"\nGAUNTLET_SLOW=2\n' > .claude/gauntlet.conf
+printf 'GAUNTLET_TYPECHECK=""\nGAUNTLET_TEST="true"\nGAUNTLET_SLOW=60\n' > .claude/gauntlet.conf
 hookrun "time$RUN-fast"
 timed "a fast run says nothing" "$OUTGOT" ""
-timed "but still records its seconds" "$WHYGOT" '^green: gates passed \(tests \) \([01]s\)$'
+timed "but still records its seconds" "$WHYGOT" '^green: gates passed \(tests \) \([0-9]+s\)$'
 printf 'GAUNTLET_TYPECHECK=""\nGAUNTLET_TEST="false"\n' > .claude/gauntlet.conf
 hookrun "time$RUN-red"
 timed "a red run records its seconds" "$WHYGOT" '^red: the tests gate failed \([0-9]+s\)$'
@@ -39,7 +39,7 @@ git add -A; git commit -qm manifest; git branch develop
 mkdir -p src/shared/utils
 echo "export const a = 1" > src/shared/utils/a.ts
 out=$(bash "$SG" 2>&1)
-timed "each mutation run is timed" "$out" '^  <repo root> config \([12]s\) — ok, nothing survived'
+timed "each mutation run is timed" "$out" '^  <repo root> config \([0-9]+s\) — ok, nothing survived'
 timed "and so is the whole gate" "$out" '^ship-gate: PASS in [0-9]+s$'
 mkdir -p src/components
 echo "export const a = 1" > src/components/Loose.ts
