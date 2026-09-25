@@ -134,3 +134,15 @@ echo "export const x = 1" > src/features/map/utils/__tests__/place-types.test.ts
 echo "export const x = 1" > src/features/map/stores/__tests__/gone-store.test.ts
 structure "a __tests__ test is judged against the folder above it" \
 "  src/features/map/stores/__tests__/gone-store.test.ts — a test sits beside the file it tests, and nothing here is named gone-store" 1
+
+# Stimulus loads *_controller.js from any depth under controllers/. Shadowweather's
+# controllers/components/chart_controller.js failed the gate twice for sitting there.
+echo "ship-gate structure: Stimulus controllers"
+structrepo sg_struct_stimulus package.json '{}'
+git add -A; git commit -qm manifest; git branch develop
+mkdir -p app/javascript/controllers/components app/javascript/lib
+echo "export default class {}" > app/javascript/controllers/components/chart_controller.js
+structure "a Stimulus controller nested under controllers/ is in its kind folder" ok 0
+echo "export default class {}" > app/javascript/lib/chart_controller.js
+structure "a *_controller.js outside controllers/ is still named" \
+"  app/javascript/lib/chart_controller.js — the kind is in the filename; it belongs in a kind folder" 1

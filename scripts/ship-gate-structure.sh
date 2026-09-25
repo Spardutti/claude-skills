@@ -46,8 +46,10 @@ js_misplaced() {  # js_misplaced <path> <owner>
     echo "sorted by kind first; it belongs in <domain>/<kind>/ or shared/<kind>/"
   elif printf '%s' "$b" | grep -qE '^use[A-Z].*\.[jt]sx?$' && ! printf '%s' "/$f" | grep -qE '/(hooks|queries)/'; then
     echo "a hook belongs in hooks/ or queries/"
+  # Stimulus loads *_controller.js from any depth under controllers/, so controllers/components/ is its kind folder.
   elif printf '%s' "$b" | grep -qE "$STRUCTURE_KIND_FILE" \
-       && ! printf '%s' "$parent" | grep -qxE 'routes|controllers|services|schemas|models|api|queries|types'; then
+       && ! printf '%s' "$parent" | grep -qxE 'routes|controllers|services|schemas|models|api|queries|types' \
+       && ! printf '%s' "/$f" | grep -qE '/controllers/(.+/)?[^/]+_controller\.[jt]s$'; then
     echo "the kind is in the filename; it belongs in a kind folder"
   fi
 }
