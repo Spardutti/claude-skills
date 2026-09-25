@@ -14,7 +14,7 @@ description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arr
 | Working on… | Read |
 |---|---|
 | Proving the tests would catch a break — Stryker, mutmut, surviving mutants, mutation score | MUTATION-TESTING.md |
-| A database fixture, or a suite that is slow or flaky under parallel workers — unique values, table resets, password hashing | DATABASE-TESTS.md |
+| A slow suite, a database fixture, or tests that are slow or flaky under parallel workers — unique values, table resets, password hashing, cloud clients | FAST-TESTS.md |
 
 ## Testing Pyramid
 
@@ -238,7 +238,7 @@ def test_add_item(cart):
 
 ### Fixtures that make parallel tests queue or crawl
 
-A fixed value in a unique column, a `DELETE FROM` of a whole table, or a production-strength password hash in a fixture slows every test once workers run side by side. Read DATABASE-TESTS.md before writing or changing a database fixture.
+A fixed value in a unique column, a `DELETE FROM` of a whole table, or a production-strength password hash in a fixture slows every test once workers run side by side. Read FAST-TESTS.md before writing or changing a database fixture or a `conftest.py`.
 
 ### A wait that swallows its timeout is a sleep
 
@@ -314,7 +314,7 @@ test.each([
 4. **Descriptive names** — `test_[what]_[scenario]_[expected]`
 5. **Factories for test data** — minimal defaults, override only what matters
 6. **Mock at the boundary** — external services and I/O only
-7. **Isolate every test** — no shared mutable state, transaction rollback, a fresh value in every unique column, cheap test password hashes (DATABASE-TESTS.md)
+7. **Isolate every test** — no shared mutable state, transaction rollback, a fresh value in every unique column, cheap test password hashes (FAST-TESTS.md)
 8. **Follow the pyramid** — ~70% unit, ~20% integration, ~10% E2E
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
@@ -330,7 +330,7 @@ test.each([
 
 - **MUTATION-TESTING.md** — read when setting up or reading mutation testing. Covers what it catches that review cannot (an assertion importing the constant it asserts on), Stryker setup with `coverageAnalysis: "perTest"` and diff-scoped `--mutate` ranges, the `.stryker-tmp` sandbox that silently doubles the test count, keeping page tests out of the Stryker run, mutmut 3's renamed config keys and mutant-name globs, why grepping for the word `survived` false-positives on Stryker's own summary header, the Ignore plugin for class-name noise, and working score thresholds.
 
-- **DATABASE-TESTS.md** — read when writing a database fixture or when parallel tests (mutmut, xdist) run slow. Covers why a rolled-back test still holds its locks, fresh values in unique columns, giving the suite an empty database instead of deleting or truncating tables, hashing test passwords with the cheapest settings, and measuring waits and CPU before changing anything.
+- **FAST-TESTS.md** — read when a suite is slow, when writing a database fixture or `conftest.py`, or when parallel tests (mutmut, xdist) run slow. Covers why a rolled-back test still holds its locks, fresh values in unique columns, giving the suite an empty database instead of deleting or truncating tables, hashing test passwords with the cheapest settings, stopping cloud SDKs probing for credentials, and measuring waits and CPU before changing anything.
 
 ## Anti-Rationalizations
 

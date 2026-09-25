@@ -1,6 +1,6 @@
-# Database Tests That Stay Fast In Parallel
+# Tests That Stay Fast
 
-Tests against a real database, each in a transaction rolled back at the end, are the right default. They get slow in two ways that only show once workers run side by side — mutmut's children, xdist's `-n`, Vitest threads: they **queue on each other's locks**, or they **pay a production cost on every test**. Both hide in fixtures, so every test inherits them.
+A slow suite is rarely slow tests. It is setup every test inherits: fixtures that **queue on each other's locks** once workers run side by side — mutmut's children, xdist's `-n`, Vitest threads — or that **pay a production cost on every test**, like a full-strength password hash or a cloud client waiting on the network. Mutation testing multiplies whatever each test pays by every mutant.
 
 ## Contents
 
@@ -8,6 +8,7 @@ Tests against a real database, each in a transaction rolled back at the end, are
 - [Unique Values In Unique Columns](#unique-values-in-unique-columns)
 - [Never Delete Or Truncate A Whole Table At Test Start](#never-delete-or-truncate-a-whole-table-at-test-start)
 - [Hash Test Passwords With The Cheapest Settings](#hash-test-passwords-with-the-cheapest-settings)
+- [Stop Cloud Clients Probing The Network](#stop-cloud-clients-probing-the-network)
 - [Measure Before Fixing](#measure-before-fixing)
 - [Rules](#rules)
 
@@ -91,6 +92,21 @@ const passwordHash = await bcrypt.hash(TEST_PASSWORD, 4);
 
 Prefer the form that covers every hash the tests make (the bcrypt patch, Django's setting) over one that covers only the fixture: a test that registers a user through the API hashes too.
 
+## Stop Cloud Clients Probing The Network
+
+A cloud SDK with no credentials goes looking for them. boto3 asks the EC2 metadata server at `169.254.169.254`, which only answers on AWS, so on a laptop or a CI runner it waits out two 1-second timeouts. An app that builds its client at import pays that every time a process loads it — once per test run, and once more for every process mutation testing starts.
+
+```python
+# BAD — a region but no credentials: boto3 probes the metadata server at import
+os.environ.setdefault("AWS_REGION", "us-east-1")
+
+# GOOD — the probe is off; fake keys cover what the client needs to build
+os.environ.setdefault("AWS_REGION", "us-east-1")
+os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
+```
+
+Set these in `conftest.py` before the app is imported. On one API it took importing the app from 2.28s to 0.55s and the suite from 2.87s to 0.83s.
+
 ## Measure Before Fixing
 
 A queue and a hot CPU look alike from outside — the suite is just slow. Look before changing anything:
@@ -113,5 +129,6 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 - Always insert a fresh value into every unique column in a fixture.
 - Never `DELETE FROM` or `TRUNCATE` a whole table to reset a test; give the suite an empty database.
 - Always hash test passwords with the algorithm's cheapest settings, in test setup only.
+- Always switch off cloud SDK credential probes in test setup.
 - Always measure — wait events, CPU, a profile — before changing a test fixture for speed.
 - Never make tests faster by running fewer of them or asserting less.
