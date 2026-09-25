@@ -14,6 +14,7 @@ description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arr
 | Working on… | Read |
 |---|---|
 | Proving the tests would catch a break — Stryker, mutmut, surviving mutants, mutation score | MUTATION-TESTING.md |
+| A database fixture, or a suite that is slow or flaky under parallel workers — unique values, table resets, password hashing | DATABASE-TESTS.md |
 
 ## Testing Pyramid
 
@@ -95,7 +96,7 @@ for slug in ("alaska", "baltico", "caribe", "egeo", "fiordos"):
 assert await suggested_slugs(client) == ["alaska", "baltico", "caribe", "egeo", "fiordos"]
 ```
 
-Delete the tiebreak once and watch the test fail. If it still passes, run `EXPLAIN`: a `GroupAggregate` keyed on the tiebreak itself sorts the ties for free, so no data can catch it. Report that; never keep a test that cannot fail.
+Delete the tiebreak once and watch the test fail. If it still passes, run `EXPLAIN`: a `GroupAggregate` keyed on the tiebreak itself sorts the ties for free, so no data can catch it. Report that; never keep a test that cannot fail. Delete it five times, not once: a test that catches the missing tiebreak only on most query plans is flaky under parallel mutation runs.
 
 ### The side effect, not just the response
 
@@ -235,15 +236,9 @@ def test_add_item(cart):
 - Never rely on test execution order
 - Reset singletons and caches in `beforeEach`/`setUp`
 
-### Unique test data, or parallel tests queue
+### Fixtures that make parallel tests queue or crawl
 
-A rolled-back test holds every row it wrote or deleted until it ends. A fixed value in a unique column, or a `DELETE FROM` a whole table at test start, makes every parallel worker (mutmut, xdist) wait for the one before it. One API's mutation run went 2.1× faster from unique values alone; xdist can instead give each worker its own database.
-```python
-# BAD — every test inserts the same email; workers queue on the unique index
-return await make_user(session, "test@example.com")
-# GOOD — a value no other running test can hold
-return await make_user(session, f"test-{uuid4()}@example.com")
-```
+A fixed value in a unique column, a `DELETE FROM` of a whole table, or a production-strength password hash in a fixture slows every test once workers run side by side. Read DATABASE-TESTS.md before writing or changing a database fixture.
 
 ### A wait that swallows its timeout is a sleep
 
@@ -319,7 +314,7 @@ test.each([
 4. **Descriptive names** — `test_[what]_[scenario]_[expected]`
 5. **Factories for test data** — minimal defaults, override only what matters
 6. **Mock at the boundary** — external services and I/O only
-7. **Isolate every test** — no shared mutable state, transaction rollback, a fresh value in every unique column
+7. **Isolate every test** — no shared mutable state, transaction rollback, a fresh value in every unique column, cheap test password hashes (DATABASE-TESTS.md)
 8. **Follow the pyramid** — ~70% unit, ~20% integration, ~10% E2E
 9. **Parameterize repetitive cases** — `parametrize`/`test.each` with descriptive IDs
 10. **Fix or delete flaky tests** — a flaky test is worse than no test
@@ -334,6 +329,8 @@ test.each([
 ## Reference Files
 
 - **MUTATION-TESTING.md** — read when setting up or reading mutation testing. Covers what it catches that review cannot (an assertion importing the constant it asserts on), Stryker setup with `coverageAnalysis: "perTest"` and diff-scoped `--mutate` ranges, the `.stryker-tmp` sandbox that silently doubles the test count, keeping page tests out of the Stryker run, mutmut 3's renamed config keys and mutant-name globs, why grepping for the word `survived` false-positives on Stryker's own summary header, the Ignore plugin for class-name noise, and working score thresholds.
+
+- **DATABASE-TESTS.md** — read when writing a database fixture or when parallel tests (mutmut, xdist) run slow. Covers why a rolled-back test still holds its locks, fresh values in unique columns, giving the suite an empty database instead of deleting or truncating tables, hashing test passwords with the cheapest settings, and measuring waits and CPU before changing anything.
 
 ## Anti-Rationalizations
 
