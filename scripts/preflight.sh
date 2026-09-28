@@ -21,8 +21,9 @@ step() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 ok()   { printf '  ok   %s\n' "$1"; }
 bad()  { printf '  FAIL %s\n' "$1"; FAILED=1; }
 
-step "1. Skill references and length caps"
+step "1. Skill references and length caps, and names the code never defines"
 if node scripts/validate-skills.mjs; then ok "validator"; else bad "validator"; fi
+if npm run --silent lint; then ok "no undefined names"; else bad "undefined names"; fi
 
 step "2. The 200-line rule, applied to this repo"
 # The skills teach consumers never to write a file over 200 lines, and CLAUDE.md

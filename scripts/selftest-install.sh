@@ -171,5 +171,23 @@ case "$needs" in
   *"<repo root>"*) PASS=$((PASS+1)); printf '  ok   %s\n' "the real root is still reported" ;;
   *)               FAIL=$((FAIL+1)); printf '  FAIL %s\n       got %s\n' "the real root is still reported" "$needs" ;;
 esac
+
+# Splitting the lib left pythonAdvice behind in local.mjs, so every Python
+# project without [tool.mutmut] ended the install on "pythonAdvice is not defined".
+echo "tool needs, a Python project without mutmut"
+newrepo toolneeds_py
+mkdir -p app
+printf '[project]\nname="api"\n[tool.uv]\n' > pyproject.toml
+node -e "
+  import('$HERE/../cli/lib/tool-needs.mjs').then(async (local) => {
+    const needs = await local.reportToolNeeds('$PWD');
+    console.log(needs.map((n) => n.install + ' | ' + n.config).join(' '));
+  });
+" > "$TMP/needs.out" 2>&1
+N=$((N+1))
+case "$(cat "$TMP/needs.out")" in
+  *'uv add --dev mutmut | pyproject.toml  [tool.mutmut] source_paths=["app/"]'*) PASS=$((PASS+1)); printf '  ok   %s\n' "mutmut is advised with the project's own installer and source" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL %s\n       got %s\n' "mutmut is advised with the project's own installer and source" "$(cat "$TMP/needs.out")" ;;
+esac
 # The installer itself, and the Stryker scaffolding it runs — the CLI, not the
 # gauntlet hook this file is named for.

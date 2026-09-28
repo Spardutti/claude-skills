@@ -32,7 +32,31 @@ async function gitIgnoredDirs(projectDir) {
   }
 }
 
+// mutmut's config has to name the real source and test directories, and the
+// install command has to match how the project actually manages dependencies —
+// `pip install` into a uv project puts it somewhere the container rebuild loses.
+async function pythonAdvice(dir, rel, entries) {
+  const has = (n) => entries.some((e) => e.name === n);
+  const pyproject = has("pyproject.toml") ? await readFile(join(dir, "pyproject.toml"), "utf-8") : "";
 
+  let install = "pip install mutmut";
+  if (has("uv.lock") || /^\[tool\.uv\]/m.test(pyproject)) install = "uv add --dev mutmut";
+  else if (has("poetry.lock")) install = "poetry add --group dev mutmut";
+
+  // Source: the package directory, not a guess. Skip the ones that are never it.
+  const ignore = ["tests", "test", "alembic", "migrations", "db", "e2e", "__pycache__", ".venv", "venv", "scripts"];
+  const dirs = entries.filter((e) => e.isDirectory() && !e.name.startsWith(".") && !ignore.includes(e.name));
+  const source = (dirs.find((d) => d.name === "src") || dirs.find((d) => d.name === "app") || dirs[0])?.name || "src";
+
+  // Tests: pytest already knows where they are.
+  const testpaths = pyproject.match(/testpaths\s*=\s*\[([^\]]*)\]/);
+  const tests = testpaths ? testpaths[1].replace(/["'\s]/g, "").split(",")[0] : "tests";
+
+  return {
+    install,
+    config: `${rel ? rel + "/" : ""}pyproject.toml  [tool.mutmut] source_paths=["${source}/"] pytest_add_cli_args_test_selection=["${tests}/"]`,
+  };
+}
 
 // What the installed commands need that this project does not have yet.
 // ship-gate.sh's own detection drives a single-package repo; a monorepo whose
