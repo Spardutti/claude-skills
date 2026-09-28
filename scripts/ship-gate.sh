@@ -271,7 +271,7 @@ for owner in $OWNERS; do
     # 8 of them on one commit, all long since killed. --mutate already scopes
     # the run to the changed hunks, so incremental buys nothing here and costs
     # a cache that goes stale exactly the way mutmut's did.
-    CMD="${RUN}npx --no-install stryker run --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
+    CMD="${RUN}npx --no-install stryker run --concurrency $(gate_workers) --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
   elif [ -z "$PY" ] && [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix ${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner
@@ -300,7 +300,7 @@ for owner in $OWNERS; do
     # makes both describe the tree being shipped; `mutmut run` rewrites it
     # anyway, and a cold run is ~35s for ~1000 mutants.
     # One cd for all three: they run in the same shell, already there.
-    CMD="${RUN}rm -rf mutants; $M run$GLOBS >'$MLOG' 2>&1; $M results"
+    CMD="${RUN}rm -rf mutants; $M run --max-children $(gate_workers)$GLOBS >'$MLOG' 2>&1; $M results"
   else
     MISSING="$MISSING  $label needs mutmut:
       uv add --dev mutmut     # or: poetry add --group dev mutmut, pip install mutmut

@@ -80,9 +80,7 @@ chmod +x bin/npx
 echo "const a=1" > a.ts
 echo "const b=2" > b.ts
 argv "stryker is handed the whole diff in one --mutate, and nothing else" \
-"arg[--no-install]
-arg[stryker]
-arg[run]
+"$STRYKER_RUN
 arg[--mutate]
 arg[a.ts:1-1,b.ts:1-1]"
 
@@ -99,9 +97,7 @@ chmod +x bin/npx
 echo "const a=1" > a.ts
 echo "export const B = () => <p/>" > B.tsx
 argv "a .tsx in the diff is not mutated, the .ts beside it is" \
-"arg[--no-install]
-arg[stryker]
-arg[run]
+"$STRYKER_RUN
 arg[--mutate]
 arg[a.ts:1-1]"
 
@@ -134,9 +130,7 @@ echo "const a=1" > a.ts
 mkdir -p 'app/[[...slug]]'
 echo "const p=1" > 'app/[[...slug]]/page.ts'
 argv "a route folder loses its range, not the whole run" \
-"arg[--no-install]
-arg[stryker]
-arg[run]
+"$STRYKER_RUN
 arg[--mutate]
 arg[a.ts:1-1,app/??...slug??/page.ts]"
 

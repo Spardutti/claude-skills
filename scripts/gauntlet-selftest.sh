@@ -30,6 +30,9 @@ newrepo() {
   export CLAUDE_PROJECT_DIR="$R"
   case ":$PATH:" in *":$R/bin:"*) ;; *) export PATH="$R/bin:$PATH" ;; esac
 }
+cores() { printf '#!/bin/sh\necho %s\n' "$1" > "$TMP/sysbin/getconf"; chmod +x "$TMP/sysbin/getconf"; }
+mkdir -p "$TMP/sysbin"; export PATH="$TMP/sysbin:$PATH"; cores 8
+STRYKER_RUN=$(printf 'arg[%s]\n' --no-install stryker run --concurrency 4)
 
 # check <label> <expected substring in .why> [expected substring in the run log]
 check() {
@@ -63,6 +66,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-page-tests.sh"  # page tests passed off as proof for logic
 . "$HERE/selftest-ship-gate-mutmut.sh"   # the Python half, and the git receipt
 . "$HERE/selftest-ship-gate-mutmut-scope.sh"  # the Python half scoped to changed modules
+. "$HERE/selftest-ship-gate-quiet.sh"    # half the cores, lowest priority
 . "$HERE/selftest-ship-gate-mutmut-first.sh"  # a module's first run tests only the diff
 . "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed
 . "$HERE/selftest-ship-gate-structure.sh"  # where a new file may live

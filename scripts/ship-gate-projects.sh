@@ -2,6 +2,11 @@
 # Sourced by ship-gate.sh: which project owns a file, how it runs mutmut, and
 # whether a project's last clean verdict still stands.
 
+# Half the cores at the lowest priority: every tool defaults to the whole machine,
+# and three projects' gates at once froze the editor with the fans at full speed.
+renice -n 19 -p $$ >/dev/null 2>&1
+gate_workers() { echo $(( ($(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2) + 1) / 2 )); }
+
 # mutmut is installed into the project's environment, not onto PATH. Ask the
 # project how to run its own tools before falling back to a bare binary.
 py_mutmut() {

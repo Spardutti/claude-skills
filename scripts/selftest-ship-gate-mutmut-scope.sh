@@ -51,7 +51,7 @@ lacks() {  # lacks <label> <substring the output must not contain> <substring it
 # Unscoped, one PR that changed three API modules re-ran all 1810 mutants of
 # the API on every gate run, auth included.
 scoped_repo sg_scope
-run_args "the run names one glob per changed module" "run app.orders.__init__.x* app.slugs.x*"
+run_args "the run names one glob per changed module" "run --max-children 4 app.orders.__init__.x* app.slugs.x*"
 
 printf '    app.auth.login.x_check__mutmut_1: survived\n    app.auth.login.x_check__mutmut_2: not checked\n' > survivors
 sg "a module the diff left alone is neither charged nor UNPROVEN" "nothing survived" 0
@@ -98,7 +98,7 @@ rm -f pytestfail
 : > survivors
 
 # Rebuilding the whole baseline re-mutated an entire API to accept eleven names.
-run_args "--baseline runs only the changed modules" "run app.orders.__init__.x* app.slugs.x*" --baseline
+run_args "--baseline runs only the changed modules" "run --max-children 4 app.orders.__init__.x* app.slugs.x*" --baseline
 
 # Scoped, it must still keep every other module's accepted debt, or the next diff
 # touching one of them is charged for survivors it did not create.
@@ -112,14 +112,14 @@ if [ "$got" = "$want" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "a scoped -
 else FAIL=$((FAIL+1)); printf '  FAIL %s\n       want: %s\n       got:  %s\n' "a scoped --baseline keeps other modules and replaces the changed ones" "$want" "$got"; fi
 : > survivors
 rm -f apps/api/.mutmut-baseline
-run_args "with no baseline the first run is scoped too" "run app.orders.__init__.x* app.slugs.x*"
+run_args "with no baseline the first run is scoped too" "run --max-children 4 app.orders.__init__.x* app.slugs.x*"
 
 # mutmut strips a leading src. from module names.
 scoped_repo sg_scope_src
 rm -f apps/api/app/slugs.py apps/api/app/orders/__init__.py
 mkdir -p apps/api/src/pkg
 echo "x=1" > apps/api/src/pkg/core.py
-run_args "a src layout's glob drops the src. prefix" "run pkg.core.x*"
+run_args "a src layout's glob drops the src. prefix" "run --max-children 4 pkg.core.x*"
 
 # Accepting survivors re-ran mutmut on the tree the last run had just tested, then
 # wrote no receipt, so one PR paid for four full runs.
@@ -137,7 +137,7 @@ else FAIL=$((FAIL+1)); printf '  FAIL %s\n' "and writes the receipt, so the gate
 sg "the next run is clean" "nothing survived" 0
 mkdir -p apps/api/tests
 echo "def test_slug(): pass" > apps/api/tests/test_slugs.py
-run_args "--baseline after a test changed runs mutmut again" "run app.orders.__init__.x* app.slugs.x*" --baseline
+run_args "--baseline after a test changed runs mutmut again" "run --max-children 4 app.orders.__init__.x* app.slugs.x*" --baseline
 
 # The replayed log is what marks a run that matched no mutant; without it the
 # replay reads as clean and writes a PASS over a run that tested nothing.

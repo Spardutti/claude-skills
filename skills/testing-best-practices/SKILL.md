@@ -14,7 +14,7 @@ description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arr
 | Working on… | Read |
 |---|---|
 | Proving the tests would catch a break — Stryker, mutmut, surviving mutants, mutation score | MUTATION-TESTING.md |
-| A slow suite, a database fixture, or tests that are slow or flaky under parallel workers — unique values, table resets, password hashing, cloud clients | FAST-TESTS.md |
+| A slow suite, a database fixture, or tests that are slow or flaky under parallel workers — unique values, table resets, pooled engines, password hashing, cloud clients, worker counts and priority | FAST-TESTS.md |
 
 ## Testing Pyramid
 
@@ -330,7 +330,7 @@ test.each([
 
 - **MUTATION-TESTING.md** — read when setting up or reading mutation testing. Covers what it catches that review cannot (an assertion importing the constant it asserts on), Stryker setup with `coverageAnalysis: "perTest"` and diff-scoped `--mutate` ranges, the `.stryker-tmp` sandbox that silently doubles the test count, keeping page tests out of the Stryker run, mutmut 3's renamed config keys and mutant-name globs, why grepping for the word `survived` false-positives on Stryker's own summary header, the Ignore plugin for class-name noise, and working score thresholds.
 
-- **FAST-TESTS.md** — read when a suite is slow, when writing a database fixture or `conftest.py`, or when parallel tests (mutmut, xdist) run slow. Covers why a rolled-back test still holds its locks, fresh values in unique columns, giving the suite an empty database instead of deleting or truncating tables, hashing test passwords with the cheapest settings, stopping cloud SDKs probing for credentials, and measuring waits and CPU before changing anything.
+- **FAST-TESTS.md** — read when a suite is slow, when writing a database fixture or `conftest.py`, or when parallel tests (mutmut, xdist) run slow. Covers why a rolled-back test still holds its locks, fresh values in unique columns, giving the suite an empty database instead of deleting or truncating tables, one pooled engine for all async tests, hashing test passwords with the cheapest settings, stopping cloud SDKs probing for credentials, running workers on half the cores at the lowest priority, and measuring waits and CPU before changing anything.
 
 ## Anti-Rationalizations
 
