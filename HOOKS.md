@@ -131,8 +131,8 @@ Keep the gates fast for a reason beyond patience: a `command` hook that reaches 
 timeout (600s by default) is cancelled and its **output discarded**, so the turn
 ends as if the hook never ran. A stalled gate is a silent pass, not a block.
 
-Only fast gates live here (target: under ~30s). Mutation testing and deep review
-stay manual — they belong to `/test-review` and `/deep-review`, not to every turn.
+Only fast gates live here (target: under ~30s). Mutation testing and the skills
+audit belong to `/ship`'s gate, not to every turn.
 
 At install time the CLI reports what it found, so a silent no-op is never a
 surprise:
