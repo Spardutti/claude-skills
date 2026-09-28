@@ -7,9 +7,9 @@ A slow suite is rarely slow tests. It is setup every test inherits: fixtures tha
 - [A Rolled-Back Test Still Holds Its Locks](#a-rolled-back-test-still-holds-its-locks)
 - [Unique Values In Unique Columns](#unique-values-in-unique-columns)
 - [Never Delete Or Truncate A Whole Table At Test Start](#never-delete-or-truncate-a-whole-table-at-test-start)
-- [Share One Pooled Engine Across Async Tests](#share-one-pooled-engine-across-async-tests)
 - [Hash Test Passwords With The Cheapest Settings](#hash-test-passwords-with-the-cheapest-settings)
 - [Stop Cloud Clients Probing The Network](#stop-cloud-clients-probing-the-network)
+- [Cut What Every Test Process Pays To Start](#cut-what-every-test-process-pays-to-start)
 - [Half The Cores, Lowest Priority](#half-the-cores-lowest-priority)
 - [Measure Before Fixing](#measure-before-fixing)
 - [Rules](#rules)
@@ -61,33 +61,6 @@ def _test_db_name() -> str:
 ```
 
 The per-worker form only helps xdist: mutmut's children set no worker id, so under mutation testing they share one database and need the empty one.
-
-## Share One Pooled Engine Across Async Tests
-
-A fresh engine per test opens a fresh Postgres connection per test: a forked backend and a login, every test, every mutant. One event loop for the session lets one pooled engine serve them all; the per-test transaction still rolls back.
-
-```python
-# BAD — every test forks and authenticates a new Postgres backend
-@pytest.fixture
-async def engine():
-    engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
-    yield engine
-    await engine.dispose()
-
-# GOOD — one pooled engine; `connection` stays per test and rolls back
-@pytest_asyncio.fixture(scope="session")
-async def engine():
-    engine = create_async_engine(DATABASE_URL)
-    yield engine
-    await engine.dispose()
-```
-
-```toml
-# pyproject.toml — a pooled connection must stay on the loop that opened it
-[tool.pytest.ini_options]
-asyncio_default_fixture_loop_scope = "session"
-asyncio_default_test_loop_scope = "session"
-```
 
 ## Hash Test Passwords With The Cheapest Settings
 
@@ -151,6 +124,25 @@ os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
 
 Set these in `conftest.py` before the app is imported. On one API it took importing the app from 2.28s to 0.55s and the suite from 2.87s to 0.83s.
 
+## Cut What Every Test Process Pays To Start
+
+Mutation testing starts the test runner once per mutant, so a cost paid once per start — invisible in one suite run — is paid hundreds of times. Time an empty test to see it.
+
+```toml
+# GOOD — pytest's cache plugin reads and writes .pytest_cache on every start;
+# on one API this cut each mutant's startup from 0.17s to 0.11s
+[tool.mutmut]
+pytest_add_cli_args = ["-p", "no:cacheprovider"]
+```
+
+```dockerfile
+# BAD in an image that runs tests — every start recompiles SQLAlchemy, FastAPI
+# and the rest; on one API about 2s of every test run
+ENV PYTHONDONTWRITEBYTECODE=1
+```
+
+Keep that line out of the development and test image; a production image may keep it.
+
 ## Half The Cores, Lowest Priority
 
 Every runner defaults to the whole machine — mutmut one child per core, Stryker, Vitest and Jest nearly as many. Three projects' gates at once froze the editor with the fans at full speed. Take half, at the lowest priority: alone the run still gets every idle core, and anything interactive goes first.
@@ -188,6 +180,7 @@ FROM pg_stat_activity WHERE state <> 'idle' GROUP BY 1, 2 ORDER BY 3 DESC;
 ```bash
 docker stats --no-stream                                   # CPU per container
 python -m cProfile -s tottime -m pytest -q | head -30      # where one run's time goes
+time pytest -q tests/test_one.py::test_empty               # what every mutant pays just to start
 ```
 
 Fix the limit the numbers show. Removing a lock does nothing while the CPUs are full; once a cheaper hash frees them, the same lock becomes the limit. One API: the empty test database alone gained nothing, the cheap hash took 943s to 557s, and the empty database on top took it to 439s.
@@ -196,9 +189,9 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 
 - Always insert a fresh value into every unique column in a fixture.
 - Never `DELETE FROM` or `TRUNCATE` a whole table to reset a test; give the suite an empty database.
-- Always share one session-scoped, pooled database engine across async tests; never open a connection per test.
 - Always hash test passwords with the algorithm's cheapest settings, in test setup only.
 - Always switch off cloud SDK credential probes in test setup.
+- Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image.
 - Always run test and mutation workers on half the cores at `nice -n 19`, inside the container when tests run in Docker.
 - Always measure — wait events, CPU, a profile — before changing a test fixture for speed.
 - Never make tests faster by running fewer of them or asserting less.
