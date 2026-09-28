@@ -266,6 +266,11 @@ gh pr view --json number,title,isDraft,mergeable,reviewDecision,statusCheckRollu
 
 Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. If there is no dev branch, the project merges features straight to main — skip the release PR and tag main directly after the feature merge (steps 1-3, then 6-7).
 
+**The version bump reaches main only through dev.** A bump committed on a `release/*` branch lands in main and never in dev, and every release then needed a third PR to back-merge it. So steps 1-3 run before the release PR, on a branch that merges into dev:
+
+- **`/ship release` from a feature branch** → run steps 1-3 on that branch before its **pr** stage and commit them as `chore(release): <version>`. The feature PR carries the bump into dev.
+- **Everything already merged, on dev** → `git checkout -b chore/release-<version>`, run steps 1-3, commit, then pr → merge into dev as usual.
+
 1. **Version** — `git fetch --tags`; `git tag --sort=-v:refname | head -5`; `git log <latest-tag>..HEAD --oneline`. If there are **no commits since the last tag**, STOP — nothing to release. Suggest the next semver:
    - **1.x and above:** MAJOR for any `!` / `BREAKING CHANGE`, MINOR for any `feat`, else PATCH.
    - **0.x (pre-1.0):** a breaking change bumps MINOR (`0.3.x → 0.4.0`); `feat` and `fix` bump PATCH. Reserve `v1.0.0` for the first stable release.
@@ -273,8 +278,8 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
    - **Always confirm the version with the user.**
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
 3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
-4. **Release PR** — `git checkout -b release/<version>`, push, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
-5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on.
+4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull`, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
+5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on. **Never `--delete-branch`** here: the head branch is dev.
 6. **Tag + GitHub release**:
 
 ```bash
@@ -292,8 +297,8 @@ gh release create <version> --title '<version>' --notes-file <file>
 
 - **`/ship` on a dirty feature branch** → commits, asks "create a PR?" → "merge it?" → "cut a release?". Decline at any point to stop.
 - **`/ship pr`** → commits if needed, pushes, creates the PR, stops. If a PR already exists, reports its URL and stops.
-- **`/ship release` with everything already merged** → starts at the release stage and runs version → changelog → release PR → merge → tag.
-- **`/ship release` on a dirty branch** → one upfront confirmation, then commit → pr → merge → release straight through.
+- **`/ship release` with everything already merged** → `chore/release-<version>` with the bump → PR into dev → merge → release PR dev → main → merge → tag.
+- **`/ship release` on a dirty feature branch** → one upfront confirmation, then commit → version bump on the same branch → pr → merge into dev → release PR dev → main → merge → tag. Two PRs, no back-merge.
 
 ## Rules
 
@@ -303,6 +308,7 @@ gh release create <version> --title '<version>' --notes-file <file>
 - NEVER tag or create a GitHub release before the release PR is merged into main.
 - NEVER merge a PR that is a draft, has conflicts, has failing CI, or is missing required reviews — stop and report.
 - NEVER squash the release PR into main — use a merge commit so the feature history survives for future changelog/version detection.
+- NEVER cut a `release/*` branch or back-merge main into dev — the version bump reaches main only through dev, so main never holds a commit dev lacks.
 - NEVER run the skills audit before a release PR — its commits already passed it; run only `ship-gate.sh`.
 - NEVER interpolate a branch name, tag, version, or title containing shell metacharacters (`` ` ``, `$(`, `;`, `&&`, `|`) into a command — pass interpolated values as single-quoted literals, pass PR/release bodies via `--body-file`/stdin, and abort if such a value contains metacharacters.
 - ALWAYS run the skills audit — one `gauntlet-skills` agent per applicable skill, all launched in one message. NEVER audit a skill yourself instead: the agent reads it fresh, with no memory of having decided it did not apply.
