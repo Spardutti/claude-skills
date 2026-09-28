@@ -32,6 +32,17 @@ async def user_id(session):
     return await make_user(session, f"test-{uuid4()}@example.com")
 ```
 
+A builder's default argument hides the same fixed value, so every test that skips the argument shares it:
+
+```python
+# BAD — parallel mutants queue on each other's uncommitted row
+async def make_account(db, email="owner@example.com"): ...
+
+# GOOD
+async def make_account(db, email=None):
+    email = email or f"owner-{uuid4().hex[:12]}@example.com"
+```
+
 The same goes for slugs, usernames, codes and any column behind a `UNIQUE` constraint. A test that asserts on the value reads it back from the fixture rather than repeating the literal.
 
 ## Never Delete Or Truncate A Whole Table At Test Start
@@ -187,7 +198,7 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 
 ## Rules
 
-- Always insert a fresh value into every unique column in a fixture.
+- Always insert a fresh value into every unique column in a fixture, including a test builder's default arguments.
 - Never `DELETE FROM` or `TRUNCATE` a whole table to reset a test; give the suite an empty database.
 - Always hash test passwords with the algorithm's cheapest settings, in test setup only.
 - Always switch off cloud SDK credential probes in test setup.
