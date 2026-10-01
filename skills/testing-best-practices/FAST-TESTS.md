@@ -10,6 +10,7 @@ A slow suite is rarely slow tests. It is setup every test inherits: fixtures tha
 - [Hash Test Passwords With The Cheapest Settings](#hash-test-passwords-with-the-cheapest-settings)
 - [Stop Cloud Clients Probing The Network](#stop-cloud-clients-probing-the-network)
 - [Cut What Every Test Process Pays To Start](#cut-what-every-test-process-pays-to-start)
+- [Turn Off Postgres JIT In Tests](#turn-off-postgres-jit-in-tests)
 - [Half The Cores, Lowest Priority](#half-the-cores-lowest-priority)
 - [Measure Before Fixing](#measure-before-fixing)
 - [Rules](#rules)
@@ -154,6 +155,25 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 Keep that line out of the development and test image; a production image may keep it.
 
+Django's test client loads the middleware again for every client it builds, and WhiteNoise scans all of `STATIC_ROOT` each time. Autorefresh skips the scan.
+
+```python
+# GOOD — api/conftest.py
+def pytest_configure():
+    settings.WHITENOISE_AUTOREFRESH = True
+```
+
+## Turn Off Postgres JIT In Tests
+
+Postgres compiles a query it costs as expensive, and it costs one by its plan, not by the rows. A complex query on near-empty test tables spends longer compiling than running.
+
+```python
+# GOOD — api/conftest.py; appends, so options already set survive
+def pytest_configure():
+    opts = settings.DATABASES["default"].setdefault("OPTIONS", {})
+    opts["options"] = f'{opts.get("options", "")} -c jit=off'.strip()
+```
+
 ## Half The Cores, Lowest Priority
 
 Every runner defaults to the whole machine — mutmut one child per core, Stryker, Vitest and Jest nearly as many. Three projects' gates at once froze the editor with the fans at full speed. Take half, at the lowest priority: alone the run still gets every idle core, and anything interactive goes first.
@@ -202,7 +222,8 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 - Never `DELETE FROM` or `TRUNCATE` a whole table to reset a test; give the suite an empty database.
 - Always hash test passwords with the algorithm's cheapest settings, in test setup only.
 - Always switch off cloud SDK credential probes in test setup.
-- Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image.
+- Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image, WhiteNoise's static scan.
+- Always set `jit=off` on a Postgres test database.
 - Always run test and mutation workers on half the cores at `nice -n 19`, inside the container when tests run in Docker.
 - Always measure — wait events, CPU, a profile — before changing a test fixture for speed.
 - Never make tests faster by running fewer of them or asserting less.
