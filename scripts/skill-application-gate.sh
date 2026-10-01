@@ -62,8 +62,10 @@ if [ "$TOOL" = "Bash" ]; then
   STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
   WRITES=""
   case "$STRIPPED" in
-    *">"*|*"tee "*|*"sed -i"*|*"cp "*|*"mv "*|*"truncate "*|*"dd "*) WRITES=1 ;;
+    *">"*|*"sed -i"*) WRITES=1 ;;
   esac
+  # Whole words only: "git add api/x.py" contains "dd ".
+  printf '%s' "$STRIPPED" | grep -qE '(^|[[:space:];|&(])(tee|cp|mv|truncate|dd)[[:space:]]' && WRITES=1
   case "$CMD" in
     *"<<"*|*python*" -c"*|*node*" -e"*|*perl*" -e"*|*ruby*" -e"*) WRITES=1 ;;
   esac

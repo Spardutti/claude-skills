@@ -24,7 +24,9 @@ SKILL_NAME=$(printf '%s' "$INPUT" | grep -o '"skill":"[^"]*"' | head -1 | sed 's
 if [ -n "$SKILL_NAME" ]; then
   # Sanitize: only allow [A-Za-z0-9_-] in the marker filename.
   SAFE_NAME=$(printf '%s' "$SKILL_NAME" | tr -cd 'A-Za-z0-9_-')
-  if [ -n "$SAFE_NAME" ]; then
+  # Only skills the CLI installed get acked; built-ins and hand-made skills have no rules for us.
+  MANIFEST="$(dirname "$(cd "$(dirname "$0")" && pwd)")/.claude-skills.json"
+  if [ -n "$SAFE_NAME" ] && tr -d ' \n' 2>/dev/null < "$MANIFEST" | grep -o '"skills":\[[^]]*\]' | grep -q "\"$SAFE_NAME\""; then
     touch "/tmp/claude-skill-loaded-$KEY-$SAFE_NAME"
     # The ack path holds a key the model cannot know, so without this line its
     # first write is always denied just to learn it.

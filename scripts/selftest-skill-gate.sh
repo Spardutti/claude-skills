@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Cases for the skill gates: the message they deny with, the files they must
-# never gate, the auto-mode rule that lets them be cleared, and Bash as a way
-# of writing files.
+# never gate, and the auto-mode rule that lets them be cleared.
 # Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
 
 
@@ -95,6 +94,10 @@ esc "application gate lets an /optimize benchmark through" allow skill-applicati
   '"tool_name":"Write","tool_input":{"file_path":"/tmp/claude-optimize-api/bench.sh"}'
 esc "application gate still stops a source edit" deny skill-application-gate.sh \
   '"tool_name":"Edit","tool_input":{"file_path":"/home/u/src/a.ts"}'
+esc "application gate lets git add of source through" allow skill-application-gate.sh \
+  '"tool_name":"Bash","tool_input":{"command":"git add api/x.py"}'
+esc "application gate still stops mv of source" deny skill-application-gate.sh \
+  '"tool_name":"Bash","tool_input":{"command":"mv a.py api/x.py"}'
 rm -f "/tmp/claude-skill-gate-$SSID" "/tmp/claude-skill-loaded-$SSID-demo"
 
 # The project-level permissions.allow the installer writes never cleared auto
@@ -154,46 +157,3 @@ elif [ "$(cat "$AMS")" = "not json {{{" ]; then
 else
   FAIL=$((FAIL+1)); printf '  FAIL %s\n       became: %s\n' "an unparseable settings file was altered" "$(cat "$AMS")"
 fi
-
-# Write|Edit|MultiEdit is not the only way to change a file. A session edited
-# twelve source files through `python3 - <<'PY'` in Bash and neither gate fired.
-echo "skill gate covers Bash"
-newrepo sg_bash
-mkdir -p .claude/skills/demo
-printf -- '---\nname: demo\n---\n## Rules\n- x\n' > .claude/skills/demo/SKILL.md
-node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
-SKG=".claude/hooks/skill-gate.sh"
-
-gate() {  # gate <label> <deny|allow> <tool> <command>
-  N=$((N+1))
-  rm -f /tmp/claude-skill-gate-gt$RUN
-  out=$(printf '%s' "{\"session_id\":\"gt$RUN\",\"tool_name\":\"$3\",\"tool_input\":{\"command\":\"$4\"}}" | bash "$SKG")
-  got=allow; case "$out" in *deny*) got=deny ;; esac
-  if [ "$got" = "$2" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
-  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got %s\n' "$1" "$2" "$got"; fi
-}
-
-gate "a heredoc into python is gated" deny Bash "python3 - <<'PY'"
-gate "a redirect into a file is gated" deny Bash "cat > src/foo.ts"
-gate "sed -i is gated" deny Bash "sed -i 's/a/b/' x.ts"
-gate "a read-only command is not gated" allow Bash "git status --short"
-gate "a redirect to /dev/null is not a write" allow Bash "npm test 2>/dev/null"
-gate "the command that clears the gate is never gated" allow Bash "touch /tmp/claude-skill-gate-gt$RUN"
-
-# Skills are about code. A repo full of PLAN_*.md hit this gate on every write.
-gatef() {  # gatef <label> <deny|allow> <file_path>
-  N=$((N+1))
-  rm -f /tmp/claude-skill-gate-gt$RUN
-  out=$(printf '%s' "{\"session_id\":\"gt$RUN\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$3\"}}" | bash "$SKG")
-  got=allow; case "$out" in *deny*) got=deny ;; esac
-  if [ "$got" = "$2" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"
-  else FAIL=$((FAIL+1)); printf '  FAIL %s — want %s, got %s\n' "$1" "$2" "$got"; fi
-}
-
-gatef "writing a plan document is not gated" allow "PLAN_notas.md"
-gatef "writing a source file is gated" deny "src/lib/expenses.ts"
-gatef "config files stay gated" deny "tsconfig.json"
-gatef "an /optimize benchmark script is not gated" allow "/tmp/claude-optimize-api/bench.sh"
-gatef "other scratch code in /tmp stays gated" deny "/tmp/scratch/bench.sh"
-gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
-gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"

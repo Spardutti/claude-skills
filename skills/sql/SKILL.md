@@ -56,6 +56,17 @@ The fix is ORM-specific — see ORM-PATTERNS.md for per-ORM eager loading APIs (
 
 **Trap:** SQLAlchemy `joinedload` + pagination silently broken — `LIMIT N` applies to joined rows, not parent rows, so you may get 2 users instead of 10. Use `selectinload` for paginated queries.
 
+The same trap hits files. Per-file latency adds up when DuckDB reads one Parquet source per query.
+
+```python
+# BAD: one query per file
+for path in paths:
+    con.sql(f"SELECT * FROM read_parquet('{path}')")
+
+# GOOD: one scan over every file; filename=true says which file a row came from
+con.sql("SELECT * FROM read_parquet($paths, filename = true)", params={"paths": paths})
+```
+
 ### 3. NOT IN With NULLs Returns Empty Set
 
 If any value in the subquery is NULL, `NOT IN` returns no rows. Always use `NOT EXISTS`.
@@ -201,7 +212,7 @@ Always inspect what your ORM generates. See ORM-PATTERNS.md for full details.
 1. **Schema:** `TIMESTAMPTZ` always, `NUMERIC` for money, `NOT NULL` by default, FK on the "many" side, no EAV, no comma-separated IDs.
 2. **Indexes:** Always index FK columns (PG/SQLite/MSSQL). Composite order = equality → range → sort. Never wrap indexed columns in functions. `SELECT` only needed columns to enable index-only scans. Use `CREATE INDEX CONCURRENTLY` in production.
 3. **Joins:** Filter outer-join right side in `ON`, not `WHERE`. Use `NOT EXISTS`, never `NOT IN`. Pre-aggregate before joining "many" tables. `COUNT(column)` not `COUNT(*)` with OUTER JOINs.
-4. **ORMs:** Never rely on lazy loading. Always specify the eager-loading strategy for your ORM. Enable SQL logging in dev.
+4. **ORMs:** Never rely on lazy loading. Always specify the eager-loading strategy for your ORM. Enable SQL logging in dev. Never query in a loop — read many Parquet files in one DuckDB scan.
 5. **Transactions:** Keep them short. Use `SERIALIZABLE` for financial/inventory operations. Lock rows in consistent order. Set `statement_timeout` and `idle_in_transaction_session_timeout`.
 6. **Migrations:** Constant-default columns are instant (PG 11+); use three-step (nullable → backfill → constrain) for volatile/computed defaults or row-derived backfills. `CREATE INDEX CONCURRENTLY`. `ADD CONSTRAINT NOT VALID` then `VALIDATE` separately. Always `SET lock_timeout`.
 7. **Measure, don't guess:** Run `EXPLAIN ANALYZE` before and after index changes. Run `ANALYZE` after bulk loads.

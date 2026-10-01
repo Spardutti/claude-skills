@@ -10,6 +10,7 @@ newrepo sg_ack
 mkdir -p .claude/skills/rx
 printf -- '---\nname: rx\ntracks: react@19.2\nmetadata:\n  gate-paths: "**/*.tsx"\n---\n## Rules\n- x\n' > .claude/skills/rx/SKILL.md
 printf '%s\n' '{"dependencies":{"react":"19.2.0"}}' > package.json
+printf '{\n  "skills": [\n    "rx"\n  ]\n}\n' > .claude/.claude-skills.json
 node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
 AKID="ak$RUN"
 AK_CLEAN="/tmp/claude-skill-gate-$AKID /tmp/claude-skill-loaded-$AKID-rx /tmp/claude-skill-acked-$AKID-rx"
@@ -57,3 +58,22 @@ SUBKEY=$(printf 'sub%s' "$RUN" | tr -cd 'A-Za-z0-9_-')
 ok=0; case "$SUB" in *"claude-skill-acked-$SUBKEY-rx"*) ok=1 ;; esac
 ack "a subagent is handed its own key" $ok "$SUB"
 rm -f "/tmp/claude-skill-gate-$SUBKEY" "/tmp/claude-skill-loaded-$SUBKEY-rx"
+
+# Built-in skills like code-review are not installed here and have no rules to apply.
+BUILTIN=$(printf '{"session_id":"%s","tool_name":"Skill","tool_input":{"skill":"code-review"}}' "$AKID" \
+          | bash .claude/hooks/skill-gate-automark.sh)
+ok=0; [ -z "$BUILTIN" ] && [ ! -f "/tmp/claude-skill-loaded-$AKID-code-review" ] && ok=1
+ack "a skill not installed in the project is never asked for an ack" $ok "$BUILTIN"
+GOUT=$(printf '{"session_id":"%s","tool_name":"Write","tool_input":{"file_path":"%s/src/App.tsx"}}' "$AKID" "$PWD" \
+       | bash .claude/hooks/skill-application-gate.sh)
+ok=0; [ -z "$GOUT" ] && ok=1
+ack "and it does not block a write" $ok "$GOUT"
+
+# A skill someone wrote by hand sits in .claude/skills too, but the CLI did not install it.
+mkdir -p .claude/skills/mine
+printf -- '---\nname: mine\n---\n## Rules\n- y\n' > .claude/skills/mine/SKILL.md
+MINE=$(printf '{"session_id":"%s","tool_name":"Skill","tool_input":{"skill":"mine"}}' "$AKID" \
+       | bash .claude/hooks/skill-gate-automark.sh)
+ok=0; [ -z "$MINE" ] && [ ! -f "/tmp/claude-skill-loaded-$AKID-mine" ] && ok=1
+ack "a hand-made skill is never asked for an ack" $ok "$MINE"
+rm -f "/tmp/claude-skill-gate-$AKID" "/tmp/claude-skill-loaded-$AKID-code-review" "/tmp/claude-skill-loaded-$AKID-mine"

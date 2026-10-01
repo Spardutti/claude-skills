@@ -16,6 +16,7 @@ newrepo sg_agent
 mkdir -p .claude/skills/rx
 printf -- '---\nname: rx\ntracks: react@19.2\nmetadata:\n  gate-paths: "**/*.tsx"\n---\n## Rules\n- x\n' > .claude/skills/rx/SKILL.md
 printf '%s\n' '{"dependencies":{"react":"19.2.0"}}' > package.json
+printf '{\n  "skills": [\n    "rx"\n  ]\n}\n' > .claude/.claude-skills.json
 node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
 SKG=".claude/hooks/skill-gate.sh"
 AMK=".claude/hooks/skill-gate-automark.sh"

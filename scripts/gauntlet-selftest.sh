@@ -77,6 +77,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders
 . "$HERE/selftest-ship-gate-tooling.sh"  # .claude/ tooling and deleted files are never UNPROVEN
 . "$HERE/selftest-skill-gate.sh"         # deny messages, exemptions, auto mode
+. "$HERE/selftest-skill-gate-bash.sh"    # Bash commands that write files, and which files are gated
 . "$HERE/selftest-mandatory-skills.sh"   # which skills are not optional
 . "$HERE/selftest-skill-ack.sh"          # the ack command, before any denial
 . "$HERE/selftest-line-limit.sh"         # the 200-line ratchet

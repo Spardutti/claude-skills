@@ -85,8 +85,10 @@ if [ "$TOOL" = "Bash" ]; then
   STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
   WRITES=""
   case "$STRIPPED" in
-    *">"*|*"tee "*|*"sed -i"*|*"cp "*|*"mv "*|*"truncate "*|*"dd "*) WRITES=1 ;;
+    *">"*|*"sed -i"*) WRITES=1 ;;
   esac
+  # Whole words only: "git add api/x.py" contains "dd ".
+  printf '%s' "$STRIPPED" | grep -qE '(^|[[:space:];|&(])(tee|cp|mv|truncate|dd)[[:space:]]' && WRITES=1
   # An interpreter given inline code or a heredoc can write anything, and the
   # shell shows no redirect at all — this is the shape that got past the gate.
   case "$CMD" in
