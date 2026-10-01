@@ -176,7 +176,7 @@ if [ -z "$FILES" ]; then
     echo "  in a language this gate does not know: $UNKNOWN"
     echo "  If they are source, add the extension in .claude/gauntlet.conf:"
     echo "    GAUNTLET_SOURCE_EXT=\"\$GAUNTLET_SOURCE_EXT|${UNKNOWN%% *}\""
-    echo "  If they are not, add it to GAUNTLET_IGNORE_EXT the same way."
+    printf '  If they are not, add it to GAUNTLET_IGNORE_EXT the same way.\n  receipt written, the PR can go ahead. Report it as UNPROVEN, not PASS.\n'
     printf 'UNPROVEN %s unknown-extensions\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
     exit 2
   fi
@@ -464,7 +464,7 @@ case $STATUS in
   1) echo "ship-gate: FAIL in ${SECONDS}s — deal with the findings above, then run this again."
      echo "           To ship anyway: bash .claude/hooks/ship-gate.sh --force"
      rm -f "$RECEIPT" ;;
-  2) echo "ship-gate: UNPROVEN in ${SECONDS}s — nothing is wrong, but nothing was proven either"
+  2) printf 'ship-gate: UNPROVEN in %ss — nothing is wrong, but nothing was proven either\n           receipt written, the PR can go ahead. Report it as UNPROVEN, not PASS.\n' "$SECONDS"
      printf 'UNPROVEN %s\n' "$(date -u +%FT%TZ)" > "$RECEIPT" ;;
 esac
 exit $STATUS

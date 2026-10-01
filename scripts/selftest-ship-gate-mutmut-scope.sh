@@ -75,6 +75,8 @@ lacks "a baselined survivor outside the scope is not reported killed" "now kille
 # then falls outside the scope, which would otherwise read as clean.
 touch nomatch
 sg "a scope that matched no mutant is UNPROVEN, not clean" "no mutant in the changed module(s)" 2
+# An agent read UNPROVEN as a block and reached for --force on a receipt it already had.
+sg "UNPROVEN says its receipt lets the PR through" "receipt written, the PR can go ahead" 2
 rm -f nomatch
 
 # A test that leaks state fails only in mutmut's second in-process pass. The gate
