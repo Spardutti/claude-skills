@@ -47,4 +47,10 @@ gatef "config files stay gated" deny "tsconfig.json"
 gatef "an /optimize benchmark script is not gated" allow "/tmp/claude-optimize-api/bench.sh"
 gatef "other scratch code in /tmp stays gated" deny "/tmp/scratch/bench.sh"
 gate "a heredoc writing markdown is not gated" allow Bash "cat > PREPLAN_x.md <<EOF"
-gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"
+gate "a heredoc writing source is gated" deny Bash "cat > src/a.ts <<EOF"# An unescaped dot made "each" read as a .h file and "projects-" as a .ts file,
+# so every prose heredoc looked like it named code.
+gate "a heredoc writing an adoc is not gated" allow Bash "cat > docs/guide.adoc <<EOF each step"
+gate "a doc under a projects- folder is not gated" allow Bash "cat > /home/u/projects-notes/README.md <<EOF"
+gate "2>&1 is not a write" allow Bash "pytest -q 2>&1 | tail -3"
+gate "a real redirect beside 2>&1 is still gated" deny Bash "make 2>&1 > src/out.ts"
+gatef "a session scratchpad file is not gated" allow "/tmp/claude-1000/-home-u-p/abc/scratchpad/mock.html"

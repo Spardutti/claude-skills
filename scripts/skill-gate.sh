@@ -63,7 +63,8 @@ if [ "$TOOL" != "Bash" ]; then
     */.claude/settings.json|*/.claude/settings.local.json) exit 0 ;;
     # /optimize's benchmark lives outside the repo so no round can edit it; it is not project code.
     /tmp/claude-optimize-*) exit 0 ;;
-    *.*) printf '%s' "$TARGET" | grep -qiE ".($PROSE_EXT)$" && exit 0 ;;
+    /tmp/claude-*/scratchpad/*) exit 0 ;;
+    *.*) printf '%s' "$TARGET" | grep -qiE "\.($PROSE_EXT)$" && exit 0 ;;
   esac
   TARGETS="$TARGET"
 fi
@@ -76,13 +77,13 @@ if [ "$TOOL" = "Bash" ]; then
     *.claude/settings.json*|*.claude/settings.local.json*) exit 0 ;;
   esac
 
-  # /dev/null redirects are not file writes; drop them before looking for one.
+  # /dev/null redirects and 2>&1 are not file writes; drop them before looking for one.
 
   # A command that names a prose file and no code file is writing prose.
-  if printf '%s' "$CMD" | grep -qiE ".($PROSE_EXT)([^A-Za-z0-9]|$)"      && ! printf '%s' "$CMD" | grep -qiE ".($CODE_EXT)([^A-Za-z0-9]|$)"; then
+  if printf '%s' "$CMD" | grep -qiE "\.($PROSE_EXT)([^A-Za-z0-9]|$)"      && ! printf '%s' "$CMD" | grep -qiE "\.($CODE_EXT)([^A-Za-z0-9]|$)"; then
     exit 0
   fi
-  STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g')
+  STRIPPED=$(printf '%s' "$CMD" | sed 's![12]*>>*[[:space:]]*/dev/null!!g; s/[0-9]*>&[0-9]//g')
   WRITES=""
   case "$STRIPPED" in
     *">"*|*"sed -i"*) WRITES=1 ;;
@@ -97,7 +98,7 @@ if [ "$TOOL" = "Bash" ]; then
   [ -z "$WRITES" ] && exit 0
   # A Bash write names its files in the command itself. Dockerfile and
   # .dockerignore carry no extension, so they are matched by name.
-  TARGETS=$(printf '%s' "$CMD" | grep -oiE "[A-Za-z0-9_./-]+.($CODE_EXT)|[A-Za-z0-9_./-]*(Dockerfile[A-Za-z0-9_.-]*|.dockerignore)" 2>/dev/null)
+  TARGETS=$(printf '%s' "$CMD" | grep -oiE "[A-Za-z0-9_./-]+\.($CODE_EXT)|[A-Za-z0-9_./-]*(Dockerfile[A-Za-z0-9_.-]*|.dockerignore)" 2>/dev/null)
 fi
 
 # --- mandatory skills -------------------------------------------------------
