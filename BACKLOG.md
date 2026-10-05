@@ -233,13 +233,11 @@ about one file read. Revisit when the skill count grows enough that granularity 
 the restructure, or when shipping to `anthropics/claude-plugins-official` (submission form:
 https://clau.de/plugin-directory-submission) becomes the goal.
 
-- [ ] **Claude Mods: rebuild `skill-gate.sh` as a mod.** Added in Claude Code 2.1.287
-  (2026-10-01). A mod is a TypeScript plugin with `tool.call`, `skill.prompt` and
-  `prompt.compose` hooks, and `$.skill.prompt` to fetch a skill's text.
-  - **Why:** the gate could hand Claude the skill text in the block message, saving the extra
-    `Skill` call, and trim a skill to the parts that fit the edited file.
-  - **Why not yet:** the API is new and may change; consumers need 2.1.287+; mods ship as
-    plugins, so this rides on the distribution decision above.
-  - **First step:** a local test mod that only inlines the skill text on block; measure turns
-    and tokens. It must replace the bash gate, never run beside it.
-  - **Revisit:** about 2026-12, or when the mod API stops changing between releases.
+**Claude Mods — looked at, not worth it (2026-10-03).** Mods (Claude Code 2.1.287+) are
+TypeScript plugins that can hook tool calls, add slash commands, and draw buttons or panes.
+- **Rebuild `skill-gate.sh` as a mod:** dropped. Inlining the skill text on block needs no
+  mod, the bash hook can print it. Handing it over before the edit skips the block, but
+  loses the ack step that makes Claude apply the skill. One saved call is not worth that.
+- **Buttons or mod commands for `/ship`:** dropped. Typing the command is just as fast, and
+  a mod command cannot think, so it can only show script output, not replace a command.
+- **Revisit** only with a new idea that needs something a hook cannot do.
