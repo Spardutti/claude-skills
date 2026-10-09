@@ -3,7 +3,7 @@ name: docker-best-practices
 metadata:
   gate-paths: "**/Dockerfile*, **/docker-compose*.yml, **/docker-compose*.yaml, **/compose.yml, **/compose.yaml, **/.dockerignore"
 category: Backend
-description: "MUST USE when writing or editing Dockerfiles, docker-compose.yml, .dockerignore, or container configuration. Enforces multi-stage builds, layer caching, security hardening, Compose Watch for local dev, and health checks."
+description: "MUST USE when writing or editing Dockerfiles, docker-compose.yml, .dockerignore, or container configuration. Enforces multi-stage builds, layer caching, security hardening, Compose Watch for local dev, and health checks. Bundle covers production Compose: restarts, limits, secrets, migrations, backups."
 ---
 
 # Docker Best Practices
@@ -13,22 +13,23 @@ description: "MUST USE when writing or editing Dockerfiles, docker-compose.yml, 
 Separate build dependencies from runtime. Ship only what you need.
 
 ```dockerfile
-# BAD: build tools, devDependencies, and source all ship to production
-FROM node:20
+# BAD: build tools, devDependencies, and source all ship to production.
+# Copying node_modules from a stage that ran a full `npm ci` ships them too.
+FROM node:24
 WORKDIR /app
 COPY . .
 RUN npm ci && npm run build
 CMD ["node", "dist/index.js"]
 
 # GOOD: multi-stage — clean production image
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
-FROM node:20-slim
+FROM node:24-slim
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
@@ -83,13 +84,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ```dockerfile
 # BAD: runs as root
-FROM node:20-slim
+FROM node:24-slim
 WORKDIR /app
 COPY . .
 CMD ["node", "server.js"]
 
 # GOOD: non-root user
-FROM node:20-slim
+FROM node:24-slim
 WORKDIR /app
 COPY --chown=node:node package*.json ./
 RUN npm ci --omit=dev
@@ -149,7 +150,7 @@ CMD ["node", "server.js"]
 FROM node:latest
 
 # GOOD: pinned slim image
-FROM node:20.11-slim
+FROM node:24.21-slim
 ```
 
 Use `<lang>-slim` for most apps. Use `distroless/static` or `scratch` for static binaries (Go, Rust).
@@ -177,7 +178,7 @@ Dockerfile*
 # In Compose — use with depends_on for startup ordering
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -190,12 +191,20 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8000/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
 ```
+
+```yaml
+# BAD: slim, alpine and distroless images have no curl — the check always fails
+test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+```
+
+Probe with the runtime the image already has: `node -e "fetch(...)"`, or
+`python -c "import urllib.request; urllib.request.urlopen(...)"`.
 
 ## Compose Watch — Local Dev
 
@@ -254,9 +263,9 @@ services:
           path: requirements.txt
 
   db:
-    image: postgres:16
+    image: postgres:18
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql  # 18+: not .../data, or the container refuses to start
     environment:
       POSTGRES_DB: app
       POSTGRES_USER: app
@@ -277,6 +286,15 @@ volumes:
   pgdata:
 ```
 
+No `restart:` in a local stack. A container you stopped stays stopped, and a
+crash loop shows up as a dead container instead of a hot laptop.
+
+## Production
+
+Read **PRODUCTION.md** before writing a `compose.prod.yaml` or deploying a stack:
+restart policies, log rotation, memory limits, `init`, runtime secrets, a
+migration step, a limited database user, and backups.
+
 ## Rules
 
 1. **Always use multi-stage builds** — separate build from runtime
@@ -289,3 +307,6 @@ volumes:
 8. **Always create `.dockerignore`** — exclude .git, node_modules, .env
 9. **Add health checks** — use with `depends_on: condition: service_healthy`
 10. **Use Compose Watch for local dev** — not bind mount volume hacks
+11. **Never set `restart:` in a local compose file** — restart policies live in `compose.prod.yaml` only
+12. **Never health-check with a tool the image lacks** — probe with the app's own runtime
+13. **Mount Postgres 18+ data at `/var/lib/postgresql`** — not `/var/lib/postgresql/data`
