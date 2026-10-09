@@ -42,8 +42,7 @@ x-defaults: &defaults
   restart: unless-stopped
   init: true
   logging:
-    driver: json-file
-    options: { max-size: "10m", max-file: "3" }
+    driver: local   # rotates by default: 5 files of 20 MB
 
 services:
   proxy:
@@ -67,9 +66,7 @@ services:
     <<: *defaults
     image: ghcr.io/acme/app:1.4.2
     secrets: [app_db_password]
-    deploy:
-      resources:
-        limits: { memory: 256M }
+    mem_limit: 256m
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -83,9 +80,7 @@ services:
       POSTGRES_DB: app
       POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
     secrets: [db_owner_password, app_db_password]
-    deploy:
-      resources:
-        limits: { memory: 512M }
+    mem_limit: 512m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 5s
@@ -113,14 +108,15 @@ app:
   # no restart:   a crash at 3am stays down until someone notices
   # no init:      zombie processes pile up; SIGTERM may never reach node
   # no limit:     one leak takes the database down with it
-  # no log cap:   json-file grows until the disk is full
+  # no log cap:   the default json-file driver grows until the disk is full
 ```
 
 - `restart: unless-stopped` comes back after a crash or a reboot, but not after
   you ran `docker compose stop`.
 - `init: true` puts a tiny init as PID 1 to reap zombies and forward signals.
 - A memory limit makes a leak kill one container, not the whole server.
-- `max-size` × `max-file` is the most disk one service's logs can ever use.
+- The `local` log driver rotates by default and stores logs compactly; the
+  default `json-file` driver never rotates unless you set `max-size`.
 
 ## Runtime Secrets
 
@@ -202,7 +198,7 @@ A dump nobody has restored is a guess.
 ## Rules
 
 - Always keep production settings in `compose.prod.yaml`; never put `restart:` in the local `compose.yaml`.
-- Always set `restart: unless-stopped`, `init: true`, a memory limit, and capped logs on every long-running production service.
+- Always set `restart: unless-stopped`, `init: true`, `mem_limit`, and the `local` log driver on every long-running production service.
 - Always pin the production image to a version tag, never `latest`.
 - Always publish ports only on the reverse proxy.
 - Always pass secrets as files under `/run/secrets`, never as plain `environment:` values.

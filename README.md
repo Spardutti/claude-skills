@@ -102,7 +102,7 @@ That last one is the difference. Your agent says the tests pass. This finds out.
 | `fastapi` 📦 | FastAPI — async correctness, `Annotated` dependency injection, `lifespan`, response models, testing with dependency overrides; bundle covers Pydantic, Alembic, Celery, and list endpoints (pagination/filtering/search/sorting) |
 | `express` 📦 | Express 5 — automatic async error forwarding, the four-argument error handler, named wildcards, `req.query` as a getter, validation at the boundary, thin routes, the helmet/CORS/rate-limit baseline; bundle covers tRPC v11 and Better Auth on Express |
 | `drf-best-practices` | Django REST Framework — thin serializers, service layer, queryset optimization, object-level permissions |
-| `drizzle-orm` | Drizzle ORM — schema design, identity columns, relations, migration safety, type inference |
+| `drizzle-orm` 📦 | Drizzle ORM — identity columns, timestamptz, indexed foreign keys, working relations, safe writes and transactions; bundle covers migrations and the 1.0 upgrade, row-level security, connections and test databases |
 | `docker-best-practices` 📦 | Multi-stage builds, layer caching, security hardening, Compose Watch, health checks; bundle covers production Compose (restarts, limits, secrets, migrations, backups) |
 
 ### Database

@@ -89,13 +89,14 @@ WORKDIR /app
 COPY . .
 CMD ["node", "server.js"]
 
-# GOOD: non-root user
+# GOOD: non-root user, before the install, so node_modules belongs to node
 FROM node:24-slim
 WORKDIR /app
+RUN chown node:node /app
+USER node
 COPY --chown=node:node package*.json ./
 RUN npm ci --omit=dev
 COPY --chown=node:node . .
-USER node
 CMD ["node", "server.js"]
 ```
 

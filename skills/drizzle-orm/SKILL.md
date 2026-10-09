@@ -1,333 +1,263 @@
 ---
 name: drizzle-orm
 category: Backend
-description: "MUST USE when writing or reviewing Drizzle ORM schemas, migrations, relational queries, or drizzle-kit configuration. Enforces identity columns over serial, proper relation definitions, migration safety, type inference, and query patterns."
+description: "MUST USE when writing or reviewing Drizzle ORM schemas, migrations, relational queries, or drizzle-kit configuration. Enforces identity columns, timestamptz, indexed foreign keys, working relations, type inference, and safe writes. Bundle covers migrations and the 1.0 upgrade, row-level security, and connections and test databases."
 tracks: drizzle-orm@0.45
 metadata:
   gate-paths: "**/*.ts"
 ---
 
-# Drizzle ORM Best Practices
+# Drizzle ORM
 
-## Schema — Use Identity Columns, Not Serial
+Drizzle 0.45 is the stable line; 1.0 is a release candidate. Everything here is
+0.45. Check `package.json` before copying, and read MIGRATIONS.md before an upgrade.
 
-```typescript
+## Quick Reference — When to Load What
+
+| Working on… | Read |
+|---|---|
+| drizzle.config, generate/migrate, renames, CI drift, upgrading to 1.0 | MIGRATIONS.md |
+| Policies, app role, current user per request | RLS.md |
+| Pool vs serverless driver, Next.js singleton, test database | CONNECTIONS.md |
+
+## Schema — Identity Columns, Not Serial
+
+```ts
 // BAD: serial is legacy PostgreSQL
-import { pgTable, serial, text } from "drizzle-orm/pg-core";
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  name: text("name"),
-});
+id: serial().primaryKey(),
 
-// GOOD: identity columns are the modern PostgreSQL standard
-import { pgTable, integer, text } from "drizzle-orm/pg-core";
-export const users = pgTable("users", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: text("name"),
-});
+// GOOD
+id: integer().primaryKey().generatedAlwaysAsIdentity(),
 ```
 
-## Schema — Column Naming
+## Schema — Let Casing Do the Naming
 
-Map camelCase TypeScript to snake_case SQL explicitly.
+```ts
+// BAD: half the columns named by hand, half by key; the SQL is a mix
+firstName: varchar("first_name", { length: 256 }),
+lastName: varchar({ length: 256 }),            // becomes "lastName"
 
-```typescript
-// BAD: implicit column name matches TS key — inconsistent SQL
-export const users = pgTable("users", {
-  firstName: varchar({ length: 256 }),
-});
-
-// GOOD: explicit snake_case SQL column name
-export const users = pgTable("users", {
-  firstName: varchar("first_name", { length: 256 }),
-});
+// GOOD: one setting, in both places, and no names by hand
+export const db = drizzle({ client: pool, schema, casing: "snake_case" });
+export default defineConfig({ casing: "snake_case", /* … */ });
 ```
 
-## Schema — Indexes and Constraints
+Set it in `drizzle()` and in `drizzle.config.ts`. With only one, queries and
+migrations disagree about column names.
 
-Define indexes in the third argument array:
+## Schema — Timestamps, Enums, Foreign Keys
 
-```typescript
+```ts
+export const roleEnum = pgEnum("role", ["guest", "user", "admin"]);
+
 export const posts = pgTable(
   "posts",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
-    slug: varchar({ length: 256 }),
-    title: varchar({ length: 256 }),
-    ownerId: integer("owner_id").references(() => users.id),
+    title: text().notNull(),
+    role: roleEnum().notNull().default("guest"),
+    userId: integer().notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow()
+      .$onUpdate(() => new Date()),
   },
-  (table) => [
-    uniqueIndex("posts_slug_idx").on(table.slug),
-    index("posts_title_idx").on(table.title),
-  ]
+  (t) => [index().on(t.userId)],   // Postgres never indexes a foreign key for you
 );
 ```
 
-## Schema — Enums, Timestamps, Foreign Keys
-
-```typescript
-// Define enums OUTSIDE the table
-export const roleEnum = pgEnum("role", ["guest", "user", "admin"]);
-
-export const posts = pgTable("posts", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  title: text("title").notNull(),
-  role: roleEnum().default("guest"),
-  userId: integer("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
-    .notNull()
-    .$onUpdate(() => new Date()),
-});
+```ts
+// BAD: timestamp without a zone — the server's time zone leaks into the data
+createdAt: timestamp().notNull().defaultNow(),
 ```
+
+`$onUpdate` runs only on a Drizzle `update()`. Raw SQL and other clients never
+touch it.
+
+## Schema — One File per Domain
+
+```ts
+// BAD: src/db/schema.ts — passes 200 lines by the fifth table
+// GOOD: src/db/schema/users.ts, posts.ts, billing.ts, index.ts re-exports them
+schema: "./src/db/schema/*.ts",   // in drizzle.config.ts
+```
+
+Keep each schema file under 200 lines. Better Auth generates its own tables, and
+their `user.id` is `text`; a foreign key to it is `text()`, not `integer()`.
 
 ## Schema — Type Inference
 
-```typescript
-// BAD: manually typing insert/select types
-interface User { id: number; name: string; email: string; }
+```ts
+// BAD: a hand-written interface drifts from the table
+interface User { id: number; name: string }
 
-// GOOD: infer from schema — always in sync
-export type InsertUser = typeof users.$inferInsert;
-export type SelectUser = typeof users.$inferSelect;
+// GOOD
+export type NewUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
 ```
 
 ## Relations — One-to-Many
 
-```typescript
-import { relations } from "drizzle-orm";
-
+```ts
 export const usersRelations = relations(users, ({ many }) => ({
   posts: many(posts),
+  memberships: many(usersToGroups),
 }));
 
 export const postsRelations = relations(posts, ({ one }) => ({
-  author: one(users, {
-    fields: [posts.userId],
-    references: [users.id],
-  }),
+  author: one(users, { fields: [posts.userId], references: [users.id] }),
 }));
 ```
+
+One `relations()` per table. Declare a second one for the same table and the
+schema file fails with a duplicate export.
 
 ## Relations — Many-to-Many
 
-```typescript
-export const usersToGroups = pgTable("users_to_groups", {
-  userId: integer("user_id")
-    .notNull()
-    .references(() => users.id),
-  groupId: integer("group_id")
-    .notNull()
-    .references(() => groups.id),
-}, (t) => [
-  primaryKey({ columns: [t.userId, t.groupId] }),
-]);
+The junction table needs its own `relations()`, with a `one()` to each side.
 
-export const usersRelations = relations(users, ({ many }) => ({
-  groups: many(usersToGroups),
+```ts
+export const usersToGroups = pgTable(
+  "users_to_groups",
+  {
+    userId: integer().notNull().references(() => users.id),
+    groupId: integer().notNull().references(() => groups.id),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.groupId] }), index().on(t.groupId)],
+);
+
+export const usersToGroupsRelations = relations(usersToGroups, ({ one }) => ({
+  user: one(users, { fields: [usersToGroups.userId], references: [users.id] }),
+  group: one(groups, { fields: [usersToGroups.groupId], references: [groups.id] }),
 }));
 
 export const groupsRelations = relations(groups, ({ many }) => ({
-  members: many(usersToGroups),
+  memberships: many(usersToGroups),
 }));
 ```
 
-## Relational Queries — `with` and Filters
-
-```typescript
-import * as schema from "./schema";
-const db = drizzle(pool, { schema }); // pass schema to enable relational queries
-
-// BAD: manual joins for simple relation fetching
-const result = await db
-  .select()
-  .from(users)
-  .leftJoin(posts, eq(users.id, posts.userId));
-
-// GOOD: relational query API — automatic joins, nested types
-const result = await db.query.users.findMany({
-  with: {
-    posts: true,
-  },
+```ts
+const user = await db.query.users.findFirst({
+  where: eq(users.id, id),
+  with: { memberships: { with: { group: true } } },
 });
+```
 
-// Filter and limit nested relations
-const result = await db.query.users.findMany({
+## Relational Queries
+
+```ts
+// BAD: every column of both tables, for a list that shows two
+await db.query.users.findMany({ with: { posts: true } });
+
+// GOOD: name the columns at each level
+await db.query.users.findMany({
+  columns: { id: true, name: true },
   with: {
     posts: {
-      where: (posts, { eq }) => eq(posts.published, true),
+      columns: { id: true, title: true },
+      where: (p, { eq }) => eq(p.published, true),
+      orderBy: (p, { desc }) => [desc(p.createdAt)],
       limit: 5,
-      orderBy: (posts, { desc }) => [desc(posts.createdAt)],
     },
   },
 });
 ```
 
-## Relations v2 — Landing in Drizzle v1.0
+Use `db.query` for nested shapes. Use `db.select()` with joins for flat rows,
+aggregates, and reports; a join is not a smell.
 
-The relations API above is the **stable 0.45.x** syntax — keep using it until v1.0 ships. Drizzle **v1.0** (currently `drizzle-orm@rc`) replaces per-table `relations()` with a single `defineRelations`, and you pass `{ relations }` to `drizzle()` instead of `{ schema }`. Know the shape so you recognize and can migrate v2 code:
+## Writes
 
-```typescript
-import { defineRelations } from "drizzle-orm";
-import * as schema from "./schema";
+```ts
+const [user] = await db.insert(users).values(input).returning();
 
-// v1 keys → v2 keys:  fields → from,  references → to,  relationName → alias
-export const relations = defineRelations(schema, (r) => ({
-  users: { posts: r.many.posts({ from: r.users.id, to: r.posts.authorId }) },
-  posts: { author: r.one.users({ from: r.posts.authorId, to: r.users.id }) },
-}));
-
-// many-to-many is native in v2 — no relation defined for the junction table:
-//   groups: r.many.groups({
-//     from: r.users.id.through(r.usersToGroups.userId),
-//     to:   r.groups.id.through(r.usersToGroups.groupId),
-//   })
-
-const db = drizzle(client, { relations }); // not { schema }
-```
-
-v2 queries also take **object-style** `where` / `orderBy` and can filter parent rows by a related table's columns (v1 can only filter children):
-
-```typescript
-await db.query.users.findMany({ where: { id: 1 }, with: { posts: true } });
-```
-
-During the `@rc` migration window, v2 lives on `db.query` while your old v1-style callback queries keep working on `db._query`.
-
-## Queries — Select Only What You Need
-
-```typescript
-// BAD: fetches all columns
-const allUsers = await db.select().from(users);
-
-// GOOD: partial select — less data over the wire
-const names = await db
-  .select({ id: users.id, name: users.name })
-  .from(users);
-```
-
-## Queries — Insert, Update, Delete
-
-```typescript
-// Insert with returning
-const [newUser] = await db
-  .insert(users)
-  .values({ name: "Alice", email: "alice@example.com" })
-  .returning();
-
-// Upsert (PostgreSQL)
 await db
   .insert(users)
-  .values({ email: "alice@example.com", name: "Alice" })
-  .onConflictDoUpdate({
-    target: users.email,
-    set: { name: "Alice Updated" },
-  });
+  .values(input)
+  .onConflictDoUpdate({ target: users.email, set: { name: input.name } });
+```
 
-// Update
-await db.update(users).set({ name: "Bob" }).where(eq(users.id, 1));
+Since 0.44 a driver error arrives wrapped in `DrizzleQueryError`. The Postgres
+code is on `cause`:
 
-// Delete
-await db.delete(users).where(eq(users.id, 1));
+```ts
+// BAD: always undefined since 0.44; every duplicate becomes a 500
+if (err.code === "23505") throw new AppError("Email taken", 409);
+
+// GOOD
+if (err instanceof DrizzleQueryError && (err.cause as { code?: string })?.code === "23505") {
+  throw new AppError("Email taken", 409);
+}
 ```
 
 ## Transactions
 
-```typescript
-// BAD: separate queries — no atomicity
-await db.insert(orders).values(order);
-await db.update(inventory).set({ stock: sql`stock - 1` }).where(eq(inventory.id, itemId));
-
-// GOOD: wrap in transaction
+```ts
+// BAD: `db` inside the callback runs outside the transaction; it never rolls back
 await db.transaction(async (tx) => {
   await tx.insert(orders).values(order);
-  await tx
-    .update(inventory)
-    .set({ stock: sql`stock - 1` })
+  await db.update(inventory).set({ stock: sql`${inventory.stock} - 1` })
+    .where(eq(inventory.id, itemId));
+});
+
+// GOOD: every statement goes through tx
+await db.transaction(async (tx) => {
+  await tx.insert(orders).values(order);
+  await tx.update(inventory).set({ stock: sql`${inventory.stock} - 1` })
     .where(eq(inventory.id, itemId));
 });
 ```
 
-## Migrations — Config and Workflow
+A thrown error rolls back. `tx.rollback()` rolls back on purpose. Pass
+`{ isolationLevel: "serializable" }` as the second argument when two writers race.
 
-```typescript
-// drizzle.config.ts
-import { defineConfig } from "drizzle-kit";
+## Pagination and Soft Deletes
 
-export default defineConfig({
-  dialect: "postgresql",
-  schema: "./src/db/schema.ts",
-  out: "./drizzle",
-  strict: true, // prompts on ambiguous changes like renames
-  dbCredentials: { url: process.env.DATABASE_URL! },
-});
+```ts
+// BAD: OFFSET reads and throws away every skipped row; page 500 is slow
+.orderBy(desc(posts.createdAt)).limit(20).offset(page * 20)
+
+// GOOD: keyset — continue after the last row the client saw
+.where(or(lt(posts.createdAt, cursor.createdAt),
+  and(eq(posts.createdAt, cursor.createdAt), lt(posts.id, cursor.id))))
+.orderBy(desc(posts.createdAt), desc(posts.id)).limit(20)
 ```
+
+Index `(createdAt, id)` for it. For soft deletes, add `deletedAt` and filter
+`isNull(t.deletedAt)` in every query; neither `db.query` nor `select()` does it
+for you. Give hot lookups a partial index:
+
+```ts
+index("posts_live_idx").on(t.userId).where(sql`deleted_at is null`),
+```
+
+## Migrations
 
 ```bash
-# 1. Generate migration from schema diff
-drizzle-kit generate --name=add_posts_table
-
-# 2. Review the generated SQL in ./drizzle/ before applying
-
-# 3a. Apply migrations (production — uses migration journal)
-drizzle-kit migrate
-
-# 3b. Push directly (dev only — no migration files)
-drizzle-kit push
-
-# Pull schema from existing database
-drizzle-kit pull
-
-# Custom/seed migration (empty SQL file you write yourself)
-drizzle-kit generate --name=seed_users --custom
+drizzle-kit generate --name=add_posts   # review the SQL before it runs
+drizzle-kit migrate                     # applies it
+drizzle-kit push                        # local prototyping only
 ```
 
-## Migrations — Programmatic Apply
-```typescript
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const db = drizzle(pool);
-
-await migrate(db, { migrationsFolder: "./drizzle" });
-await pool.end();
-```
-
-## Migrations — Rename Columns Safely
-
-Drizzle Kit may interpret renames as drop + add = **data loss**. With `strict: true` it will prompt you. Write a custom migration instead:
-
-```sql
--- drizzle/XXXX_rename_name_to_full_name/migration.sql
-ALTER TABLE "users" RENAME COLUMN "name" TO "full_name";
-```
-
-## Migrations — Add Non-Nullable Column Safely
-
-Generate the column addition, then use `--custom` for backfill + constraint:
-
-```sql
-ALTER TABLE "users" ADD COLUMN "role" VARCHAR(20);             -- 1. nullable
-UPDATE "users" SET "role" = 'member' WHERE "role" IS NULL;     -- 2. backfill
-ALTER TABLE "users" ALTER COLUMN "role" SET NOT NULL;           -- 3. constrain
-```
+Renames, custom SQL, production runs, CI drift checks, and the 1.0 upgrade are in
+MIGRATIONS.md. Safe DDL on a live table is in the sql skill.
 
 ## Rules
 
-1. **Use identity columns** (`generatedAlwaysAsIdentity()`) over `serial` for PostgreSQL
-2. **Explicit snake_case column names** — always pass the SQL name string
-3. **Infer types from schema** — use `$inferInsert` / `$inferSelect`, never manual interfaces
-4. **Define relations separately** — `relations()` calls live alongside table definitions
-5. **Use relational query API** (`db.query.X.findMany({ with })`) for nested data
-6. **Select only needed columns** — avoid bare `select()` in production queries
-7. **Wrap multi-table writes in transactions** — `db.transaction()`
-8. **Always review generated SQL** before running `drizzle-kit migrate`
-9. **Enable `strict: true`** in drizzle config — catches ambiguous renames
-10. **Never use `push` in production** — always use migration files via `generate` + `migrate`
-11. **Three-step non-nullable columns** — add nullable, backfill, set NOT NULL
-12. **Commit migration files to version control** — they are your database changelog
-13. **Run `drizzle-kit generate` in CI** to detect schema drift
+1. **Always use identity columns**, never `serial`.
+2. **Always set `casing: "snake_case"`** in both `drizzle()` and `drizzle.config.ts`; never name columns by hand.
+3. **Always use `timestamp({ withTimezone: true })`.**
+4. **Always index a foreign key column** — Postgres does not.
+5. **Always keep schema files under 200 lines**, one per domain.
+6. **Always infer types** with `$inferInsert` / `$inferSelect`.
+7. **Always give a junction table its own `relations()`**, and one `relations()` per table.
+8. **Always name `columns`** in relational queries that feed a list or an API.
+9. **Always read the Postgres code from `err.cause`** of a `DrizzleQueryError`.
+10. **Never use `db` inside a transaction callback** — use `tx`.
+11. **Never paginate deep lists with OFFSET** — use a keyset on an indexed pair.
+12. **Never use `push` against a shared or production database.**
+
+## Reference Files
+
+- **MIGRATIONS.md** — read before editing `drizzle.config.ts`, generating or applying a migration, renaming a column, or upgrading to 1.0. Covers config, the 0.x file layout, renames, custom migrations, the one-shot production step, CI drift checks, and the 1.0 upgrade checklist with relations v2.
+- **RLS.md** — read before adding row-level security or a policy. Covers why the app must not connect as a superuser, `pgRole` and `pgPolicy`, setting the current user per request inside a transaction, and testing that a policy denies.
+- **CONNECTIONS.md** — read before creating the `db` instance or a test database. Covers `node-postgres` for a long-running server, the Next.js dev singleton, serverless drivers and transaction poolers, and a migrated test database.
