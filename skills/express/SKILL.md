@@ -1,15 +1,15 @@
 ---
 name: express
 category: Backend
-description: "MUST USE when writing or reviewing Express routes, middleware, or error handling. Express 5 — automatic async error forwarding, the four-argument error handler, named wildcards, validation at the boundary, thin routes, and the security baseline every production app needs. Bundle covers tRPC v11 on Express."
-tracks: express@5.2, @trpc/server@11.18
+description: "MUST USE when writing or reviewing Express routes, middleware, or error handling. Express 5 — automatic async error forwarding, the four-argument error handler, named wildcards, validation at the boundary, thin routes, and the security baseline every production app needs. Bundle covers tRPC v11 and Better Auth on Express."
+tracks: express@5.3, @trpc/server@11.19, better-auth@1.7, zod@4.x
 metadata:
   gate-paths: "**/*.ts, **/*.js"
 ---
 
 # Express
 
-Express 5 (5.2.x current; 5.1 is fine, Node 18+ required). If a file still uses
+Express 5 (5.3.x current; 5.1 is fine, Node 18+ required). If a file still uses
 `express@4`, the async and wildcard rules below do **not** apply to it — check
 `package.json` before assuming.
 
@@ -18,6 +18,7 @@ Express 5 (5.2.x current; 5.1 is fine, Node 18+ required). If a file still uses
 | Working on… | Read |
 |---|---|
 | tRPC routers, procedures, context, TRPCError, errorFormatter | TRPC.md |
+| Sign-in, sessions, requireAuth, ownership checks, Better Auth | AUTH.md |
 
 ## Project Structure
 
@@ -51,7 +52,7 @@ flow goes in `tests/`. Create a kind folder when its first file arrives, not bef
 Express 5 catches a rejected promise from a handler and sends it to the error
 middleware. The try/catch-and-`next(err)` dance is Express 4 muscle memory.
 
-```js
+```ts
 // BAD — Express 4 habit; the wrapper does nothing in 5
 app.get("/users/:id", async (req, res, next) => {
   try {
@@ -78,46 +79,52 @@ release a resource. Catching to re-throw is noise.
 Express identifies the error handler by **arity**. Three parameters and it is a
 normal middleware that never sees an error.
 
-```js
+```ts
 // BAD — silently never runs; Express sees a normal middleware
 app.use((err, req, res) => { res.status(500).json({ error: err.message }); });
 
 // GOOD — four parameters, registered after every route
-app.use((err, req, res, next) => {
-  const status = err.status ?? 500;
-  if (status >= 500) req.log.error({ err }, "unhandled");
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  if (res.headersSent) return next(err);  // mid-stream; let Express close the socket
+  const status = err instanceof AppError ? err.status : 500;
+  if (status >= 500) req.log.error({ err }, "unhandled");  // req.log: pino-http
   res.status(status).json({
     error: status >= 500 ? "Internal Server Error" : err.message,
   });
-});
+};
+app.use(errorHandler);
 ```
 
 Never send `err.message` for a 5xx — it leaks stack details and internal names.
 Client errors carry a message you wrote; server errors get a generic one.
 
-Order is load-bearing: routes → 404 handler → error handler. A `app.use` after
-the error handler is unreachable.
+Order is load-bearing: routes → 404 handler → error handler. Middleware after
+the error handler never sees an error, so the 404 handler must come before it.
 
 ## 3. One Error Type, Carrying Its Status
 
-```js
+```ts
+// BAD — a plain Error has no status; "not found" reaches the client as a 500
+throw new Error("User not found");
+
 // GOOD
 export class AppError extends Error {
-  constructor(message, status = 400, cause) {
+  status: number;
+  constructor(message: string, status = 400, cause?: unknown) {
     super(message, { cause });
     this.status = status;
   }
 }
 ```
 
-Anything thrown without a `status` is a bug, not a client error, and defaults to
+Anything thrown that is not an `AppError` is a bug, not a client error, and defaults to
 500. That is the correct default — an unexpected error is not a 400.
 
 ## 4. Validate at the Boundary, Once
 
 Parse the request into a typed value at the edge; below that, nothing revalidates.
 
-```js
+```ts
 // BAD — validation scattered through the handler
 app.post("/expenses", async (req, res) => {
   if (!req.body.amount) throw new AppError("amount required");
@@ -139,7 +146,7 @@ app.post("/expenses", async (req, res) => {
 
 Map `ZodError` to a 400 in the error handler, in one place:
 
-```js
+```ts
 if (err instanceof z.ZodError) {
   // Zod 4: z.flattenError(err). Zod 3: err.flatten().
   return res.status(400).json({ error: "Invalid request", details: z.flattenError(err) });
@@ -156,7 +163,7 @@ against Zod 4 and then formats nothing.
 Express 5 defines `req.query` with a getter and no setter. Assigning is silently
 useless in loose mode and throws in strict mode.
 
-```js
+```ts
 // BAD — no longer takes effect
 req.query = { ...req.query, page: 1 };
 
@@ -170,7 +177,7 @@ Same for `req.params` shape changes. Treat both as read-only input.
 
 `path-to-regexp` changed. A bare `*` throws at registration.
 
-```js
+```ts
 // BAD — throws on startup in Express 5
 app.get("/files/*", handler);
 
@@ -187,10 +194,14 @@ Optional `:param?` is gone too — use `{/:param}`.
 
 ## 7. `res.status()` Validates Now
 
-```js
+```ts
 res.status("404");   // TypeError — must be an integer
 res.status(99);      // RangeError — must be 100–999
-res.status(err.status ?? 500);   // GOOD — never pass through an unchecked value
+res.status(upstream.status ?? 500);  // BAD — "404" or 0 from upstream still throws
+
+// GOOD — check the value before it reaches res.status
+const status = Number.isInteger(upstream.status) ? upstream.status : 502;
+res.status(status);
 ```
 
 A status computed from user input or an upstream response can crash the handler.
@@ -202,7 +213,7 @@ A route reads input, calls one thing, and shapes the response. Business logic
 lives in a module that has never heard of HTTP — that is what makes it testable
 without a server and reusable from a job or a CLI.
 
-```js
+```ts
 // BAD — the route IS the feature
 app.post("/expenses", async (req, res) => {
   const input = CreateExpense.parse(req.body);
@@ -223,19 +234,30 @@ app.post("/expenses", async (req, res) => {
 
 Not optional, and not alternatives to each other — they solve different problems.
 
-```js
-app.use(helmet());                                    // security headers
+```ts
+// BAD — any site can call with the user's cookies, and a body has no size cap
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+
+// GOOD
+app.use(helmet());
 app.use(cors({ origin: ALLOWED_ORIGINS }));           // never `origin: true` in prod
 app.use(rateLimit({ windowMs: 60_000, limit: 100 })); // brute force, abuse
-app.use(express.json({ limit: "100kb" }));            // an unbounded body is a DoS
+app.use("/api", express.json({ limit: "100kb" }));    // an unbounded body is a DoS
 ```
+
+Scope the JSON parser to REST routes: tRPC and Better Auth read the body
+themselves (TRPC.md, AUTH.md). Since 5.3 an invalid `limit` throws at startup.
 
 Also: `app.set("trust proxy", 1)` behind a load balancer, or the rate limiter
 sees one IP for everyone and `req.ip` is wrong.
 
 ## 10. Shut Down Cleanly
 
-```js
+```ts
+// BAD — a deploy's SIGTERM kills every in-flight request
+app.listen(PORT);
+
 // GOOD
 const server = app.listen(PORT);
 for (const signal of ["SIGTERM", "SIGINT"]) {
@@ -267,3 +289,4 @@ Without this a deploy kills in-flight requests mid-write.
 ## Reference Files
 
 - **TRPC.md** — read before adding any endpoint to a repo that already has a tRPC router — a new route belongs there, not in a fresh REST handler — and when working on tRPC routers, procedures, or the Express adapter. Covers `createExpressMiddleware` and typed context, `protectedProcedure` middleware that narrows the context type, why a plain `Error` becomes a 500 and `TRPCError` does not, the error-code-to-HTTP mapping, `errorFormatter` for field-level Zod errors (and the Zod 3 → 4 difference), `maxBodySize`, and where tRPC and REST routes coexist in one app.
+- **AUTH.md** — read before touching sign-in, sessions, or who may access a row. Covers the Better Auth instance and Drizzle adapter, mounting `toNodeHandler` before the body parser, generating the schema with `npx auth`, a `requireAuth` middleware, ownership in the query, the tRPC `protectedProcedure`, CORS with credentials, rate limits, the React client, and testing with real sessions.

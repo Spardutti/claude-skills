@@ -64,18 +64,20 @@ being nullable afterwards.
 export const publicProcedure = t.procedure;
 
 export const protectedProcedure = t.procedure.use(async function isAuthed(opts) {
-  if (!opts.ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+  const user = opts.ctx.token ? await getUser(opts.ctx.token) : null;
+  if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
   return opts.next({
-    ctx: { user: opts.ctx.user },   // now non-nullable for everything downstream
+    ctx: { user },   // non-nullable for everything downstream
   });
 });
 ```
 
 ```ts
-// BAD — the check is real but the type is not; every procedure re-narrows
-publicProcedure.query(({ ctx }) => {
-  if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-  return load(ctx.user!.id);       // the `!` is the tell
+// BAD — every procedure repeats the lookup and the check; one will forget
+publicProcedure.query(async ({ ctx }) => {
+  const user = ctx.token ? await getUser(ctx.token) : null;
+  if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+  return load(user.id);
 });
 
 // GOOD
@@ -184,7 +186,7 @@ put the logic underneath and let both call it.
 - Always create context with a **function**, typed from `CreateExpressContextOptions` — a value built at startup is shared by every request.
 - Always keep `createContext` cheap; it runs on requests that then fail auth.
 - Always throw `TRPCError` with a code — a plain `Error` becomes a 500 with its message hidden.
-- Always define one `protectedProcedure` that narrows `ctx.user`, and reuse it; a `!` on `ctx.user` means the check is in the wrong place.
+- Always define one `protectedProcedure` that resolves the user and narrows `ctx.user`, and reuse it; an auth check inside a procedure is in the wrong place.
 - Always pass `cause` when wrapping a lower-level error, or the real failure never reaches your logs.
 - Always add an `errorFormatter` if a client renders field errors — and match it to your Zod major, `flatten()` for 3 and `z.flattenError` for 4.
 - Always set `maxBodySize` on the adapter; the Express body limit does not cover it.
