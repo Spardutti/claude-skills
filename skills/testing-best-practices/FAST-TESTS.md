@@ -74,11 +74,23 @@ def _test_db_name() -> str:
 
 The per-worker form only helps xdist: mutmut's children set no worker id, so under mutation testing they share one database and need the empty one.
 
+Stryker does set one. A setup that drops and rebuilds the test database forces `"concurrency": 1` while every worker shares it:
+
+```ts
+// BAD — globalSetup runs DROP DATABASE app_test WITH (FORCE); a second worker would wipe the first
+"concurrency": 1
+
+// GOOD — one database per Stryker worker, then raise concurrency
+parsed.pathname = parsed.pathname.replace(/_test$/, `_w${process.env.STRYKER_MUTATOR_WORKER}_test`);
+```
+
+Rename every scratch database a test creates for itself the same way. On one API this alone took a Stryker run from 326s to 90s.
+
 ## Hash Test Passwords With The Cheapest Settings
 
 Argon2 and bcrypt are slow on purpose. A fixture that hashes the test password at production strength charges that cost on **every login in every test** — on one API it was 15 of 54 seconds, and mutation testing multiplies it by every mutant.
 
-Verification reads the cost from the stored hash, so a cheap hash still runs the real algorithm through the real code path. Production keeps its settings; only the fixture changes.
+bcrypt and Argon2 verification reads the cost from the stored hash, so a cheap hash still runs the real algorithm through the real code path. Production keeps its settings; only the fixture changes. Check where your library reads its cost before relying on this.
 
 ```python
 # BAD — every login in every test pays the production cost
@@ -103,6 +115,16 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 // GOOD — bcrypt's minimum in the test fixture
 const passwordHash = await bcrypt.hash(TEST_PASSWORD, 4);
 ```
+
+A library that hardcodes its cost ignores a cheap stored hash. Better Auth's scrypt always runs at N 16384, r 16, so swap its hash and verify in tests:
+
+```ts
+// GOOD — the same scrypt at its lowest cost; Vitest sets VITEST in every worker, Stryker's too
+const cheap = process.env.VITEST === "true" ? { hash: hashPassword, verify: verifyPassword } : undefined;
+betterAuth({ emailAndPassword: { enabled: true, password: cheap } });
+```
+
+The fixture's stored hash must come from the same `hashPassword`. One made by the library's own hasher fails every test sign-in.
 
 Prefer the form that covers every hash the tests make (the bcrypt patch, Django's setting) over one that covers only the fixture: a test that registers a user through the API hashes too.
 
@@ -214,13 +236,16 @@ python -m cProfile -s tottime -m pytest -q | head -30      # where one run's tim
 time pytest -q tests/test_one.py::test_empty               # what every mutant pays just to start
 ```
 
+Time a run's split before predicting a gain. One Stryker run was 4s of tests and 11s of Vitest startup, so a cheaper hash could only save part of the 4s.
+
 Fix the limit the numbers show. Removing a lock does nothing while the CPUs are full; once a cheaper hash frees them, the same lock becomes the limit. One API: the empty test database alone gained nothing, the cheap hash took 943s to 557s, and the empty database on top took it to 439s.
 
 ## Rules
 
 - Always insert a fresh value into every unique column in a fixture, including a test builder's default arguments.
 - Never `DELETE FROM` or `TRUNCATE` a whole table to reset a test; give the suite an empty database.
-- Always hash test passwords with the algorithm's cheapest settings, in test setup only.
+- Always give each parallel worker its own database when test setup drops it, scratch databases included; never pin concurrency to 1 instead.
+- Always hash test passwords with the algorithm's cheapest settings, in test setup only; when the library hardcodes its cost, swap its hash and verify functions.
 - Always switch off cloud SDK credential probes in test setup.
 - Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image, WhiteNoise's static scan.
 - Always set `jit=off` on a Postgres test database.
