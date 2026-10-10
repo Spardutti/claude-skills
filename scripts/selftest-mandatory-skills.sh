@@ -17,10 +17,11 @@ printf -- '---\nname: api\ntracks: fastapi@0.141 (pypi)\nmetadata:\n  gate-paths
 # No paths:/tracks: — must stay advisory, or this change tightens skills that
 # never opted in.
 printf -- '---\nname: plain\n---\n## Rules\n- x\n' > .claude/skills/plain/SKILL.md
-# Hand-made: not in the manifest, so the automark never marks it and it must never be required.
-mkdir -p .claude/skills/brand
+# Hand-made: brand is listed under custom, so it is gated; loose is not listed, so it never is.
+mkdir -p .claude/skills/brand .claude/skills/loose
 printf -- '---\nname: brand\nmetadata:\n  gate-paths: "**/*.css"\n---\n## Rules\n- x\n' > .claude/skills/brand/SKILL.md
-printf '%s\n' '{"skills":["rx","api","plain"]}' > .claude/.claude-skills.json
+printf -- '---\nname: loose\nmetadata:\n  gate-paths: "**/*.scss"\n---\n## Rules\n- x\n' > .claude/skills/loose/SKILL.md
+printf '%s\n' '{"skills":["rx","api","plain"],"custom":["brand"]}' > .claude/.claude-skills.json
 printf '%s\n' '{"dependencies":{"react":"19.2.0"}}' > package.json
 printf '%s\n' '[project]' > pyproject.toml
 printf '%s\n' 'dependencies = ["fastapi>=0.141"]' >> pyproject.toml
@@ -60,7 +61,9 @@ must "the wrong stack's skill is not demanded"     allow   app/main.py        lo
 must "a skill without paths stays advisory"        generic src/util.go
 must "prose is still ungated"                      allow   NOTES.md           marker
 must "a jsx edit matches the second glob"          rx      src/legacy/a.jsx
-must "a hand-made skill is never mandatory"        allow   web/site.css       marker
+must "a skill listed under custom is mandatory"  brand   web/site.css       marker
+must "loading the custom skill clears it"        allow   web/site.css       loaded:brand
+must "a hand-made skill not listed is not"       allow   web/site.scss      marker
 
 # The same file written through Bash must reach the same verdict, or the
 # heredoc route walks past the mandatory skills the structured tools enforce.

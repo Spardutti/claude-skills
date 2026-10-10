@@ -162,6 +162,7 @@ Every install writes a manifest at `.claude/.claude-skills.json` recording what 
 - **Pre-check what you already have** in the picker — re-running doubles as an update screen; toggle to add or remove.
 - **Detect stale items** — skills/commands renamed or removed from the catalog upstream are flagged, and the CLI offers to delete them.
 - **Never touch what it didn't install** — the manifest is the CLI's own record; hand-written skills are invisible to it and always safe.
+- **Gate your own skills** — list a hand-written skill under `"custom"` (`"custom": ["brand"]`) and the skill gate enforces its `gate-paths` like an installed one. The CLI keeps `"custom"` as written and never deletes those skills. Never add your own skill to `"skills"`: a sync deletes anything there that is not in the catalog.
 
 ```bash
 npx @spardutti/claude-skills --sync

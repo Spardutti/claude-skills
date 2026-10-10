@@ -16,6 +16,7 @@ export async function readManifest(targetDir = process.cwd()) {
       skills: data.skills ?? [],
       commands: data.commands ?? [],
       agents: data.agents ?? [],
+      custom: data.custom ?? [],
     };
   } catch {
     return null; // no manifest — a pre-manifest project or a fresh install
@@ -23,15 +24,17 @@ export async function readManifest(targetDir = process.cwd()) {
 }
 
 // Record exactly what the CLI has installed. This is the CLI's source of truth —
-// it never deletes anything not listed here.
+// it never deletes anything not listed here. `custom` is the user's own gated skills, carried over untouched.
 export async function writeManifest(targetDir, { catalogVersion, skills, commands, agents }) {
   await mkdir(join(targetDir, ".claude"), { recursive: true });
+  const custom = (await readManifest(targetDir))?.custom ?? [];
   const data = {
     catalogVersion,
     installedAt: new Date().toISOString(),
     skills: [...new Set(skills)].sort(),
     commands: [...new Set(commands)].sort(),
     agents: [...new Set(agents)].sort(),
+    custom,
   };
   await writeFile(manifestPath(targetDir), JSON.stringify(data, null, 2) + "\n");
 }

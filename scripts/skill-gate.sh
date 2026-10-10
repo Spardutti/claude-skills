@@ -116,7 +116,7 @@ MISSING=""
 ACKS=""
 MANIFESTS=""
 if [ -n "$TARGETS" ]; then
-  INSTALLED=$(tr -d ' \n' 2>/dev/null < "$PROJECT_DIR/.claude/.claude-skills.json" | grep -o '"skills":\[[^]]*\]')
+  INSTALLED=$(tr -d ' \n' 2>/dev/null < "$PROJECT_DIR/.claude/.claude-skills.json" | grep -oE '"(skills|custom)":\[[^]]*\]')
   MANIFESTS=$(find "$PROJECT_DIR" -maxdepth 4 \( -name node_modules -o -name .git -o -name .venv -o -name dist \) -prune -o \( -name package.json -o -name pyproject.toml -o -name requirements.txt \) -print 2>/dev/null)
 fi
 if [ -n "$TARGETS" ]; then
@@ -136,7 +136,7 @@ if [ -n "$TARGETS" ]; then
     SNAME=$(sed -n 's/^name:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
     [ -z "$SPATHS" ] && continue
     [ -z "$SNAME" ] && continue
-    case "$INSTALLED" in *"\"$SNAME\""*) ;; *) continue ;; esac  # automark never marks a hand-made skill
+    case "$INSTALLED" in *"\"$SNAME\""*) ;; *) continue ;; esac  # automark marks only installed and custom skills
 
     HIT=""
     for G in $(printf '%s' "$SPATHS" | tr ',' ' '); do

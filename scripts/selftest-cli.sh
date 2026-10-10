@@ -120,8 +120,22 @@ node -e "
   m.skills.push('gone-skill');
   fs.writeFileSync(f, JSON.stringify(m));
 "
+mkdir -p "$CP/.claude/skills/brand"
+printf -- '---\nname: brand\n---\n' > "$CP/.claude/skills/brand/SKILL.md"
+node -e "
+  const f='$CP/.claude/.claude-skills.json', fs=require('fs');
+  const m=JSON.parse(fs.readFileSync(f,'utf8'));
+  m.custom=['brand'];
+  fs.writeFileSync(f, JSON.stringify(m));
+"
 OUT=$(cli_run "$CP" --sync)
 cli_case "an item dropped upstream is pruned" "Pruned 1 item" "$OUT"
+N=$((N+1))
+if [ -f "$CP/.claude/skills/brand/SKILL.md" ] && grep -q '"brand"' "$CP/.claude/.claude-skills.json"; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "a custom skill survives a sync, on disk and in the list"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n' "a custom skill survives a sync, on disk and in the list"
+fi
 N=$((N+1))
 if [ -d "$CP/.claude/skills/gone-skill" ]; then
   FAIL=$((FAIL+1)); printf '  FAIL %s\n' "and its directory is gone"

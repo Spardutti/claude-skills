@@ -76,4 +76,9 @@ MINE=$(printf '{"session_id":"%s","tool_name":"Skill","tool_input":{"skill":"min
        | bash .claude/hooks/skill-gate-automark.sh)
 ok=0; [ -z "$MINE" ] && [ ! -f "/tmp/claude-skill-loaded-$AKID-mine" ] && ok=1
 ack "a hand-made skill is never asked for an ack" $ok "$MINE"
+printf '{\n  "skills": [\n    "rx"\n  ],\n  "custom": [\n    "mine"\n  ]\n}\n' > .claude/.claude-skills.json
+MINE=$(printf '{"session_id":"%s","tool_name":"Skill","tool_input":{"skill":"mine"}}' "$AKID" \
+       | bash .claude/hooks/skill-gate-automark.sh)
+ok=0; case "$MINE" in *"touch /tmp/claude-skill-acked-$AKID-mine"*) ok=1 ;; esac
+ack "a hand-made skill listed under custom is asked for an ack" $ok "$MINE"
 rm -f "/tmp/claude-skill-gate-$AKID" "/tmp/claude-skill-loaded-$AKID-code-review" "/tmp/claude-skill-loaded-$AKID-mine"
