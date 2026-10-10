@@ -85,7 +85,7 @@ GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alem
 # Override in .claude/gauntlet.conf to mutate components too.
 GAUNTLET_NO_MUTATE='\.(tsx|jsx)$'
 [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
-[ -f ".claude/gauntlet.conf" ] && . ".claude/gauntlet.conf"
+CONF=.claude/gauntlet.conf; [ -f "$CONF" ] || CONF="$HERE/../gauntlet.conf"; [ -f "$CONF" ] && . "$CONF"
 
 # ------------------------------------------------------------------- the scope
 BASE="${1:-}"

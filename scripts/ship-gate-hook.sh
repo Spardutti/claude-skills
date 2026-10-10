@@ -46,9 +46,42 @@ GATE="$PROJECT_DIR/.claude/hooks/ship-gate.sh"
 [ -x "$GATE" ] || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+pr_branch() {
+  case "$CMD" in
+    *"gh pr create"*) printf '%s\n' "$CMD" | sed -nE 's/.*(--head[ =]|-H )([^ ;&|]+).*/\2/p' ;;
+    *"gh pr merge"*) merge_branch ;;
+  esac
+}
+
+merge_branch() {
+  local pr="" repo="" next=""
+  for t in $(printf '%s\n' "$CMD" | sed 's/.*gh pr merge//; s/[;&|].*//'); do
+    if [ "$next" = repo ]; then repo=$t; next=""; continue; fi
+    case "$t" in
+      -R|--repo) next=repo ;;
+      --repo=*) repo=${t#--repo=} ;;
+      -*) ;;
+      *) [ -z "$pr" ] && pr=$t ;;
+    esac
+  done
+  [ -n "$pr" ] || return 0
+  gh pr view "$pr" ${repo:+-R "$repo"} --json headRefName -q .headRefName 2>/dev/null
+}
+
+worktree_of() {
+  git worktree list --porcelain 2>/dev/null \
+    | awk -v b="refs/heads/$1" '/^worktree /{w=substr($0,10)} $0=="branch " b {print w; exit}'
+}
+
+# A PR from a worktree ships that folder's diff, so its receipt is keyed there,
+# not in the folder this session started in.
+TARGET="$PROJECT_DIR"
+BRANCH=$(pr_branch)
+[ -n "$BRANCH" ] && WT=$(worktree_of "$BRANCH") && [ -n "$WT" ] && TARGET="$WT"
+
 # Ask the gate for the key rather than recomputing it here. Two implementations
 # of the same rule drift, and the drift is silent.
-KEY=$(bash "$GATE" --key 2>/dev/null)
+KEY=$(CLAUDE_PROJECT_DIR="$TARGET" bash "$GATE" --key 2>/dev/null)
 [ -z "$KEY" ] && exit 0
 
 RECEIPT="/tmp/claude-shipgate-$KEY"
@@ -69,6 +102,10 @@ previous receipt on purpose.
 
 Do NOT hand-roll a substitute check: only ship-gate.sh writes a receipt, so a
 weaker check you designed yourself cannot be passed off as this one.
+
+From a worktree, run the gate there and name the branch with --head:
+
+  CLAUDE_PROJECT_DIR=<worktree> bash $GATE
 
 To publish without the gate, say so out loud and run:
 

@@ -115,6 +115,9 @@ Print the scope, then run the checks cheapest first, stopping at the first that 
 bash .claude/hooks/ship-gate.sh
 ```
 
+In a git worktree, run this folder's gate against the worktree — `CLAUDE_PROJECT_DIR=<worktree> bash .claude/hooks/ship-gate.sh` — and
+open the PR with `--head <branch>`, so the hook finds that worktree's receipt. Never `--force` here to cover a worktree.
+
 These two are arithmetic and a tool invocation. They are deliberately **not** described
 here as things to carry out, because a check written in prose is a check a model can
 decide is not worth it — and that is exactly what happened the first time this gate ran.
