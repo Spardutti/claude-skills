@@ -103,3 +103,10 @@ structure_fail() {
   rm -f "$RECEIPT"
   exit 1
 }
+
+# An agent that pipes the gate through `tail` cuts the findings off; the last line still says where they are.
+gate_report() {
+  REPORT="/tmp/claude-shipgate-$1.log"
+  exec > >(tee "$REPORT") 2>&1
+  trap 'echo "ship-gate: full output in $REPORT"' EXIT
+}

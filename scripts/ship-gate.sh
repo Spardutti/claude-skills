@@ -112,8 +112,7 @@ CHANGED=$(changed_files)
 # diff-based key changes when the content did not, and the receipt would go stale
 # the moment it was committed. This is identical either side of a commit, and
 # changes the instant any of those files is edited.
-RECEIPT_KEY=$(receipt_key)
-RECEIPT="/tmp/claude-shipgate-$RECEIPT_KEY"
+RECEIPT_KEY=$(receipt_key); RECEIPT="/tmp/claude-shipgate-$RECEIPT_KEY"
 
 if [ "$MODE" = key ]; then printf '%s\n' "$RECEIPT_KEY"; exit 0; fi
 if [ "$MODE" = force ]; then
@@ -121,6 +120,7 @@ if [ "$MODE" = force ]; then
   echo "ship-gate: FORCED — receipt written without running any check."
   exit 0
 fi
+gate_report "$RECEIPT_KEY"
 SOURCED=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
         | grep -vE '(\.|_)(test|spec)\.[^.]+$|(^|/)tests?/|(^|/)\.stryker-tmp/' | while read -r f; do
           [ -f "$f" ] && printf '%s\n' "$f"

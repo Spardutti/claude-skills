@@ -72,6 +72,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed
 . "$HERE/selftest-ship-gate-structure.sh"  # where a new file may live
 . "$HERE/selftest-ship-gate-fail-fast.sh"  # no mutation run after a cheap check fails
+. "$HERE/selftest-ship-gate-report.sh"    # the last line names the saved output
 . "$HERE/selftest-timing.sh"             # how long the Stop hook and the ship gate took
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
 . "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
