@@ -17,6 +17,10 @@ printf -- '---\nname: api\ntracks: fastapi@0.141 (pypi)\nmetadata:\n  gate-paths
 # No paths:/tracks: — must stay advisory, or this change tightens skills that
 # never opted in.
 printf -- '---\nname: plain\n---\n## Rules\n- x\n' > .claude/skills/plain/SKILL.md
+# Hand-made: not in the manifest, so the automark never marks it and it must never be required.
+mkdir -p .claude/skills/brand
+printf -- '---\nname: brand\nmetadata:\n  gate-paths: "**/*.css"\n---\n## Rules\n- x\n' > .claude/skills/brand/SKILL.md
+printf '%s\n' '{"skills":["rx","api","plain"]}' > .claude/.claude-skills.json
 printf '%s\n' '{"dependencies":{"react":"19.2.0"}}' > package.json
 printf '%s\n' '[project]' > pyproject.toml
 printf '%s\n' 'dependencies = ["fastapi>=0.141"]' >> pyproject.toml
@@ -56,6 +60,7 @@ must "the wrong stack's skill is not demanded"     allow   app/main.py        lo
 must "a skill without paths stays advisory"        generic src/util.go
 must "prose is still ungated"                      allow   NOTES.md           marker
 must "a jsx edit matches the second glob"          rx      src/legacy/a.jsx
+must "a hand-made skill is never mandatory"        allow   web/site.css       marker
 
 # The same file written through Bash must reach the same verdict, or the
 # heredoc route walks past the mandatory skills the structured tools enforce.
@@ -91,6 +96,7 @@ mkdir -p .claude/skills/dbq .claude/skills/dock .claude/skills/rx
 printf -- '---\nname: dbq\nmetadata:\n  gate-paths: "**/*.sql"\n---\n## Rules\n- x\n' > .claude/skills/dbq/SKILL.md
 printf -- '---\nname: dock\nmetadata:\n  gate-paths: "**/Dockerfile*, **/docker-compose*.yml"\n---\n## Rules\n- x\n' > .claude/skills/dock/SKILL.md
 printf -- '---\nname: rx\ntracks: react@19.2\nmetadata:\n  gate-paths: "**/*.tsx"\n---\n## Rules\n- x\n' > .claude/skills/rx/SKILL.md
+printf '%s\n' '{"skills":["dbq","dock","rx"]}' > .claude/.claude-skills.json
 # Deliberately no package.json and no pyproject.toml: a repo with no manifest
 # at all must still get its path-only skills.
 node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
@@ -120,6 +126,7 @@ echo "a universal skill claims every gated file"
 newrepo sg_univ
 mkdir -p .claude/skills/univ
 printf -- '---\nname: univ\nmetadata:\n  gate-paths: "**/*"\n---\n## Rules\n- x\n' > .claude/skills/univ/SKILL.md
+printf '%s\n' '{"skills":["univ"]}' > .claude/.claude-skills.json
 node -e "import('$HERE/../cli/lib/setup-hook.mjs').then(m=>m.setupHook('$PWD'))" >/dev/null 2>&1
 SKG=".claude/hooks/skill-gate.sh"
 MSID="uv$RUN"
