@@ -272,7 +272,7 @@ for owner in $OWNERS; do
     # 8 of them on one commit, all long since killed. --mutate already scopes
     # the run to the changed hunks, so incremental buys nothing here and costs
     # a cache that goes stale exactly the way mutmut's did.
-    CMD="${RUN}npx --no-install stryker run --concurrency $(gate_workers) --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
+    CMD="${RUN}$(stryker_bin "$base") run --concurrency $(gate_workers) --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
   elif [ -z "$PY" ] && [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix ${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner
@@ -411,7 +411,7 @@ for owner in $OWNERS; do
     STATUS=1
   elif [ $RC -ne 0 ]; then
     echo "  $label $TOOL (${T}s) — the run failed:"
-    printf '%s\n' "$OUT" | tail -12 | sed 's/^/      /'
+    printf '%s\n' "$OUT" | tail -12 | sed 's/^/      /'; stryker_elsewhere "$TOOL" "$base"
     [ "$STATUS" = 0 ] && STATUS=2
   elif [ -n "$NOTE" ]; then
     printf '%s\n' "$NOTE"

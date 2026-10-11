@@ -212,7 +212,14 @@ exec docker compose run --rm -T api pytest "$@"
 ```
 
 `.gauntlet-test` takes the changed files as arguments; `.gauntlet-typecheck` takes
-none. The ship gate reads `.mutmut-run` the same way.
+none. The ship gate reads `.mutmut-run` and `.stryker-run` the same way, each taking
+the arguments `mutmut` or `stryker` would:
+
+```sh
+# api/.stryker-run
+#!/bin/sh
+exec docker compose run --rm -T test nice -n 19 npx stryker "$@"
+```
 
 This is per **project**, not per repo — any directory holding a `package.json` or
 `pyproject.toml`. `GAUNTLET_TEST` disables detection everywhere, so a monorepo

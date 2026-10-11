@@ -25,6 +25,18 @@ py_mutmut() {
   command -v mutmut >/dev/null 2>&1 && printf 'mutmut\n'
 }
 
+# Node that lives only in Docker leaves no Stryker on the host. An executable
+# .stryker-run runs it there instead, taking the arguments stryker would.
+stryker_bin() { if [ -x "$1.stryker-run" ]; then echo ./.stryker-run; else echo npx --no-install stryker; fi; }
+stryker_elsewhere() {  # stryker_elsewhere <tool> <base>: after a failed run, say where Stryker could run
+  [ "$1" = stryker ] && [ ! -x "$2.stryker-run" ] || return 0
+  d=$(cd "${2:-.}" && pwd)
+  while [ "$d" != / ]; do [ -d "$d/node_modules/@stryker-mutator/core" ] && return 0; d=$(dirname "$d"); done
+  echo "      Stryker is not installed on this machine. If Node runs only in Docker, add an"
+  echo "      executable $2.stryker-run that runs it there and passes on its arguments:"
+  echo "        docker compose run --rm -T <service> nice -n 19 npx stryker \"\$@\""
+}
+
 owner_of() {
   d=$(dirname "$1")
   while :; do
