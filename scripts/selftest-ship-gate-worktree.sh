@@ -5,7 +5,7 @@
 echo "ship-gate from a worktree"
 newrepo sg-wt
 mkdir -p .claude/hooks
-cp "$SG" "$SGH" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" .claude/hooks/
+cp "$SG" "$SGH" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" .claude/hooks/
 chmod +x .claude/hooks/*.sh
 H=".claude/hooks/ship-gate-hook.sh"
 printf "GAUNTLET_MUTATE='echo clean'\n" > .claude/gauntlet.conf

@@ -46,7 +46,7 @@
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-. "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
+. "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" && . "$HERE/ship-gate-files.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
 
 MODE=""
 case "${1:-}" in
@@ -122,7 +122,7 @@ if [ "$MODE" = force ]; then
 fi
 gate_report "$RECEIPT_KEY"
 SOURCED=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
-        | grep -vE '(\.|_)(test|spec)\.[^.]+$|(^|/)tests?/|(^|/)\.stryker-tmp/' | while read -r f; do
+        | grep -vE "$TEST_RE|(^|/)\.stryker-tmp/" | while read -r f; do
           [ -f "$f" ] && printf '%s\n' "$f"
         done)
 
@@ -223,6 +223,7 @@ for owner in $OWNERS; do
   OWNED=$(while IFS= read -r f; do
             [ "$(owner_of "$f")" = "$owner" ] && printf '%s\n' "$f"
           done <<< "$FILES" | grep -vE "$GAUNTLET_NO_MUTATE" || true)
+  FCTX=""; if stryker_owner "$owner" "$OWNED"; then FCTX=$(files_context "$owner" "$OWNED"); files_split "$FCTX" "$owner" "$label"; fi
   [ -z "$OWNED" ] && continue
 
   # ONE comma-joined --mutate value, never a flag per range. Stryker's CLI
@@ -324,32 +325,9 @@ for owner in $OWNERS; do
   T0=$SECONDS; OUT=$(export FILES="$(printf '%s' "$OWNED" | tr '\n' ' ')" MUTATE_FLAGS="--mutate ${FLAGS#,}"; eval "$CMD" 2>&1); RC=$?; T=$((SECONDS - T0))
   [ "$TOOL" = mutmut ] && [ $RC -eq 0 ] && { printf '%s\n' "$OUT" > "$PKEY.out"; cp "$MLOG" "$PKEY.log" 2>/dev/null; }
   [ -n "$SCOPE_RE" ] && [ $RC -eq 0 ] && OUT=$(printf '%s\n' "$OUT" | grep -E "^[[:space:]]*($SCOPE_RE)\.x")
-  # Match a finding, never a summary row. Stryker prints a `# survived` COLUMN
-  # HEADER every run and repeats the word in its table, so a bare grep reports
-  # survivors on a clean run — worse than not running at all. Stryker marks each
-  # real finding `[Survived]`; table and border lines are excluded outright.
-  # NoCoverage is printed exactly like Survived and means something worse: not
-  # "a test missed this mutation" but "no test executes this line at all". The
-  # gate matched only [Survived], so a diff whose files have no tests came back
-  # PASS — 306 uncovered mutants reported as proven on one commit. It is judged
-  # only for files that went in WITH a range: a glob-shaped path is mutated
-  # whole, so its untouched lines would report uncovered forever, and a finding
-  # nobody can close is what teaches people to --force.
-  #
-  # The status line carries no file name; the line under it does, as
-  # file:line:column. They are paired here rather than grepped separately.
   if [ "$TOOL" = stryker ]; then
-    ALL=$(printf '%s\n' "$OUT" | awk -v globbed="$GLOBBED" '
-      /^\[Survived\]/   { pend = $0; kind = "s"; next }
-      /^\[NoCoverage\]/ { pend = $0; kind = "n"; next }
-      pend != "" {
-        file = $0; sub(/:[0-9]+:[0-9]+$/, "", file)
-        if (kind == "s" || index(globbed, "," file ",") == 0) print pend "  " $0
-        pend = ""
-      }
-      # A survivor with no location under it is still a survivor, never dropped.
-      END { if (pend != "" && kind == "s") print pend }
-    ')
+    ALL=$(stryker_findings "$OUT" "$GLOBBED")
+    [ -n "$FCTX" ] && [ $RC -eq 0 ] && files_record "$FCTX" "$owner" "$ALL"
   else
     ALL=$(printf '%s\n' "$OUT" | grep -E '[Ss]urvived' \
           | grep -vE '^[[:space:]]*[#│|+-]|# *surviv')

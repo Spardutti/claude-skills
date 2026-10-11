@@ -60,7 +60,7 @@ echo "export const c = 3" >> apps/admin/src/a.ts
 ran_in "a change in one JS app re-runs every JS app" "admin web"
 
 echo "test" > apps/web/src/a.test.ts
-ran_in "a changed test re-runs its kind" "admin web"
+ran_in "a new test file re-runs nothing: adding a test cannot revive a mutant" ""
 
 echo "# notes" > apps/web/NOTES.md
 ran_in "a docs change re-runs nothing" ""
@@ -77,7 +77,7 @@ ran_in "--baseline after a change asks mutmut, not a JS app that passed" "api" -
 
 # A verdict from an older gate is a verdict from whatever bugs it had.
 mkdir -p "$TMP/gate2"
-cp "$SG" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$TMP/gate2/"
+cp "$SG" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$TMP/gate2/"
 echo "# a newer gate" >> "$TMP/gate2/ship-gate.sh"
 SG_REAL=$SG; SG="$TMP/gate2/ship-gate.sh"
 ran_in "a changed gate trusts no verdict an older one recorded" "admin api web"

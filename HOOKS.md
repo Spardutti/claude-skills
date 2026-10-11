@@ -309,6 +309,13 @@ than riding on the previous verdict. `ship-gate.sh --force` writes a FORCED
 receipt, which makes skipping a visible command rather than a private judgement
 call.
 
+**A file that passed is not mutated again** while nothing it rests on moves: the
+file itself, other code of its kind, the base, and the gate. Tests are the
+exception. A test that only gained lines keeps the verdict, because adding a test
+cannot let a mutant through. A test that lost a line re-mutates every file. So
+after a run with findings, the next one mutates only the files you fixed. A change
+in a file it calls is not re-checked, and the output says so. Stryker only.
+
 **Known hole:** a PR opened in the GitHub web UI meets no gate.
 
 ## Manual Install

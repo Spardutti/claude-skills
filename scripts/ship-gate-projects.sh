@@ -127,7 +127,7 @@ project_key() {  # project_key <owner> <tool>
   fam=$(family_of "$1/.")
   { printf '%s\n' "$PROJECT_DIR" "$1" "$2" "$(git rev-parse "$BASE" 2>/dev/null)" \
       "$GAUNTLET_NO_MUTATE" "$GAUNTLET_IGNORE_FILES"
-    cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh"
+    cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-files.sh"
     printf '%s\n' "$CHANGED" | grep -vE '\.(md|mdx|txt|rst|adoc)$' | while IFS= read -r f; do
       [ -n "$f" ] || continue
       case "$(family_of "$f")" in "$fam"|any) printf '%s\n' "$f"; [ -f "$f" ] && cat "$f" ;; esac
