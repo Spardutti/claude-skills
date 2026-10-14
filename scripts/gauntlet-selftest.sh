@@ -84,6 +84,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-skill-gate-bash.sh"    # Bash commands that write files, and which files are gated
 . "$HERE/selftest-mandatory-skills.sh"   # which skills are not optional
 . "$HERE/selftest-skill-ack.sh"          # the ack command, before any denial
+. "$HERE/selftest-skill-flags.sh"        # logging skills-audit verdicts, and /skill-report
 . "$HERE/selftest-line-limit.sh"         # the 200-line ratchet
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
 . "$HERE/selftest-fetch.sh"              # the CLI talking to GitHub

@@ -20,6 +20,8 @@ import { homedir } from "node:os";
 //   ship-gate-projects.sh     sourced by ship-gate.sh — project detection, reuse
 //   ship-gate-hook.sh         PreToolUse on Bash — no commit without a receipt
 //   version-check.sh          SessionStart — a line when a newer catalog exists
+//   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
+//   skill-report.mjs          read by /skill-report — tallies that log
 
 const GATE_FILENAME = "skill-gate.sh";
 const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
@@ -31,6 +33,8 @@ const SHIP_GATE_STRUCTURE_FILENAME = "ship-gate-structure.sh";
 const SHIP_GATE_FILES_FILENAME = "ship-gate-files.sh";
 const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
+const SKILL_FLAGS_FILENAME = "skill-flags-record.sh";
+const SKILL_REPORT_FILENAME = "skill-report.mjs";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -112,6 +116,8 @@ export async function setupHook(targetDir = process.cwd()) {
     SHIP_GATE_FILES_FILENAME,
     SHIP_GATE_HOOK_FILENAME,
     VERSION_CHECK_FILENAME,
+    SKILL_FLAGS_FILENAME,
+    SKILL_REPORT_FILENAME,
   ]) {
     const dest = join(hooksDir, name);
     await writeFile(dest, await readHookSource(name), { mode: 0o755 });
@@ -133,5 +139,6 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Hook installed: .claude/hooks/${GAUNTLET_FILENAME}`);
   console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
   console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
+  console.log(`  Hook installed: .claude/hooks/${SKILL_FLAGS_FILENAME}`);
   console.log(`  Settings updated: .claude/settings.json`);
 }

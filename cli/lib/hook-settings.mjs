@@ -11,6 +11,7 @@ const GAUNTLET_FILENAME = "gauntlet.sh";
 const SHIP_GATE_FILENAME = "ship-gate.sh";
 const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
+const SKILL_FLAGS_FILENAME = "skill-flags-record.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -114,6 +115,16 @@ export async function registerHooks(settingsPath) {
     upsert(settings.hooks.Stop, GAUNTLET_FILENAME, gauntletEntry);
   } else {
     settings.hooks.Stop = [gauntletEntry];
+  }
+
+  // No matcher: the script filters on agent_type itself.
+  const skillFlagsCommand = `$CLAUDE_PROJECT_DIR/.claude/hooks/${SKILL_FLAGS_FILENAME}`;
+  const skillFlagsEntry = { hooks: [{ type: "command", command: skillFlagsCommand }] };
+
+  if (Array.isArray(settings.hooks.SubagentStop)) {
+    upsert(settings.hooks.SubagentStop, SKILL_FLAGS_FILENAME, skillFlagsEntry);
+  } else {
+    settings.hooks.SubagentStop = [skillFlagsEntry];
   }
 
   // Both gates clear by touching a marker under /tmp. The hook scripts let those
