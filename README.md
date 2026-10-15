@@ -122,7 +122,7 @@ Cross-cutting craft — applies to any stack, any language.
 | `git-merge-conflicts` | Resolve a merge/rebase conflict by intent, not by side — `zdiff3` to see the merge base, the inverted meaning of `ours`/`theirs` during a rebase, the semantic and tree conflicts git never marks, lockfiles and migrations you regenerate instead of merging |
 | `research` | Open the source, don't recall it — route to the tool that owns the answer, primary sources only, pin the version you're actually on, run the validator instead of guessing, and mark every claim VERIFIED / INFERRED / UNVERIFIED |
 | `typescript-best-practices` | TypeScript 7.x — type design, generics, type guards, `satisfies`, `using`, error handling, `tsconfig` |
-| `testing-best-practices` 📦 | Arrange-Act-Assert, assertions that fail when the code breaks — exact values, list ties and short pages, side effects, both sides of a limit — factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite; bundle covers mutation testing — Stryker and mutmut setup, `ignoreStatic`, diff-scoped runs, the traps, and working score thresholds |
+| `testing-best-practices` 📦 | Arrange-Act-Assert, assertions that fail when the code breaks — exact values, list ties and short pages, side effects, both sides of a limit — factory-based test data, isolation, mocking boundaries, a pyramid-balanced suite; bundle covers mutation testing — Stryker and mutmut setup, `ignoreStatic`, diff-scoped runs, the traps, and working score thresholds; and property tests — fast-check and Hypothesis with a fixed seed so mutation runs stay stable |
 | `security-practices` | OWASP Top 10 prevention, input validation, auth, SQL injection, XSS, CSRF, secure defaults |
 
 ## Commands

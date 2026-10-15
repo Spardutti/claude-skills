@@ -1,10 +1,10 @@
 ---
 name: testing-best-practices
-tracks: vitest@5, pytest@9 (pypi)
+tracks: vitest@5, pytest@9 (pypi), fast-check@4, hypothesis@6 (pypi)
 metadata:
   gate-paths: "**/*.test.ts, **/*.test.tsx, **/*.spec.ts, **/*.spec.tsx, **/test_*.py, **/*_test.py"
 category: Foundations
-description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, assertions that fail when the code breaks (exact values, list ties, side effects, limits), factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage; bundle covers mutation testing (Stryker, mutmut) for proving the tests would catch a break."
+description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arrange-Act-Assert, assertions that fail when the code breaks (exact values, list ties, side effects, limits), factory-based test data, test isolation, mocking boundaries, and pyramid-balanced coverage; bundle covers mutation testing (Stryker, mutmut) for proving the tests would catch a break, and property tests (fast-check, Hypothesis)."
 ---
 
 # Testing Best Practices
@@ -15,6 +15,7 @@ description: "MUST USE when writing, reviewing, or modifying tests. Enforces Arr
 |---|---|
 | Proving the tests would catch a break — Stryker, mutmut, surviving mutants, mutation score | MUTATION-TESTING.md |
 | A slow suite, a database fixture, or tests that are slow or flaky under parallel workers — unique values, table resets, password hashing, cloud clients, per-start cost, worker counts and priority | FAST-TESTS.md |
+| Pure code with many possible inputs — parsers, serializers, money math, round trips, fast-check, Hypothesis, `test.prop`, `@given`, seeds | PROPERTY-TESTS.md |
 
 ## Testing Pyramid
 
