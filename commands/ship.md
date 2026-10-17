@@ -2,7 +2,7 @@
 name: ship
 description: "Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
 category: Workflow
-allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task
+allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task, Skill
 requires-agents: [gauntlet-skills]
 argument-hint: "[pr | release] [--force to skip the gate]"
 ---
@@ -29,7 +29,7 @@ Rules that always hold:
 - **Never re-do a satisfied stage** — already committed? start at pr.
 - **Never skip a required stage** — `/ship release` with uncommitted work runs commit → pr → merge → release first.
 - A merge into the **main** branch always asks for confirmation, even when a target is set.
-- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it. A release PR gets only the script, never the skills audit: every commit in it already passed the full gate in its own PR.
+- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it. A release PR gets only the script, never the skills audit or the bug review: every commit in it already passed the full gate in its own PR.
 
 ## Step 0 — Prechecks and Start Detection
 
@@ -93,14 +93,14 @@ findings before the PR.
 already passed this gate in their own PRs, and auditing them again started a skills agent
 over every file in the release. Before the release PR, run only the script. It compares
 against the dev branch, so it finds nothing to check and finishes in seconds, and it
-writes the receipt the PR needs. Skip the skills audit.
+writes the receipt the PR needs. Skip the skills audit and the bug review.
 
 This is the one enforcement moment. It does not re-run the test suite: the `gauntlet.sh`
-Stop hook already ran types and tests on every turn. It checks the three things nothing
+Stop hook already ran types and tests on every turn. It checks the four things nothing
 else does, and **it fixes what it finds** rather than handing you a list.
 
-Two of the three live in `ship-gate.sh` behind an exit code, and one — the skills audit —
-lives here, because it is the only one that genuinely needs a model.
+Two of the four live in `ship-gate.sh` behind an exit code, and two — the skills audit and the bug review —
+live here, because they are the ones that genuinely need a model.
 
 **Scope** — everything about to ship, and nothing else: `git diff <base>...HEAD` plus
 `git diff HEAD` and untracked files. Collect the changed source files and their changed
@@ -209,6 +209,27 @@ Never audit a skill yourself instead of launching its agent. The point of the su
 that it reads the skill fresh, with no memory of having decided earlier that the skill did
 not apply — which is exactly the failure this step exists to catch.
 
+### 4 — bug review: one `/code-review` round
+
+The other checks ask whether the code follows the rules and whether the tests notice a
+change. None asks whether the logic is right: a test that expects the wrong answer passes mutation.
+
+Run it once, after the skills audit, through the Skill tool:
+
+```
+/code-review medium origin/<base>...<branch>
+```
+
+Pass the level and the range every time. With no level it reuses the one the user typed
+last, and with no range it compares against `main`, not the dev branch. Use `origin/`: a local
+base that is behind re-reviews work already merged. Name the branch, not `HEAD`: in a worktree,
+`HEAD` is whatever folder the session sits in.
+
+Fix its findings the same way as the skills audit: apply the ones you agree with, say
+why for the ones you do not, and stop the ship on one that needs a design decision.
+**One round only** — do not review the fixes again. A reviewer re-run on its own fixes
+keeps finding older code, not new bugs. Re-run `ship-gate.sh` if anything changed.
+
 ### Result
 
 - **Everything fixed** → say what was fixed in one or two lines, then continue to the first stage. The fixes are part of the commit.
@@ -312,11 +333,12 @@ gh release create <version> --title '<version>' --notes-file <file>
 - NEVER merge a PR that is a draft, has conflicts, has failing CI, or is missing required reviews — stop and report.
 - NEVER squash the release PR into main — use a merge commit so the feature history survives for future changelog/version detection.
 - NEVER cut a `release/*` branch or back-merge main into dev — the version bump reaches main only through dev, so main never holds a commit dev lacks.
-- NEVER run the skills audit before a release PR — its commits already passed it; run only `ship-gate.sh`.
+- NEVER run the skills audit or the bug review before a release PR — its commits already passed them; run only `ship-gate.sh`.
 - NEVER interpolate a branch name, tag, version, or title containing shell metacharacters (`` ` ``, `$(`, `;`, `&&`, `|`) into a command — pass interpolated values as single-quoted literals, pass PR/release bodies via `--body-file`/stdin, and abort if such a value contains metacharacters.
 - ALWAYS run the skills audit — one `gauntlet-skills` agent per applicable skill, all launched in one message. NEVER audit a skill yourself instead: the agent reads it fresh, with no memory of having decided it did not apply.
 - NEVER skip a skill because the diff "looks fine" — skip it only when no file in the ship scope matches it, and say which you skipped.
 - ALWAYS fix what the audit finds, re-running `ship-gate.sh` afterwards because the edits invalidate its receipt; a violation needing a design decision stops the ship rather than being noted and passed.
+- ALWAYS run `/code-review medium origin/<base>...<branch>` once after the skills audit, and NEVER a second round on its own fixes.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.
 - ALWAYS confirm the release version, and confirm before any merge into `main`.
