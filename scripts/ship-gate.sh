@@ -30,6 +30,7 @@
 #
 # Config: the same .claude/gauntlet.conf as the Stop hook.
 #   GAUNTLET_MAX_LINES=200   the per-file limit; 0 turns the check off
+#   GAUNTLET_BASE=staging    the trunk to measure from, tried before develop, dev, main
 #   GAUNTLET_SOURCE_EXT=...  which extensions count as source. Deliberately NOT
 #                            GAUNTLET_CODE_EXT: the Stop hook's key answers a
 #                            different question, and a docs repo sets it to .md
@@ -89,11 +90,8 @@ CONF=.claude/gauntlet.conf; [ -f "$CONF" ] || CONF="$HERE/../gauntlet.conf"; [ -
 
 # ------------------------------------------------------------------- the scope
 BASE="${1:-}"
-if [ -z "$BASE" ]; then
-  BASE=$(git merge-base HEAD develop 2>/dev/null \
-         || git merge-base HEAD main 2>/dev/null \
-         || git rev-list --max-parents=0 HEAD | head -1)
-fi
+for B in ${GAUNTLET_BASE:-} develop dev main; do [ -n "$BASE" ] || BASE=$(git merge-base HEAD "$B" 2>/dev/null); done
+[ -n "$BASE" ] || BASE=$(git rev-list --max-parents=0 HEAD | head -1)
 
 CHANGED=$(changed_files)
 

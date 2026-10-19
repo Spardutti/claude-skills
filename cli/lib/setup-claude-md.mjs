@@ -19,6 +19,16 @@ const FILE_SIZE_BODY = `## File Size Enforcement
 - This rule applies during skill evaluation: if the code you're about to write would exceed 200 lines in any single file, refactor into multiple files first.
 - Skill evaluation must check this limit as part of every ACTIVATE decision.`;
 
+const TOOLING_BODY = `## Claude Skills Tooling
+
+The hooks and skills in \`.claude/\` come from \`@spardutti/claude-skills\`. Facts you need when working with them:
+
+- **Your own skill:** write \`.claude/skills/<name>/SKILL.md\` with \`name\` and \`description\`, then add \`<name>\` to \`"custom"\` in \`.claude/.claude-skills.json\`. Never add it to \`"skills"\`: a sync deletes anything there that is not in the catalog.
+- **Make it mandatory on some files:** put \`gate-paths: "src/**/*.tsx"\` under \`metadata:\`, quoted. A bare top-level \`paths:\` makes Claude Code drop the skill. Add \`tracks: react@19\` to fire only when the project depends on that package.
+- **Hook settings** live in \`.claude/gauntlet.conf\` (shell syntax): \`GAUNTLET_TEST\`, \`GAUNTLET_TYPECHECK\`, \`GAUNTLET_BASE\` (the trunk branch, if not develop/dev/main), \`GAUNTLET_MAX_LINES\`, \`GAUNTLET_IGNORE_FILES\`, \`GAUNTLET_OFF=1\`.
+- **Ship gate:** \`bash .claude/hooks/ship-gate.sh\` before a PR. Never run it with \`--force\` or \`--baseline\` unless the user asks.
+- **Never edit \`.claude/hooks/\`** — a sync overwrites it. Update with \`npx @spardutti/claude-skills --sync\`.`;
+
 const BLOCKS = [
   {
     id: "skill-evaluation",
@@ -30,6 +40,10 @@ const BLOCKS = [
     id: "file-size",
     body: FILE_SIZE_BODY,
     legacyHeadings: ["## File Size Enforcement"],
+  },
+  {
+    id: "tooling",
+    body: TOOLING_BODY,
   },
 ];
 

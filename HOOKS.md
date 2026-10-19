@@ -263,6 +263,7 @@ GAUNTLET_REQUIRE_TESTS=1             # block when the runner matched 0 test file
 
 # /ship's gate reads its own keys from the same file
 GAUNTLET_MAX_LINES=200               # per-file limit; 0 turns the check off
+GAUNTLET_BASE='staging'              # trunk to measure from; else develop, dev, main
 GAUNTLET_SOURCE_EXT='ts|tsx|py'      # what counts as SOURCE — not the same question
 GAUNTLET_MUTATE='bash mutate.sh'     # replace per-project mutation detection
 GAUNTLET_IGNORE_FILES='*.gen.ts'     # globs that are never gated — see below
@@ -304,6 +305,9 @@ re-mutated every file the branch had ever touched: one 46-file branch paid fifte
 minutes on every commit. Neither a commit nor a push to a feature branch publishes
 anything, so neither is gated. `gh pr create`, `gh pr merge`, and a `git push` from
 `main`/`master`/`develop` are.
+
+The branch starts where it left the trunk: `GAUNTLET_BASE` if set, else the
+first of `develop`, `dev`, `main` that exists.
 
 Run it early when you want the findings before the PR:
 

@@ -77,6 +77,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-report.sh"    # the last line names the saved output
 . "$HERE/selftest-timing.sh"             # how long the Stop hook and the ship gate took
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
+. "$HERE/selftest-ship-gate-base.sh"     # which branch the ship gate measures from
 . "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
 . "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders
 . "$HERE/selftest-ship-gate-tooling.sh"  # .claude/ tooling and deleted files are never UNPROVEN
@@ -89,5 +90,6 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
 . "$HERE/selftest-fetch.sh"              # the CLI talking to GitHub
 . "$HERE/selftest-install.sh"            # installing over an existing install
+. "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end
 . "$HERE/selftest-stryker.sh"            # scaffolding Stryker into a project
