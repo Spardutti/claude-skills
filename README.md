@@ -36,7 +36,7 @@ npx @spardutti/claude-skills
 ```
 
 ```text
-  Claude Skills Installer v2.25.0
+  Claude Skills Installer v2.51.2
 
   ── Frontend ──────────────────────────────
   ◉ react              ◯ tanstack-query
@@ -76,7 +76,8 @@ install adds the part that does not negotiate:
 - A `Stop` hook that runs your typecheck and tests on the changed files every turn,
   and refuses to let the turn end red.
 - A delivery gate that **changes your code on purpose and checks whether any test
-  notices.** When none do, the PR does not open.
+  notices.** When none do, the PR does not open. The same gate runs one
+  `/code-review` round for logic bugs and fixes what it finds.
 
 That last one is the difference. Your agent says the tests pass. This finds out.
 
