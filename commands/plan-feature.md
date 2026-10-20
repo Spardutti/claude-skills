@@ -51,7 +51,7 @@ The plan is code, not prose. Markdown can name a reuse target that does not exis
 - **Extend** files: add only the new signatures and types. Never wire a stub into code that runs — a registry entry, route or extension list calling a throwing stub breaks the hot-reloaded dev server. List those lines in the notes; the build adds them.
 - **Reuse** symbols: import them for real — never redeclare one.
 - Every body is the marker `stub`, plus one line saying what it must do.
-- Name the planned behavior as pending tests in the matching test file.
+- Name the planned behavior as pending tests in the matching test file. Each name carries one exact example — input and expected result — so the build cannot pick another meaning.
 
 ```ts
 /** Rows for invoices whose issue date falls inside range, oldest first. */
@@ -61,7 +61,7 @@ export async function exportInvoices(userId: UserId, range: ExportRange): Promis
 ```
 
 ```ts
-it.todo("skips invoices outside the range");
+it.todo('range 2026-01-01..2026-01-31 skips an invoice issued 2026-02-01');
 ```
 
 Python uses `raise NotImplementedError("stub")` and `@pytest.mark.skip(reason="stub")`. Prefer a distinct type (`UserId`) over a bare `string` where the codebase already has one — it lets the checker catch swapped arguments.
