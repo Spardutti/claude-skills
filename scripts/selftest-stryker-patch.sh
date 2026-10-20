@@ -64,8 +64,51 @@ scaf "a non-perTest config is left alone" \
 scaf "and its coverageAnalysis is not switched" \
   "require('$PWD/stryker.config.json').coverageAnalysis === 'all'"
 
-cd /
-rm -rf "$TMP"
-echo
-echo "$PASS passed, $FAIL failed, $N total"
-[ "$FAIL" = 0 ]
+# TypeScript 7 has no JS compiler API, and Stryker's tsconfig rewrite calls it, so
+# every run crashed and the gate said UNPROVEN on a project that did nothing wrong.
+echo "stryker on TypeScript 7"
+scaffold_here() {
+  node -e "
+    import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
+      console.log(JSON.stringify(await m.scaffoldStryker('$PWD', '')));
+    });
+  " > "$TMP/scaf.json" 2>&1
+}
+newrepo strts7
+printf '{"devDependencies":{"typescript":"^7.0.2"}}\n' > package.json
+scaffold_here
+scaf "a fresh config on TypeScript 7 skips the tsconfig rewrite" \
+  "require('$PWD/stryker.config.json').tsconfigFile.startsWith('no-tsconfig-rewrite')"
+newrepo strts7up
+printf '{"devDependencies":{"typescript":"7.0.2"}}\n' > package.json
+printf '{"testRunner":"vitest","ignorers":["tailwind-classnames"],"coverageAnalysis":"perTest","ignoreStatic":true}\n' > stryker.config.json
+scaffold_here
+scaf "an existing config on TypeScript 7 gains it too" \
+  "require('$PWD/stryker.config.json').tsconfigFile.startsWith('no-tsconfig-rewrite')"
+newrepo strts7root
+printf '{"devDependencies":{"typescript":"^7.0.2"}}\n' > package.json
+mkdir -p apps/web && printf '{"name":"web"}\n' > apps/web/package.json
+node -e "
+  import('$HERE/../cli/lib/scaffold-stryker.mjs').then(async (m) => {
+    console.log(JSON.stringify(await m.scaffoldStryker('$PWD', 'apps/web')));
+  });
+" > "$TMP/scaf.json" 2>&1
+scaf "a sub-project finds TypeScript 7 at the workspace root" \
+  "require('$PWD/apps/web/stryker.config.json').tsconfigFile.startsWith('no-tsconfig-rewrite')"
+newrepo strts7catalog
+printf '{"devDependencies":{"typescript":"catalog:"}}\n' > package.json
+mkdir -p node_modules/typescript && printf '{"version":"7.0.2"}\n' > node_modules/typescript/package.json
+scaffold_here
+scaf "a range with no number is read from the installed version" \
+  "require('$PWD/stryker.config.json').tsconfigFile.startsWith('no-tsconfig-rewrite')"
+newrepo strts7own
+printf '{"devDependencies":{"typescript":"7.0.2"}}\n' > package.json
+printf '{"testRunner":"vitest","ignorers":["tailwind-classnames"],"coverageAnalysis":"perTest","ignoreStatic":true,"tsconfigFile":"tsconfig.app.json"}\n' > stryker.config.json
+scaffold_here
+scaf "a tsconfigFile the project chose is kept" \
+  "require('$PWD/stryker.config.json').tsconfigFile === 'tsconfig.app.json'"
+newrepo strts6
+printf '{"devDependencies":{"typescript":"^6.0.2"}}\n' > package.json
+scaffold_here
+scaf "TypeScript 6 keeps the rewrite" \
+  "require('$PWD/stryker.config.json').tsconfigFile === undefined"

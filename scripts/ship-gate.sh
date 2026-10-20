@@ -324,8 +324,7 @@ for owner in $OWNERS; do
   [ "$TOOL" = mutmut ] && [ $RC -eq 0 ] && { printf '%s\n' "$OUT" > "$PKEY.out"; cp "$MLOG" "$PKEY.log" 2>/dev/null; }
   [ -n "$SCOPE_RE" ] && [ $RC -eq 0 ] && OUT=$(printf '%s\n' "$OUT" | grep -E "^[[:space:]]*($SCOPE_RE)\.x")
   if [ "$TOOL" = stryker ]; then
-    ALL=$(stryker_findings "$OUT" "$GLOBBED")
-    [ -n "$FCTX" ] && [ $RC -eq 0 ] && files_record "$FCTX" "$owner" "$ALL"
+    stryker_judge || { [ "$STATUS" = 0 ] && STATUS=2; continue; }
   else
     ALL=$(printf '%s\n' "$OUT" | grep -E '[Ss]urvived' \
           | grep -vE '^[[:space:]]*[#│|+-]|# *surviv')

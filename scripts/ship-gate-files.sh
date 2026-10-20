@@ -110,3 +110,22 @@ stryker_findings() {  # stryker_findings <output> <globbed paths, comma-wrapped>
     END { if (pend != "" && kind == "s") print pend }
   '
 }
+
+# A survivor needs a test run against it. Survivors with 0 tests per mutant and
+# nothing killed mean the runner filtered every test out (stryker-js#6210, Vitest 5).
+stryker_zero_tests() {  # stryker_zero_tests <output> <label> <seconds>
+  grep -q '^\[Survived\]' <<< "$1" && grep -q 'Ran 0\.00 tests per mutant' <<< "$1" || return 1
+  [ "$(awk -F'|' '/^ *All files/ { gsub(/ /, "", $4); print $4 }' <<< "$1")" = 0 ] || return 1
+  echo "  $2 stryker (${3}s) — its survivors ran 0 tests, so they prove nothing and are dropped."
+  echo "      On Vitest 5 this is stryker-js#6210: pin vitest@4 until a fixed runner ships."
+}
+
+# Sets ALL from a Stryker run. Fails when a broken run leaves nothing provable.
+stryker_judge() {  # uses OUT GLOBBED FCTX RC owner label T from ship-gate.sh
+  ALL=$(stryker_findings "$OUT" "$GLOBBED")
+  if stryker_zero_tests "$OUT" "$label" "$T"; then
+    ALL=$(grep -v '^\[Survived\]' <<< "$ALL"); [ -n "$ALL" ]; return
+  fi
+  [ -n "$FCTX" ] && [ "$RC" -eq 0 ] && files_record "$FCTX" "$owner" "$ALL"
+  return 0
+}

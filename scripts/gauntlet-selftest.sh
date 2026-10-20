@@ -63,6 +63,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 # Adding a case means editing the file that owns the subject, not this one.
 . "$HERE/selftest-gauntlet-hook.sh"      # the Stop hook: skips, detection, runners
 . "$HERE/selftest-ship-gate-stryker.sh"  # the JS half of the ship gate
+. "$HERE/selftest-ship-gate-stryker-zero.sh"  # survivors from a run that tested nothing
 . "$HERE/selftest-ship-gate-page-tests.sh"  # page tests passed off as proof for logic
 . "$HERE/selftest-ship-gate-mutmut.sh"   # the Python half, and the git receipt
 . "$HERE/selftest-ship-gate-worktree.sh"  # a PR shipped from a git worktree
@@ -93,3 +94,9 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end
 . "$HERE/selftest-stryker.sh"            # scaffolding Stryker into a project
+
+cd /
+rm -rf "$TMP"
+echo
+echo "$PASS passed, $FAIL failed, $N total"
+[ "$FAIL" = 0 ]

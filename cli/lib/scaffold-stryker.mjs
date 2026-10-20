@@ -35,6 +35,7 @@ const CONFIG = {
   tempDirName: ".stryker-tmp",
 };
 import { IGNORER, IGNORER_VERSION } from "./stryker-ignorer.mjs";
+import { TS7_TSCONFIG, usesTs7 } from "./stryker-ts7.mjs";
 
 async function exists(p) {
   try {
@@ -69,6 +70,7 @@ export async function scaffoldStryker(projectDir, rel) {
   const kept = [];
   const patched = [];
   const unreadable = [];
+  const ts7 = await usesTs7(dir, projectDir);
 
   // A project that already runs Stryker keeps every setting it chose. The two
   // entries that wire the ignorer in are added, because a config written before
@@ -95,8 +97,9 @@ export async function scaffoldStryker(projectDir, rel) {
       const coverage = cfg.coverageAnalysis;
       const canSetStatic = coverage === undefined || coverage === "perTest";
       const needsStatic = cfg.ignoreStatic !== true && canSetStatic;
+      const needsTsconfig = ts7 && cfg.tsconfigFile === undefined;
 
-      if (!needsIgnorer && !needsStatic) {
+      if (!needsIgnorer && !needsStatic && !needsTsconfig) {
         kept.push(`${at}stryker.config.json`);
       } else {
         if (needsIgnorer) {
@@ -107,12 +110,14 @@ export async function scaffoldStryker(projectDir, rel) {
           cfg.coverageAnalysis = "perTest";
           cfg.ignoreStatic = true;
         }
+        if (needsTsconfig) cfg.tsconfigFile = TS7_TSCONFIG;
         await writeFile(configPath, JSON.stringify(cfg, null, 2) + "\n");
         patched.push(`${at}stryker.config.json`);
       }
     }
   } else {
-    await writeFile(configPath, JSON.stringify(CONFIG, null, 2) + "\n");
+    const config = ts7 ? { ...CONFIG, tsconfigFile: TS7_TSCONFIG } : CONFIG;
+    await writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
     wrote.push(`${at}stryker.config.json`);
   }
 
