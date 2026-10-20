@@ -1,8 +1,8 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, and on your go the same agent builds the plan"
+description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go the same agent fills them in"
 category: Workflow
-allowed-tools: Read, Grep, Glob, Task, Write, Edit
+allowed-tools: Read, Grep, Glob, Task, Write, Edit, Bash
 requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
 argument-hint: "<short feature description>"
 ---
@@ -43,44 +43,70 @@ Now, and only now, ask the user clarifying questions — **batched in a single m
 
 Skip questions whose answer is obvious from the scans, **or already settled by a discovery log** — never re-ask something the log resolved. If everything is clear, skip this step entirely.
 
-## Step 4 — Produce the Integration Plan
+## Step 4 — Write the Plan as Stubs
 
-Output a single markdown plan. Keep it short and actionable — this is a checklist for building next, not a design doc.
+The plan is code, not prose. Markdown can name a reuse target that does not exist; a stub cannot — the type checker refuses it. Write the plan's shapes at the **real paths**, so the build later fills bodies in place and `git diff` is the plan.
+
+- **Add** files: create them with signatures and types only.
+- **Extend** files: add only the new signatures and types. Never wire a stub into code that runs — a registry entry, route or extension list calling a throwing stub breaks the hot-reloaded dev server. List those lines in the notes; the build adds them.
+- **Reuse** symbols: import them for real — never redeclare one.
+- Every body is the marker `stub`, plus one line saying what it must do.
+- Name the planned behavior as pending tests in the matching test file.
+
+```ts
+/** Rows for invoices whose issue date falls inside range, oldest first. */
+export async function exportInvoices(userId: UserId, range: ExportRange): Promise<string> {
+  throw new Error("stub");
+}
+```
+
+```ts
+it.todo("skips invoices outside the range");
+```
+
+Python uses `raise NotImplementedError("stub")` and `@pytest.mark.skip(reason="stub")`. Prefer a distinct type (`UserId`) over a bare `string` where the codebase already has one — it lets the checker catch swapped arguments.
+
+Run the type checker each touched app already uses (`tsc --noEmit`, `mypy`, `pyright`). Fix the sketch until it passes. If the app has no type checker, say so — the sketch is then a plan only, not a checked one.
+
+If the sketch spans more than ~12 files, the feature is too big — tell the user to split it.
+
+## Step 4b — Notes the Stubs Cannot Hold
+
+Print only what code cannot say. Never list reuse, extend or add targets here — the stub diff already shows them, and two copies drift.
 
 ```markdown
-# Integration Plan — <feature name>
-
-## Reuse
-- `<symbol>` at `path:line` — <what it gives us>
-- ...
-
-## Extend
-- `<file>` — <what to add to it>
-- `<file>` (<loc> LOC — over limit) — <what to add>; split <part> into a new file as part of this work
-- ...
-
-## Add
-- `<new file path>` — <one-line purpose, following <pattern> convention>
-- ...
+# Plan notes — <feature name>
 
 ## Pattern to follow
 <1–3 bullets pointing at an existing feature to mirror, with file paths>
 
+## Splits
+- `<file>` (<loc> LOC) — split <part> into `<new file>` before adding to it
+
+## Wiring (added at build)
+- `<file>` — <the registration line a throwing stub cannot carry yet>
+
 ## Open questions
-<anything the user did not resolve in Step 3, or [] if none>
+<anything unresolved in Step 3, plus ordering, transaction or side-effect risks a stub cannot show — or [] if none>
 ```
 
-**Size check.** Each `must_modify` touch-point carries a `loc` (current line count). If extending a file would push it near or over 200 lines, the "Extend" entry must say so and fold the split into the plan as a planned step — don't leave it to be discovered mid-build. A file already over 200 before this feature is flagged the same way, so the split is approved up front rather than surfaced mid-implementation.
+**Size check.** Each `must_modify` touch-point carries a `loc`. If extending a file pushes it near or over 200 lines, or it is already over, list the split under Splits so it is approved up front, not found mid-build.
 
-If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write the plan there with the Write tool. Otherwise just print it.
+**No type checker?** Then the stubs prove nothing, so also add `## Reuse`, `## Extend` and `## Add` lists (`<symbol>` at `path:line`, `<file>` — what changes) to the notes.
+
+If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write the notes there. Otherwise just print them.
 
 ## Step 5 — Stop, Then Build It Yourself
 
-**Print the plan and stop.** Build nothing until the user says go. The plan is cheap to correct now and expensive to correct later.
+**Print the notes, show the stub diff, and stop.** Diff only the files the stubs created or touched — the tree may hold other uncommitted work, so never show a bare `git diff --stat`. If a touched file already had uncommitted changes, show only the lines the stub added there. Keep that file list; the build checks against it. Build nothing until the user says go. The user may edit the stubs directly — re-run the type check on their edits before building. The plan is cheap to correct now and expensive to correct later.
 
 When the user says go, build the plan yourself, in this conversation. Do not spawn agents to write code: parallel code-writing workers each reloaded their skills and the plan, crossed messages, and re-reported, and one feature spent 51 minutes waiting on its slowest worker. One agent gives the user one diff to review.
 
-Build the side others depend on first (schema and API before the screens that call them). Write the tests for what you write, and run each touched app's tests and type check before moving on. When they pass, report the diff.
+Build the side others depend on first (schema and API before the screens that call them). Fill the stubs in place and turn each pending test into a real one. Write the tests for what you write, and run each touched app's tests and type check before moving on.
+
+If a stub's signature turns out wrong, stop and tell the user why before changing it — never work around a stub with a hack inside the body. The design was approved as signatures, so a changed signature is a changed plan.
+
+Before reporting, grep the touched files for the `stub` marker. None may remain. Then compare every exported signature in the stub files against the approved stub. List each difference in the report as "Plan changed: <signature>, because <reason>" — a rule the build can forget, a check it cannot. When tests pass and no marker remains, report the diff.
 
 Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and asks for changes first, and any edit voids the gate's receipt, so an early run is always paid again. `/ship` runs it once, before the PR.
 
@@ -97,4 +123,9 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and a
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If a subagent returns nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
 - Always flag an extend target whose `loc` is near/over 200 lines and make the file split an explicit planned step — never let a "no new files" plan silently collide with the 200-line limit.
-- Cap the plan at ~40 lines. If it grows beyond that, the feature is too big — tell the user to split it.
+- Cap the notes at ~40 lines. If it grows beyond that, the feature is too big — tell the user to split it.
+- Always write the stub sketch at the real paths and type-check it before stopping — never redeclare a symbol the plan says to reuse.
+- Never change an approved stub's signature during the build without telling the user why first.
+- Never wire a throwing stub into code that runs — registration lines wait for the build.
+- Always compare final signatures against the approved stubs before reporting, and list every difference.
+- Never report a build while a `stub` marker or pending test remains.
