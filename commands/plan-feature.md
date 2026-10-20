@@ -47,8 +47,10 @@ Skip questions whose answer is obvious from the scans, **or already settled by a
 
 The plan is code, not prose. Markdown can name a reuse target that does not exist; a stub cannot — the type checker refuses it. Write the plan's shapes at the **real paths**, so the build later fills bodies in place and `git diff` is the plan.
 
+**Branch first.** The stubs land at real paths, so on the default branch create a feature branch in each touched repo before writing one.
+
 - **Add** files: create them with signatures and types only.
-- **Extend** files: add only the new signatures and types. Never wire a stub into code that runs — a registry entry, route or extension list calling a throwing stub breaks the hot-reloaded dev server. List those lines in the notes; the build adds them.
+- **Extend** files: add only the new signatures and types. Never wire a stub into code that runs — a registry entry, route or extension list calling a throwing stub breaks the hot-reloaded dev server. List those lines in the notes; the build adds them. A new abstract method counts too: every subclass breaks, so give each one a stub override in the sketch.
 - **Reuse** symbols: import them for real — never redeclare one.
 - Every body is the marker `stub`, plus one line saying what it must do.
 - Name the planned behavior as pending tests in the matching test file. Each name carries one exact example — input and expected result — so the build cannot pick another meaning.
@@ -66,9 +68,9 @@ it.todo('range 2026-01-01..2026-01-31 skips an invoice issued 2026-02-01');
 
 Python uses `raise NotImplementedError("stub")` and `@pytest.mark.skip(reason="stub")`. Prefer a distinct type (`UserId`) over a bare `string` where the codebase already has one — it lets the checker catch swapped arguments.
 
-Run the type checker each touched app already uses (`tsc --noEmit`, `mypy`, `pyright`). Fix the sketch until it passes. If the app has no type checker, say so — the sketch is then a plan only, not a checked one.
+Run the type checker each touched app already uses (`tsc --noEmit`, `mypy`, `pyright`). Fix the sketch until it passes. If the app has no type checker, import every touched module instead (`python -c "import app.export"`) and say it proves less — names resolve, types go unchecked.
 
-If the sketch spans more than ~12 files, the feature is too big — tell the user to split it.
+If one PR's share of the sketch spans more than ~12 files, the feature is too big — tell the user to split it. A feature across repos counts each repo's PR on its own.
 
 ## Step 4b — Notes the Stubs Cannot Hold
 
@@ -124,6 +126,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and a
 - If a subagent returns nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
 - Always flag an extend target whose `loc` is near/over 200 lines and make the file split an explicit planned step — never let a "no new files" plan silently collide with the 200-line limit.
 - Cap the notes at ~40 lines. If it grows beyond that, the feature is too big — tell the user to split it.
+- Never write stubs on the default branch — branch each touched repo first.
 - Always write the stub sketch at the real paths and type-check it before stopping — never redeclare a symbol the plan says to reuse.
 - Never change an approved stub's signature during the build without telling the user why first.
 - Never wire a throwing stub into code that runs — registration lines wait for the build.
