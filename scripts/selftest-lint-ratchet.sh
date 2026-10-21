@@ -68,6 +68,10 @@ chmod +x "$LR/node_modules/.bin/eslint"
 lint src/d.ts 1
 lr "without the TypeScript plugin, the core rule still runs" 1 "src/d.ts:11  too long" --file src/d.ts
 args_are "the retry drops only the plugin rule" "$(printf 'arg[%s]\n' -f json --rule "$MAXL" src/d.ts)"
+cp "$LR/.lint-baseline" "$LR/lb.keep"; printf '# rules: max-lines-per-function\n' > "$LR/.lint-baseline"; rm -f "$LR/args.log"
+lr "--baseline-new says when the plugin rule cannot run" 0 "could not run @typescript-eslint/explicit-module-boundary-types" --baseline-new
+args_are "with only the plugin rule new, no retry lints the whole repo" ""
+mv "$LR/lb.keep" "$LR/.lint-baseline"
 mv "$LR/eslint.real" "$LR/node_modules/.bin/eslint"
 
 N=$((N+1))

@@ -121,9 +121,8 @@ function writeBaselines(dir, hooksDir) {
     spawnSync("bash", [join(hooksDir, LINE_LIMIT_FILENAME), "--baseline"],
       { cwd: root, env: { ...process.env, LINE_LIMIT_ROOT: root }, stdio: "ignore" });
   }
-  console.log("  Recording old code as baseline debt (runs ESLint once per new rule)...");
   spawnSync(process.execPath, [join(hooksDir, LINT_RATCHET_FILENAME), "--baseline-new"],
-    { cwd: dir, stdio: "ignore", timeout: 600_000 });
+    { cwd: dir, stdio: ["ignore", "inherit", "ignore"], timeout: 600_000 });
 }
 
 export async function setupHook(targetDir = process.cwd()) {

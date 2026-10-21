@@ -42,7 +42,7 @@ function eslint(rules, target) {
   const results = eslintOnce(rules, target);
   const core = rules.filter((r) => !r.id.includes("/"));
   if (results || core.length === rules.length) return { results, ran: rules };
-  return { results: eslintOnce(core, target), ran: core };
+  return { results: core.length ? eslintOnce(core, target) : [], ran: core };
 }
 
 function eslintOnce(rules, target) {
@@ -84,11 +84,15 @@ function baseline(only, newOnly) {
   const lint = existsSync(ESLINT) ? LINT.filter(pick) : [];
   const text = TEXT.filter(pick);
   if (newOnly && was.exists && lint.length + text.length === 0) return 0;
+  if (newOnly) console.log(`  Recording old code as baseline debt for: ${[...lint, ...text].map((r) => r.id).join(" ")}`);
   const { results, ran } = lint.length ? eslint(lint, ".") : { results: [], ran: [] };
   if (!results) {
     console.error("lint-ratchet: eslint gave no JSON; baseline not written.");
     return 1;
   }
+  const cannot = lint.filter((r) => !ran.includes(r)).map((r) => r.id);
+  if (cannot.length) console.log(`lint-ratchet: ESLint could not run ${cannot.join(" ")}; its plugin is not in the ESLint config.`);
+  if (newOnly && was.exists && ran.length + text.length === 0) return 0;
   const found = [...eslintFindings(results), ...projectFiles(ROOT).flatMap((rel) => textFindings(text, ROOT, rel))];
   const judged = new Set([...ran, ...text].map((r) => r.id));
   const n = writeBaseline(BASELINE, mergeBaseline(was, countBy(found), judged), new Set([...was.rules, ...judged]));
