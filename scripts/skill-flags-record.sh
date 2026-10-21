@@ -19,9 +19,9 @@ TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"agent_transcript_path":"[^"]*"' | 
 MODEL=""
 [ -f "$TRANSCRIPT" ] && MODEL=$(grep -o '"model":"[^"]*"' "$TRANSCRIPT" | tail -1 | sed 's/.*:"//; s/"$//')
 
-. "$SCRIPT_DIR/gate-config.sh" 2>/dev/null || json_string() { tr -cd '[:alnum:]/._-'; }
+. "$SCRIPT_DIR/gate-config.sh" 2>/dev/null || exit 0
 BRANCH=$(git -C "$PROJECT_DIR" branch --show-current 2>/dev/null | json_string)
 printf '{"ts":"%s","branch":"%s","model":"%s","reply":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BRANCH" "$MODEL" "$REPLY" \
-  >> "$PROJECT_DIR/.claude/$LOG"
+  >> "$(diary_dir "$SCRIPT_DIR")/$LOG"
 
 exit 0

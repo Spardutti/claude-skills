@@ -26,6 +26,12 @@ is_ignored() {
   return 1
 }
 
+# Every diary sits in the .claude that holds the hooks writing it, so a worktree or a
+# subfolder session still shares one set. Outside .claude/hooks (this repo's scripts/), the project.
+diary_dir() {  # diary_dir <script dir>
+  case "$1" in */.claude/hooks) dirname "$1" ;; *) printf '%s/.claude' "${CLAUDE_PROJECT_DIR:-$PWD}" ;; esac
+}
+
 json_string() {
   awk 'BEGIN { ORS = "" } {
     gsub(/\033\[[0-9;?]*[ -\/]*[@-~]/, "")

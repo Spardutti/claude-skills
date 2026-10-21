@@ -2,7 +2,7 @@
 name: add-rule
 description: "Turn a mistake Claude keeps making — from /code-review, the skills audit or the ship gate — into a check on every edit: a text rule when a pattern can catch it, a lesson shown on matching files when it needs judgment. Both live in .edit-rules.json, never in CLAUDE.md"
 category: Workflow
-allowed-tools: Bash(node .claude/hooks/lint-ratchet.mjs*), Bash(node scripts/lint-ratchet.mjs*), Bash(git *), Read, Grep, Glob, Edit, Write
+allowed-tools: Bash(node .claude/hooks/lint-ratchet.mjs*), Bash(node scripts/lint-ratchet.mjs*), Bash(node .claude/hooks/diary-check.mjs*), Bash(node scripts/diary-check.mjs*), Bash(git *), Read, Grep, Glob, Edit, Write
 argument-hint: "[the mistake, in plain words] — none reads the saved review findings"
 ---
 
@@ -18,11 +18,18 @@ in the claude-skills repo itself.
 
 ## Step 0 — No argument: find what keeps coming back
 
-Read the three diaries:
+Three diaries record findings: `.claude/review-findings.jsonl` (every `/code-review` run as a
+subagent), `.claude/skill-flags.jsonl` (every `/ship` skills audit) and
+`.claude/gate-findings.jsonl` (every ship gate FAIL: test gaps, surviving mutants, misplaced files).
+Read them through the script, which drops clean audits and trunk re-runs, then reset the count:
 
-- `.claude/review-findings.jsonl` — every `/code-review` run as a subagent
-- `.claude/skill-flags.jsonl` — every `/ship` skills audit
-- `.claude/gate-findings.jsonl` — every ship gate FAIL: test gaps, surviving mutants, misplaced files
+```bash
+node .claude/hooks/diary-check.mjs --entries
+node .claude/hooks/diary-check.mjs --mark
+```
+
+(`scripts/diary-check.mjs` in the claude-skills repo.) Mark whatever you find, so `/ship` does
+not offer these entries again.
 
 Group the findings by the mistake behind them, not by wording. A surviving mutant
 is a test that was never written, so group those by the kind of test missing: the

@@ -119,8 +119,9 @@ gate_exit() {
   exec 1>&3 2>&4
   # A child left running (a dev server) can hold tee open forever; give it 2s, not a hang.
   for _ in 1 2 3 4 5 6 7 8 9 10; do [ -n "$TEE_PID" ] && kill -0 "$TEE_PID" 2>/dev/null || break; sleep 0.2; done
-  mkdir -p "$PROJECT_DIR/.claude"
+  local diary; diary=$(diary_dir "$HERE")
+  mkdir -p "$diary"
   printf '{"ts":"%s","branch":"%s","status":"FAIL","report":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "$(git branch --show-current 2>/dev/null | json_string)" "$(json_string < "$REPORT")" \
-    >> "$PROJECT_DIR/.claude/gate-findings.jsonl"
+    >> "$diary/gate-findings.jsonl"
 }

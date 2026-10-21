@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { appendFileSync, existsSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brokenRules, loadEditRules, projectFiles, textFindings } from "./text-rules.mjs";
@@ -120,6 +120,7 @@ function checkFile(path) {
       console.log(`NOTE — ${rule.id} has no baseline yet, so its ${hits.length} finding(s) in ${rel} do not block. Run node ${SELF} --baseline-new to record old code.`);
     } else if (hits.length > before) {
       failed = 1;
+      if (process.env.LINT_RATCHET_BLOCKED) appendFileSync(process.env.LINT_RATCHET_BLOCKED, `${rule.id}\n`);
       console.log(`LINT — ${rel}: ${hits.length} × ${rule.id}, was ${before}. Fix the new one(s):`);
       for (const h of hits) console.log(`  ${rel}:${h.line}  ${h.message}`);
     } else if (hits.length > 0) {

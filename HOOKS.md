@@ -320,7 +320,8 @@ switched on later (ESLint installed, a skill added) only notes until
 
 **Three diaries** feed `/add-rule`: `.claude/review-findings.jsonl` (every
 `/code-review` subagent), `.claude/skill-flags.jsonl` (every `/ship` skills audit)
-and `.claude/gate-findings.jsonl` (every ship gate FAIL).
+and `.claude/gate-findings.jsonl` (every ship gate FAIL). Each block is also logged
+to `.claude/edit-blocks.jsonl`; `/skill-report` tallies which rules block most.
 
 ## The Ship Gate
 

@@ -39,6 +39,7 @@ function walk(root, dir) {
 export function brokenRules(rules) {
   const broken = [];
   for (const r of rules) {
+    if (/\s/.test(r.id ?? "")) broken.push(`${r.id}: its id has whitespace, which .lint-baseline cannot store`);
     if (matchLines(r, r.bad ?? "").length === 0) broken.push(`${r.id}: its bad example is not caught`);
     if (matchLines(r, r.good ?? "").length > 0) broken.push(`${r.id}: its good example is flagged`);
   }

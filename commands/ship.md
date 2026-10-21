@@ -317,6 +317,21 @@ gh release create <version> --title '<version>' --notes-file <file>
 
 ---
 
+## Last, wherever the run stops — repeats worth a rule
+
+At the end of every `/ship` run — after the last stage it reached, or the prompt the user
+declined — run:
+
+```bash
+node .claude/hooks/diary-check.mjs
+```
+
+Silent → say nothing. A line → it names a date, or `(never)`, meaning every entry is new. Run
+`node .claude/hooks/diary-check.mjs --mark` at once, then read `--entries` as `/add-rule` Step 0 does and name at most three mistakes
+that came back on two or more branches **with at least one entry after that date** — an older
+repeat was already offered. Nothing qualifies → say nothing. Otherwise ask which to turn into a
+check; on a pick, run `/add-rule` with that mistake. Never write a rule here.
+
 ## Flow Examples
 
 - **`/ship` on a dirty feature branch** → commits, asks "create a PR?" → "merge it?" → "cut a release?". Decline at any point to stop.
@@ -339,6 +354,7 @@ gh release create <version> --title '<version>' --notes-file <file>
 - NEVER skip a skill because the diff "looks fine" — skip it only when no file in the ship scope matches it, and say which you skipped.
 - ALWAYS fix what the audit finds, re-running `ship-gate.sh` afterwards because the edits invalidate its receipt; a violation needing a design decision stops the ship rather than being noted and passed.
 - ALWAYS run `/code-review medium origin/<base>...<branch>` once after the skills audit, and NEVER a second round on its own fixes.
+- ALWAYS run `diary-check.mjs` at the end of every run, `--mark` before asking, and hand a picked repeat to `/add-rule`; NEVER write a rule in `/ship`.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.
 - ALWAYS confirm the release version, and confirm before any merge into `main`.

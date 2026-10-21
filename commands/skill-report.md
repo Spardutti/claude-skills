@@ -7,8 +7,8 @@ allowed-tools: Bash(node .claude/hooks/skill-report.mjs*)
 
 # Skill Report — Which Skills Earn Their Place
 
-Every `/ship` skills audit is logged to `.claude/skill-flags.jsonl` by a hook.
-This command reads that log.
+Every `/ship` skills audit is logged to `.claude/skill-flags.jsonl`, and every edit the
+edit hook blocks to `.claude/edit-blocks.jsonl`. This command reads both.
 
 ## Steps
 
@@ -21,6 +21,10 @@ This command reads that log.
      suggest removing it for a few `/ship` runs and watching whether flags appear elsewhere.
 4. If the `models:` line lists more than one model, say the numbers mix models and that a
    skill which only flags on the older one is the stronger "try without it" case.
+5. If an `edit-hook blocks` table is printed (from `.claude/edit-blocks.jsonl`), name at
+   most three rules that blocked on **three or more branches**. Each one is a rule Claude
+   keeps writing wrong first: suggest where its skill should state it earlier — a BAD/GOOD
+   pair near the top, or a line in Rules — so the first draft gets it right.
 
 ## BAD / GOOD
 

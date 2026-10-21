@@ -33,3 +33,14 @@ case "$out" in
   *"src/new.ts — 250 lines"*"src/two.ts — 230 lines"*) PASS=$((PASS+1)); echo "  ok   the gate lists over-limit files without line-limit's own trailer" ;;
   *) FAIL=$((FAIL+1)); echo "  FAIL the gate lists over-limit files without line-limit's own trailer — $out" ;;
 esac
+
+WT="$TMP/sg_length_wt"; rm -rf "$WT"; mkdir -p "$WT"
+git -C "$WT" init -q; git -C "$WT" config user.email t@t.t; git -C "$WT" config user.name t
+echo '{}' > "$WT/package.json"; git -C "$WT" add -A; git -C "$WT" commit -qm base; git -C "$WT" branch develop
+awk 'BEGIN { for (i=0;i<240;i++) print "export const q" i " = 1" }' > "$WT/long.ts"
+before=$(wc -l < .claude/gate-findings.jsonl 2>/dev/null || echo 0)
+N=$((N+1))
+CLAUDE_PROJECT_DIR="$WT" bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
+after=$(wc -l < .claude/gate-findings.jsonl 2>/dev/null || echo 0)
+if [ "$after" -gt "$before" ] && [ ! -e "$WT/.claude/gate-findings.jsonl" ]; then PASS=$((PASS+1)); echo "  ok   a gate run on a worktree writes its diary next to the hooks that ran it"
+else FAIL=$((FAIL+1)); echo "  FAIL a gate run on a worktree writes its diary next to the hooks that ran it — hooks' diary $before→$after, worktree: $(ls -a "$WT/.claude" 2>&1 | tr '\n' ' ')"; fi

@@ -1,18 +1,10 @@
 #!/usr/bin/env node
-// Prints, per skill, how often the /ship skills audit applied it and flagged a violation.
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { claudeDir, parseLine, parseVerdict, readLines } from "./diary-lib.mjs";
 
-const DEFAULT_LOG = fileURLToPath(new URL("../skill-flags.jsonl", import.meta.url));
-
-function parseVerdict(line) {
-  try {
-    const { model, reply } = JSON.parse(line);
-    return { model, verdict: JSON.parse(reply.slice(reply.indexOf("{"), reply.lastIndexOf("}") + 1)) };
-  } catch {
-    return null;
-  }
-}
+const given = process.argv[2] && resolve(process.argv[2]);
+const DIR = !given ? claudeDir() : statSync(given, { throwIfNoEntry: false })?.isFile() ? dirname(given) : given;
 
 function tally(lines) {
   const skills = new Map();
@@ -52,10 +44,28 @@ function render({ skills, models, unreadable }) {
   return out.join("\n");
 }
 
-let text = "";
-try {
-  text = readFileSync(process.argv[2] ?? DEFAULT_LOG, "utf-8");
-} catch {
-  // no log yet
+function tallyBlocks(lines) {
+  const rules = new Map();
+  for (const line of lines) {
+    const entry = parseLine(line);
+    const ids = Array.isArray(entry?.rules) ? entry.rules : (entry?.rules ?? "").split(" ").filter(Boolean);
+    for (const id of ids) {
+      const r = rules.get(id) ?? { count: 0, branches: new Set() };
+      r.count += 1;
+      if (entry.branch) r.branches.add(entry.branch);
+      rules.set(id, r);
+    }
+  }
+  return rules;
 }
-console.log(render(tally(text.split("\n").filter(Boolean))));
+
+function renderBlocks(rules) {
+  if (rules.size === 0) return "";
+  const rows = [...rules].sort((a, b) => b[1].branches.size - a[1].branches.size || b[1].count - a[1].count);
+  const width = Math.max(22, ...rows.map(([id]) => id.length));
+  const line = ([id, r]) => `${id.padEnd(width)}  ${String(r.count).padStart(5)}  ${String(r.branches.size).padStart(8)}`;
+  return ["", `${"edit-hook blocks".padEnd(width)}  count  branches`, ...rows.map(line)].join("\n");
+}
+
+const audits = tally(readLines(resolve(DIR, "skill-flags.jsonl")));
+console.log(render(audits) + renderBlocks(tallyBlocks(readLines(resolve(DIR, "edit-blocks.jsonl")))));

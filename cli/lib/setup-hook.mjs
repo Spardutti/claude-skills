@@ -24,6 +24,7 @@ import { homedir } from "node:os";
 //   version-check.sh          SessionStart — a line when a newer catalog exists
 //   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
 //   skill-report.mjs          read by /skill-report — tallies that log
+//   diary-check.mjs           run by /ship — says when /add-rule has repeats to look at
 //   edit-check.sh             PostToolUse — line-limit.sh, lint-ratchet.mjs and
 //                             text-rules.mjs on each edited file
 
@@ -45,6 +46,8 @@ const LINE_LIMIT_FILENAME = "line-limit.sh";
 const LINT_RATCHET_FILENAME = "lint-ratchet.mjs";
 const TEXT_RULES_FILENAME = "text-rules.mjs";
 const RATCHET_BASELINE_FILENAME = "ratchet-baseline.mjs";
+const DIARY_CHECK_FILENAME = "diary-check.mjs";
+const DIARY_LIB_FILENAME = "diary-lib.mjs";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -148,6 +151,8 @@ export async function setupHook(targetDir = process.cwd()) {
     LINT_RATCHET_FILENAME,
     TEXT_RULES_FILENAME,
     RATCHET_BASELINE_FILENAME,
+    DIARY_CHECK_FILENAME,
+    DIARY_LIB_FILENAME,
   ]) {
     const dest = join(hooksDir, name);
     await writeFile(dest, await readHookSource(name), { mode: 0o755 });
