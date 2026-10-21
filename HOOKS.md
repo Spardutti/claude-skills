@@ -11,12 +11,13 @@ are for; this covers how they behave when one gets in your way.
 - [When The Gate Blocks Something It Shouldn't](#when-the-gate-blocks-something-it-shouldnt)
 - [The Gauntlet (Stop Hook)](#the-gauntlet-stop-hook)
 - [Configuration Reference](#configuration-reference)
+- [The Edit Check](#the-edit-check)
 - [The Ship Gate](#the-ship-gate)
 - [Manual Install](#manual-install)
 
 ## What Gets Installed
 
-Six hooks, plus a rule appended to your `CLAUDE.md`.
+Seven hooks, plus a rule appended to your `CLAUDE.md`.
 
 Three guard the **front** — nothing is written until your skills are considered:
 
@@ -31,6 +32,10 @@ Two guard the **back** — nothing finishes or ships until the code passes:
 - `ship-gate-hook.sh` — a `PreToolUse` gate on `Bash` that refuses `gh pr create`,
   `gh pr merge`, and a `git push` from a protected branch without a receipt from
   `ship-gate.sh`
+
+One checks each edit as it lands — see [The Edit Check](#the-edit-check):
+
+- `edit-check.sh` — a `PostToolUse` hook on `Write|Edit|MultiEdit`
 
 One stays out of the way entirely:
 
@@ -293,10 +298,35 @@ Set your house rules once in `~/.claude/gauntlet.conf`; only reach for the proje
 file where a repo does something unusual (or set `GAUNTLET_OFF=1` there to opt one
 out).
 
+## The Edit Check
+
+After every Write or Edit, `edit-check.sh` checks the one file that changed:
+
+- **Length** — over `GAUNTLET_MAX_LINES` (200), the same rule the ship gate uses.
+- **Function length and return types** — through the project's ESLint, only when
+  `code-structure` / `typescript-best-practices` are installed. Test files skip the
+  30-line rule; `.tsx` skips return types.
+- **Your own rules** — `.edit-rules.json` at the repo root, written by `/add-rule`.
+
+A new problem blocks the edit and Claude fixes it on the spot. Code that broke a
+rule before the install is recorded in `.line-limit-baseline` and `.lint-baseline`
+(commit both): it never blocks, it may not grow, and editing it brings a "fix it if
+this change allows" note. Files the gate skips (`GAUNTLET_IGNORE_FILES`, e.g.
+`components/ui/`) and git-ignored files are skipped here too.
+
+`--baseline` only banks: an entry may drop or go, never appear or grow. A rule
+switched on later (ESLint installed, a skill added) only notes until
+`node .claude/hooks/lint-ratchet.mjs --baseline-new` records its old hits.
+
+**Three diaries** feed `/add-rule`: `.claude/review-findings.jsonl` (every
+`/code-review` subagent), `.claude/skill-flags.jsonl` (every `/ship` skills audit)
+and `.claude/gate-findings.jsonl` (every ship gate FAIL).
+
 ## The Ship Gate
 
 `ship-gate.sh` checks file length and mutation-tests the changed lines, behind an
-exit code. It writes a receipt keyed to the exact content about to ship;
+exit code. The length check is `line-limit.sh`, so old files in `.line-limit-baseline`
+pass as long as they do not grow. It writes a receipt keyed to the exact content about to ship;
 `ship-gate-hook.sh` refuses the publishing commands without a matching one.
 
 **It gates the PR, not every commit.** Its mutation scope is `merge-base..HEAD` —

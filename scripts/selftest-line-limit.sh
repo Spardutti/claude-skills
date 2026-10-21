@@ -4,7 +4,7 @@
 
 echo "the 200-line ratchet"
 LL="$TMP/ll"; rm -rf "$LL"; mkdir -p "$LL/scripts"
-cp "$HERE/line-limit.sh" "$LL/scripts/line-limit.sh"
+cp "$HERE/line-limit.sh" "$HERE/gate-config.sh" "$LL/scripts/"
 mklines() { awk -v n="$2" 'BEGIN { for (i=0;i<n;i++) print ": pad" }' > "$LL/$1"; }
 
 mklines big.sh 300
@@ -33,3 +33,14 @@ ll "paying debt down is not a failure"    0 "debt paid down"
 rm "$LL/big.sh"
 ll "a deleted file is reported, not red"  0 "gone (was 300 lines)"
 
+mklines kept.sh 300; mklines grown.sh 280; rm -f "$LL/.line-limit-baseline"
+bash "$LL/scripts/line-limit.sh" --baseline >/dev/null 2>&1
+mklines kept.sh 260; mklines sneaked.sh 400; mklines grown.sh 290
+bash "$LL/scripts/line-limit.sh" --baseline >/dev/null 2>&1
+N=$((N+1))
+got=$(sort "$LL/.line-limit-baseline" | tr '\n' '|')
+if [ "$got" = "260 kept.sh|280 grown.sh|" ]; then PASS=$((PASS+1)); echo "  ok   --baseline on an existing baseline only lowers, never adds or raises"
+else FAIL=$((FAIL+1)); echo "  FAIL --baseline on an existing baseline only lowers, never adds or raises — $got"; fi
+mkdir -p "$LL/My Dir"; mklines "My Dir/s.sh" 300; rm -f "$LL/.line-limit-baseline"
+bash "$LL/scripts/line-limit.sh" --baseline >/dev/null 2>&1
+ll "a path with a space is still accepted debt" 0 "none grew"

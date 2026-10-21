@@ -1,44 +1,57 @@
 #!/usr/bin/env bash
-# line-limit.sh — the 200-line rule, applied to this repo's own code.
-#
-#   bash scripts/line-limit.sh             check; exit 1 on a violation
-#   bash scripts/line-limit.sh --baseline  record today's counts as accepted
-#
-# The skills teach consumers never to write a file longer than 200 lines, and
-# CLAUDE.md used to exempt this repo from its own rule. That sentence is why
-# setup-hook.mjs reached 1740 lines with nothing objecting.
-#
-# A hard cap would fail on eight files today, so this is a RATCHET instead:
-# every file already over the limit is recorded once in .line-limit-baseline
-# and may not grow. A file that is not in the baseline gets the real 200-line
-# limit. Debt is visible and can only shrink — the same shape as the
-# .mutmut-baseline the ship gate already uses, and for the same reason: a gate
-# that cannot go green on day one is a gate people delete.
-#
-# Not covered here: skills/*.md, which have their own caps in
-# validate-skills.mjs, and anything under node_modules or .git.
 
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(dirname "$HERE")"
-LIMIT=200
+. "$HERE/gate-config.sh" || exit 1
+ROOT="$(cd "${LINE_LIMIT_ROOT:-$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || echo "$HERE/..")}" && pwd -P)"
+load_gauntlet_conf "$ROOT/.claude/gauntlet.conf" "$HERE/../gauntlet.conf"
+LIMIT=$GAUNTLET_MAX_LINES
 BASELINE="$ROOT/.line-limit-baseline"
+SELF="${HERE#"$ROOT"/}/line-limit.sh"
+if ! [ "$LIMIT" -gt 0 ] 2>/dev/null; then
+  [ "${1:-}" = "--file" ] || echo "LINE LIMIT — off (GAUNTLET_MAX_LINES=$LIMIT)"
+  exit 0
+fi
 
-# `find | wc -l` prints paths relative to ROOT so the baseline is portable
-# between clones.
+is_code() {
+  local ext="\\.($GAUNTLET_SOURCE_EXT|sh)$" skip="(^|/)node_modules/|^\\.claude/"
+  [[ $1 =~ $ext ]] && ! [[ $1 =~ $skip ]] && ! is_ignored "$1"
+}
+
+# Paths are kept relative to ROOT so the baseline is portable between clones.
+files() {
+  { git -C "$ROOT" ls-files --cached --others --exclude-standard 2>/dev/null \
+    || (cd "$ROOT" && find . -type f -not -path './.git/*' | sed 's|^\./||'); } \
+    | while IFS= read -r f; do is_code "$f" && [ -f "$ROOT/$f" ] && printf '%s/%s\n' "$ROOT" "$f"; done | sort
+}
+
 counts() {
-  find "$ROOT" -type f \( -name '*.mjs' -o -name '*.js' -o -name '*.sh' \) \
-    -not -path '*/node_modules/*' -not -path '*/.git/*' \
-    -not -path '*/.claude/*' 2>/dev/null | sort | while IFS= read -r f; do
+  while IFS= read -r f; do
     printf '%s %s\n' "$(wc -l < "$f" | tr -d ' ')" "${f#"$ROOT"/}"
   done
 }
 
-NOW=$(counts)
+ONE=""
+if [ "${1:-}" = "--file" ]; then
+  ONE="$(cd "$(dirname -- "${2:-.}")" 2>/dev/null && pwd -P)/$(basename -- "${2:-.}")"
+  REL="${ONE#"$ROOT"/}"
+  [ "$REL" != "$ONE" ] && [ -f "$ONE" ] && is_code "$REL" || exit 0
+  git -C "$ROOT" check-ignore -q -- "$REL" 2>/dev/null && exit 0
+  NOW=$(printf '%s\n' "$ONE" | counts)
+else
+  NOW=$(files | counts)
+fi
 
+# On an existing baseline this only banks: an entry may drop or go, never appear or grow.
 if [ "${1:-}" = "--baseline" ]; then
-  printf '%s\n' "$NOW" | awk -v lim="$LIMIT" '$1 > lim' > "$BASELINE"
+  if [ -f "$BASELINE" ]; then
+    printf '%s\n' "$NOW" | awk -v lim="$LIMIT" '{ n = $1; p = $0; sub(/^[^ ]+ /, "", p) }
+      NR == FNR { was[p] = n; next } (p in was) && n > lim { print (n < was[p] ? n : was[p]), p }' "$BASELINE" - > "$BASELINE.tmp" \
+      && mv "$BASELINE.tmp" "$BASELINE"
+  else
+    printf '%s\n' "$NOW" | awk -v lim="$LIMIT" '$1 > lim' > "$BASELINE"
+  fi
   n=$(wc -l < "$BASELINE" | tr -d ' ')
   echo "line-limit: baseline written — $n file(s) over $LIMIT accepted as debt."
   echo "Commit $BASELINE. From here they may shrink but never grow."
@@ -52,7 +65,7 @@ SHRANK=""
 
 while read -r n f; do
   [ -z "$f" ] && continue
-  was=$(awk -v p="$f" '$2 == p { print $1 }' "$BASELINE" 2>/dev/null)
+  was=$(awk -v p="$f" '{ n = $1; sub(/^[^ ]+ /, "") } $0 == p { print n }' "$BASELINE" 2>/dev/null)
   if [ -z "$was" ]; then
     # Not accepted debt, so the real limit applies.
     if [ "$n" -gt "$LIMIT" ]; then
@@ -67,6 +80,8 @@ while read -r n f; do
   elif [ "$n" -lt "$was" ]; then
     SHRANK="$SHRANK  $f — $n lines, was $was
 "
+  elif [ -n "$ONE" ]; then
+    echo "LINE LIMIT — $f is $n lines, over $LIMIT (old debt). Split it if this change allows."
   fi
 done <<EOF
 $NOW
@@ -75,7 +90,7 @@ EOF
 # A file in the baseline that no longer exists is debt that was paid by deleting
 # or renaming it. Report it so the baseline can be trimmed, never fail on it.
 GONE=""
-if [ -f "$BASELINE" ]; then
+if [ -z "$ONE" ] && [ -f "$BASELINE" ]; then
   while read -r was f; do
     [ -z "$f" ] && continue
     [ -f "$ROOT/$f" ] || GONE="$GONE  $f — gone (was $was lines)
@@ -86,7 +101,7 @@ fi
 if [ -n "$NEW_OVER" ]; then
   echo "LINE LIMIT — over $LIMIT and not accepted debt:"
   printf '%s' "$NEW_OVER"
-  echo "  Split them. This repo teaches the rule; it does not get an exemption."
+  echo "  Split them."
 fi
 
 if [ -n "$GREW" ]; then
@@ -99,10 +114,10 @@ if [ -n "$SHRANK" ] || [ -n "$GONE" ]; then
   echo "LINE LIMIT — debt paid down (not a failure):"
   [ -n "$SHRANK" ] && printf '%s' "$SHRANK"
   [ -n "$GONE" ] && printf '%s' "$GONE"
-  echo "  Run: bash scripts/line-limit.sh --baseline   to bank it."
+  echo "  Run: bash $SELF --baseline   to bank it."
 fi
 
-if [ "$FAILED" = 0 ] && [ -z "$SHRANK" ] && [ -z "$GONE" ]; then
+if [ "$FAILED" = 0 ] && [ -z "$SHRANK" ] && [ -z "$GONE" ] && [ -z "$ONE" ]; then
   over=$(wc -l < "$BASELINE" 2>/dev/null | tr -d ' ')
   echo "LINE LIMIT — ok. ${over:-0} file(s) of accepted debt, none grew."
 fi

@@ -75,6 +75,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-stryker-run.sh"  # Stryker run elsewhere, through .stryker-run
 . "$HERE/selftest-ship-gate-structure.sh"  # where a new file may live
 . "$HERE/selftest-ship-gate-fail-fast.sh"  # no mutation run after a cheap check fails
+. "$HERE/selftest-ship-gate-length.sh"  # the length check honours .line-limit-baseline
 . "$HERE/selftest-ship-gate-report.sh"    # the last line names the saved output
 . "$HERE/selftest-timing.sh"             # how long the Stop hook and the ship gate took
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
@@ -88,9 +89,13 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-skill-ack.sh"          # the ack command, before any denial
 . "$HERE/selftest-skill-flags.sh"        # logging skills-audit verdicts, and /skill-report
 . "$HERE/selftest-line-limit.sh"         # the 200-line ratchet
+. "$HERE/selftest-edit-check.sh"         # the 200-line ratchet on each edited file
+. "$HERE/selftest-lint-ratchet.sh"       # the ESLint ratchet on each edited file
+. "$HERE/selftest-lint-ratchet-baseline.sh"  # baselines never bank growth, and edge cases
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
 . "$HERE/selftest-fetch.sh"              # the CLI talking to GitHub
 . "$HERE/selftest-install.sh"            # installing over an existing install
+. "$HERE/selftest-install-edit-check.sh"  # the edit check, installed and upgraded
 . "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end
 . "$HERE/selftest-stryker.sh"            # scaffolding Stryker into a project

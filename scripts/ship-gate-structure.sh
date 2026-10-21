@@ -107,6 +107,20 @@ structure_fail() {
 # An agent that pipes the gate through `tail` cuts the findings off; the last line still says where they are.
 gate_report() {
   REPORT="/tmp/claude-shipgate-$1.log"
-  exec > >(tee "$REPORT") 2>&1
-  trap 'echo "ship-gate: full output in $REPORT"' EXIT
+  exec 3>&1 4>&2 > >(tee "$REPORT") 2>&1
+  TEE_PID=${!:-}  # bash before 4.4 does not set $! for process substitution
+  trap 'gate_exit $?' EXIT
+}
+
+# A FAIL goes to the diary /add-rule reads, so a test gap the gate keeps finding can become a rule.
+gate_exit() {
+  echo "ship-gate: full output in $REPORT"
+  [ "$1" = 1 ] || return 0
+  exec 1>&3 2>&4
+  # A child left running (a dev server) can hold tee open forever; give it 2s, not a hang.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -n "$TEE_PID" ] && kill -0 "$TEE_PID" 2>/dev/null || break; sleep 0.2; done
+  mkdir -p "$PROJECT_DIR/.claude"
+  printf '{"ts":"%s","branch":"%s","status":"FAIL","report":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$(git branch --show-current 2>/dev/null | json_string)" "$(json_string < "$REPORT")" \
+    >> "$PROJECT_DIR/.claude/gate-findings.jsonl"
 }

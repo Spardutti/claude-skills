@@ -36,7 +36,7 @@ npx @spardutti/claude-skills
 ```
 
 ```text
-  Claude Skills Installer v2.51.2
+  Claude Skills Installer v2.52.0
 
   ── Frontend ──────────────────────────────
   ◉ react              ◯ tanstack-query
@@ -138,6 +138,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 | `/optimize` | Make one measured job faster without changing what it proves — fixes a benchmark and a result that must not move, sends 4 read-only subagents to find suspects, then changes one thing per round with a prediction written first, keeping only what beats the noise. Profiles after every wrong prediction, reruns before judging a result that flipped, and ends by writing the cause as a skill rule for you |
 | `/handoff` | Write a handoff doc so a fresh session picks the work up — captures what auto-compaction loses: decisions made and rejected, dead ends already ruled out, why the tree is dirty, and the one next step |
 | `/lockdown` | Per-repo supply-chain hardening — detects the package managers, Dockerfiles, and CI in use, then guides you through and applies install-time, deploy, and pipeline hardening for npm/pnpm, pip/uv, Docker, and GitHub Actions |
+| `/add-rule` | Turn a mistake Claude keeps making into a check on every edit — a text rule with a bad and a good example from real code when a pattern can catch it, or a lesson shown only on the files it names when it needs judgment. Old hits go into a baseline and come back as "fix it if you can" notes; nothing is added to CLAUDE.md |
 | `/skill-report` | Which installed skills earn their place in this repo — every `/ship` skills audit is logged by a hook, and this tallies it: how often each skill applied, how often it caught a violation, and the rule it catches most. Names rules that break often enough to become a script check, and skills that never flag and may be dead weight |
 
 ## How It Works
@@ -195,7 +196,9 @@ scripts/       validate-skills.mjs — checks skill length caps and reference in
                ship-gate.sh — /ship's file-length, folder-structure and mutation checks, behind an exit code
                ship-gate-hook.sh — refuses gh pr create/merge without a ship-gate receipt
                version-check.sh — SessionStart nudge when a newer catalog is published
-               skill-flags-record.sh — logs each /ship skills-audit verdict; skill-report.mjs tallies it
+               skill-flags-record.sh — logs each /ship skills audit and /code-review; skill-report.mjs tallies them
+               edit-check.sh — PostToolUse check on each edited file: line-limit.sh, lint-ratchet.mjs, .edit-rules.json
+               line-limit.sh — the 200-line ratchet, shared by the edit check, the ship gate and preflight
                gauntlet-selftest.sh — behavioural tests for the hooks (runs on pre-push)
                gauntlet-survey.sh — what the hook would do in every repo under a directory
                preflight.sh — everything that must pass before a release

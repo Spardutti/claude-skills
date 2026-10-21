@@ -47,7 +47,7 @@
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-. "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" && . "$HERE/ship-gate-files.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
+. "$HERE/gate-config.sh" && . "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" && . "$HERE/ship-gate-files.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
 
 MODE=""
 case "${1:-}" in
@@ -73,20 +73,7 @@ if [ -n "$ROOT" ]; then
   PROJECT_DIR="$ROOT"
 fi
 
-GAUNTLET_MAX_LINES=200
-GAUNTLET_MUTATE=""
-GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
-GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|jsonc?|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"
-GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alembic/versions/*.py */components/ui/*.tsx */hooks/use-mobile.ts */*.config.*"
-# Length-checked and skill-audited like everything else, but not mutated.
-# Mutation pays on logic and burns time on presentation: a component's mutants
-# are class names, copy and JSX shape, none of which is behaviour, and one
-# session spent an evening killing them. Logic that lives inside a component is
-# logic that wants extracting — which the 200-line rule already pushes toward.
-# Override in .claude/gauntlet.conf to mutate components too.
-GAUNTLET_NO_MUTATE='\.(tsx|jsx)$'
-[ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
-CONF=.claude/gauntlet.conf; [ -f "$CONF" ] || CONF="$HERE/../gauntlet.conf"; [ -f "$CONF" ] && . "$CONF"
+load_gauntlet_conf .claude/gauntlet.conf "$HERE/../gauntlet.conf"
 
 # ------------------------------------------------------------------- the scope
 BASE="${1:-}"
@@ -135,17 +122,6 @@ SOURCED=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
 # uncovered line started failing the gate: vitest.config.ts has no tests, will
 # never have tests, and is not a thing anyone writes a test for. Left in, every
 # diff that touches a config reports findings nobody can close.
-# set -f matters: an unquoted list is glob-expanded before it is split, so
-# */components/ui/*.tsx turned itself into the very path it was meant to match
-# and then matched nothing.
-is_ignored() {
-  set -f
-  for pat in $GAUNTLET_IGNORE_FILES; do
-    case "/$1" in $pat) set +f; return 0 ;; esac
-  done
-  set +f
-  return 1
-}
 FILES=$(printf '%s\n' "$SOURCED" | while IFS= read -r f; do
           [ -n "$f" ] && ! is_ignored "$f" && printf '%s\n' "$f"
         done)
@@ -190,7 +166,7 @@ if [ "$GAUNTLET_MAX_LINES" -gt 0 ]; then
   while IFS= read -r f; do
     n=$(wc -l < "$f")
     [ "$n" -gt "$LARGEST" ] && LARGEST=$n
-    [ "$n" -gt "$GAUNTLET_MAX_LINES" ] && OVER="$OVER  $f — $n lines (limit $GAUNTLET_MAX_LINES)
+    out=$(LINE_LIMIT_ROOT="$PWD" bash "$HERE/line-limit.sh" --file "$f") || OVER="$OVER$(printf '%s\n' "$out" | grep -E '^  .* — [0-9]+ lines')
 "
   done <<< "$FILES"
 fi

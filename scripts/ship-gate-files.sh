@@ -20,7 +20,7 @@ changed_tests() {  # changed_tests <family>
 files_context() {  # files_context <owner> <owned files>
   fam=$(family_of "$1/.")
   { printf '%s\n' "$PROJECT_DIR" "$1" "$(git rev-parse "$BASE" 2>/dev/null)"
-    cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-files.sh"
+    cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-files.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh"
     printf '%s\n' "$CHANGED" | grep -vE '\.(md|mdx|txt|rst|adoc)$' | grep -vE "$TEST_RE" \
       | grep -vxF -f <(printf '%s\n' "$2") | while IFS= read -r f; do
       [ -n "$f" ] || continue

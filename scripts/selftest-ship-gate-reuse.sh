@@ -77,10 +77,13 @@ ran_in "--baseline after a change asks mutmut, not a JS app that passed" "api" -
 
 # A verdict from an older gate is a verdict from whatever bugs it had.
 mkdir -p "$TMP/gate2"
-cp "$SG" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$TMP/gate2/"
+cp "$SG" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$TMP/gate2/"
 echo "# a newer gate" >> "$TMP/gate2/ship-gate.sh"
 SG_REAL=$SG; SG="$TMP/gate2/ship-gate.sh"
 ran_in "a changed gate trusts no verdict an older one recorded" "admin api web"
+mkdir -p "$TMP/gate4"; cp "$TMP/gate2/"* "$TMP/gate4/"; echo "# newer config" >> "$TMP/gate4/gate-config.sh"
+SG="$TMP/gate4/ship-gate.sh"
+ran_in "a changed gate-config.sh trusts no older verdict either" "admin api web"
 SG=$SG_REAL
 
 # A config command's scope is unknown, so it has no kind to key on.

@@ -1,7 +1,8 @@
 import { registerHooks } from "./hook-settings.mjs";
 import { mkdir, writeFile, readFile, chmod, unlink } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 
 // Installs the hook scripts and registers them in .claude/settings.json.
@@ -17,17 +18,21 @@ import { homedir } from "node:os";
 //                             explicitly applied before the first edit
 //   gauntlet.sh               Stop — fast typecheck and tests on the diff
 //   ship-gate.sh              file length and mutation, behind an exit code
+//   gate-config.sh            sourced by ship-gate.sh — shared helpers
 //   ship-gate-projects.sh     sourced by ship-gate.sh — project detection, reuse
 //   ship-gate-hook.sh         PreToolUse on Bash — no commit without a receipt
 //   version-check.sh          SessionStart — a line when a newer catalog exists
 //   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
 //   skill-report.mjs          read by /skill-report — tallies that log
+//   edit-check.sh             PostToolUse — line-limit.sh, lint-ratchet.mjs and
+//                             text-rules.mjs on each edited file
 
 const GATE_FILENAME = "skill-gate.sh";
 const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
 const APPLICATION_GATE_FILENAME = "skill-application-gate.sh";
 const GAUNTLET_FILENAME = "gauntlet.sh";
 const SHIP_GATE_FILENAME = "ship-gate.sh";
+const GATE_CONFIG_FILENAME = "gate-config.sh";
 const SHIP_GATE_PROJECTS_FILENAME = "ship-gate-projects.sh";
 const SHIP_GATE_STRUCTURE_FILENAME = "ship-gate-structure.sh";
 const SHIP_GATE_FILES_FILENAME = "ship-gate-files.sh";
@@ -35,6 +40,11 @@ const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
 const SKILL_FLAGS_FILENAME = "skill-flags-record.sh";
 const SKILL_REPORT_FILENAME = "skill-report.mjs";
+const EDIT_CHECK_FILENAME = "edit-check.sh";
+const LINE_LIMIT_FILENAME = "line-limit.sh";
+const LINT_RATCHET_FILENAME = "lint-ratchet.mjs";
+const TEXT_RULES_FILENAME = "text-rules.mjs";
+const RATCHET_BASELINE_FILENAME = "ratchet-baseline.mjs";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -99,6 +109,20 @@ export async function writeGauntletConf(targetDir, testCommand) {
   return confPath;
 }
 
+// Before the edit hook is registered, so code that predates it never blocks an edit.
+// Only rules never baselined are recorded: re-recording a known one would bank growth.
+function writeBaselines(dir, hooksDir) {
+  const gitRoot = spawnSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout?.trim();
+  const root = gitRoot || dir;
+  if (!existsSync(join(root, ".line-limit-baseline"))) {
+    spawnSync("bash", [join(hooksDir, LINE_LIMIT_FILENAME), "--baseline"],
+      { cwd: root, env: { ...process.env, LINE_LIMIT_ROOT: root }, stdio: "ignore" });
+  }
+  console.log("  Recording old code as baseline debt (runs ESLint once per new rule)...");
+  spawnSync(process.execPath, [join(hooksDir, LINT_RATCHET_FILENAME), "--baseline-new"],
+    { cwd: dir, stdio: "ignore", timeout: 600_000 });
+}
+
 export async function setupHook(targetDir = process.cwd()) {
   const resolved = resolve(targetDir);
   const hooksDir = join(resolved, ".claude", "hooks");
@@ -111,6 +135,7 @@ export async function setupHook(targetDir = process.cwd()) {
     APPLICATION_GATE_FILENAME,
     GAUNTLET_FILENAME,
     SHIP_GATE_FILENAME,
+    GATE_CONFIG_FILENAME,
     SHIP_GATE_PROJECTS_FILENAME,
     SHIP_GATE_STRUCTURE_FILENAME,
     SHIP_GATE_FILES_FILENAME,
@@ -118,6 +143,11 @@ export async function setupHook(targetDir = process.cwd()) {
     VERSION_CHECK_FILENAME,
     SKILL_FLAGS_FILENAME,
     SKILL_REPORT_FILENAME,
+    EDIT_CHECK_FILENAME,
+    LINE_LIMIT_FILENAME,
+    LINT_RATCHET_FILENAME,
+    TEXT_RULES_FILENAME,
+    RATCHET_BASELINE_FILENAME,
   ]) {
     const dest = join(hooksDir, name);
     await writeFile(dest, await readHookSource(name), { mode: 0o755 });
@@ -131,6 +161,7 @@ export async function setupHook(targetDir = process.cwd()) {
     // not present — fine
   }
 
+  writeBaselines(resolved, hooksDir);
   await registerHooks(settingsPath);
 
   console.log(`  Hook installed: .claude/hooks/${GATE_FILENAME}`);
@@ -140,5 +171,6 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
   console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${SKILL_FLAGS_FILENAME}`);
+  console.log("  Hook installed: .claude/hooks/edit-check.sh (baselines: .line-limit-baseline, .lint-baseline)");
   console.log(`  Settings updated: .claude/settings.json`);
 }

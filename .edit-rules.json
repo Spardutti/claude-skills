@@ -1,0 +1,12 @@
+{
+  "text": [
+    {
+      "id": "no-file-header",
+      "files": "\\.(sh|mjs|js|jsx|ts|tsx|py)$",
+      "pattern": "^(?:#!.*\\n)?\\s*(?:#(?![!]|\\s*shellcheck)|//(?!\\s*@ts-|\\s*eslint)|/\\*(?!\\s*eslint))",
+      "message": "The file opens with a header comment. Delete it; put the why in the commit message.",
+      "bad": "#!/usr/bin/env bash\n# line-limit.sh \u2014 the 200-line rule\nset -u\n",
+      "good": "#!/usr/bin/env bash\n# shellcheck disable=SC2034\nset -u\n"
+    }
+  ]
+}

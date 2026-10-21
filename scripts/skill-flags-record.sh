@@ -1,10 +1,10 @@
 #!/bin/bash
-# SubagentStop: appends each gauntlet-skills verdict to .claude/skill-flags.jsonl.
 
 INPUT=$(cat | tr -d '\n')
 
 case "$INPUT" in
-  *'"agent_type":"gauntlet-skills"'*) ;;
+  *'"agent_type":"gauntlet-skills"'*) LOG=skill-flags.jsonl ;;
+  *'\"failure_scenario\"'*) LOG=review-findings.jsonl ;;
   *) exit 0 ;;
 esac
 
@@ -19,7 +19,9 @@ TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"agent_transcript_path":"[^"]*"' | 
 MODEL=""
 [ -f "$TRANSCRIPT" ] && MODEL=$(grep -o '"model":"[^"]*"' "$TRANSCRIPT" | tail -1 | sed 's/.*:"//; s/"$//')
 
-printf '{"ts":"%s","model":"%s","reply":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODEL" "$REPLY" \
-  >> "$PROJECT_DIR/.claude/skill-flags.jsonl"
+. "$SCRIPT_DIR/gate-config.sh" 2>/dev/null || json_string() { tr -cd '[:alnum:]/._-'; }
+BRANCH=$(git -C "$PROJECT_DIR" branch --show-current 2>/dev/null | json_string)
+printf '{"ts":"%s","branch":"%s","model":"%s","reply":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BRANCH" "$MODEL" "$REPLY" \
+  >> "$PROJECT_DIR/.claude/$LOG"
 
 exit 0

@@ -55,3 +55,18 @@ rm -f "$FLAGLOG"
 REPORT=$(node .claude/hooks/skill-report.mjs 2>&1)
 ok=0; [ "$REPORT" = "No skill audits recorded yet. Run /ship to record some." ] && ok=1
 sf "no log yet says so instead of failing" $ok "$REPORT"
+
+REVLOG=.claude/review-findings.jsonl
+R1='[{"file":"a.ts","summary":"says \"no\"","failure_scenario":"x"}]'
+stop general-purpose "$R1"
+GOT=$(node -e "const l=JSON.parse(require('fs').readFileSync('$REVLOG','utf8'));process.stdout.write(l.reply)" 2>&1)
+ok=0; [ "$GOT" = "$R1" ] && [ ! -f "$FLAGLOG" ] && ok=1
+sf "a /code-review reply is logged to its own file, intact" $ok "$GOT"
+stop general-purpose 'I read three files and found nothing.'
+ok=0; [ "$(wc -l < "$REVLOG")" -eq 1 ] && ok=1
+sf "a subagent reply with no findings is not logged" $ok "$(cat "$REVLOG")"
+ok=0; grep -q '"branch":"' "$REVLOG" && ok=1
+sf "a logged review names the branch it was run on" $ok "$(head -c 200 "$REVLOG")"
+stop general-purpose 'The review JSON has a failure_scenario field per finding.'
+ok=0; [ "$(wc -l < "$REVLOG")" -eq 1 ] && ok=1
+sf "a reply that only mentions failure_scenario in prose is not logged" $ok "$(tail -1 "$REVLOG")"
