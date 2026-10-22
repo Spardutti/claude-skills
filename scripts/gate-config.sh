@@ -8,6 +8,9 @@ GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alem
 # Components are length-checked but not mutated: their mutants are class names and JSX, not
 # behaviour. Override in .claude/gauntlet.conf to mutate them too.
 GAUNTLET_NO_MUTATE='\.(tsx|jsx)$'
+# The /ship log is off unless a conf sets GAUNTLET_SHIP_LOG=1; every project writes to one folder.
+GAUNTLET_SHIP_LOG=""
+GAUNTLET_SHIP_LOG_DIR="${HOME:-}/.claude/ship-logs"
 
 load_gauntlet_conf() {  # load_gauntlet_conf <project conf> <fallback conf>
   [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"

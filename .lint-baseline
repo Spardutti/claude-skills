@@ -55,15 +55,12 @@
 1 no-file-header scripts/selftest-subagent-skills.sh
 1 no-file-header scripts/selftest-survey.sh
 1 no-file-header scripts/selftest-timing.sh
-1 no-file-header scripts/ship-gate-files.sh
 1 no-file-header scripts/ship-gate-hook.sh
 1 no-file-header scripts/ship-gate-projects.sh
-1 no-file-header scripts/ship-gate-structure.sh
 1 no-file-header scripts/ship-gate.sh
 1 no-file-header scripts/skill-application-gate.sh
 1 no-file-header scripts/skill-gate-automark.sh
 1 no-file-header scripts/skill-gate.sh
-1 no-file-header scripts/skill-report.mjs
 1 no-file-header scripts/version-check.sh
 2 max-lines-per-function cli/lib/prompt.mjs
 2 max-lines-per-function cli/lib/tool-needs.mjs

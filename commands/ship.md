@@ -47,6 +47,10 @@ git remote                            # empty = no remote configured
 - **No remote** → the pr/merge/release stages cannot run; STOP before them with "No `origin` remote configured."
 - **`gh` not installed or not authenticated** → required for the pr, merge, and release stages. Check `gh auth status` before any of them; if it fails, explain setup and STOP.
 
+### Mark the start
+
+Right after the prechecks, run `bash .claude/hooks/ship-mark.sh begin`. The PR hook opens and merges no PR on a branch without this mark, so a gate run by hand cannot skip the audit and the review.
+
 ### Identify branches
 
 ```bash
@@ -225,8 +229,15 @@ last, and with no range it compares against `main`, not the dev branch. Use `ori
 base that is behind re-reviews work already merged. Name the branch, not `HEAD`: in a worktree,
 `HEAD` is whatever folder the session sits in.
 
-Fix its findings the same way as the skills audit: apply the ones you agree with, say
-why for the ones you do not, and stop the ship on one that needs a design decision.
+**No proof, no fix.** A finding is what a reviewer said, not evidence. Before changing code
+for one, write the test that shows the bug, and run it:
+
+- **It fails** → confirmed. Fix the code; the test stays as the guard. Old bug or new, fix it here.
+- **It passes** → refuted. The reviewer was wrong: change nothing and say why.
+- **No test can show it** (it needs a real browser, exact timing, an outside service) →
+  unconfirmed. List it for the user with that reason; never fix on a guess.
+
+Stop the ship on a confirmed finding that needs a design decision.
 **One round only** — do not review the fixes again. A reviewer re-run on its own fixes
 keeps finding older code, not new bugs. Re-run `ship-gate.sh` if anything changed.
 
@@ -302,7 +313,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
    - **Always confirm the version with the user.**
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
 3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
-4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull`, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
+4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull && bash .claude/hooks/ship-mark.sh begin`, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
 5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on. **Never `--delete-branch`** here: the head branch is dev.
 6. **Tag + GitHub release**:
 
@@ -332,6 +343,22 @@ that came back on two or more branches **with at least one entry after that date
 repeat was already offered. Nothing qualifies → say nothing. Otherwise ask which to turn into a
 check; on a pick, run `/add-rule` with that mistake. Never write a rule here.
 
+## The ship log — only when it is on
+
+`node .claude/hooks/ship-log.mjs on` exits 0 when the user turned the log on
+(`GAUNTLET_SHIP_LOG=1`). Otherwise skip this section. The gate logs each of its own runs;
+you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs`:
+
+- `start` once, before the first check of the run. A ship left open by an interrupted run is
+  saved as abandoned, so it never mixes into this one.
+- `step audit start` before the skills audit and `step audit end` after it; the same with `review`.
+- `finding '<json>'` once for every finding you fixed, refuted or left, from any check:
+  `{"by":"review","what":"<one line>","file":"<path>","verdict":"confirmed","fixed":true}`.
+  `by` is `mutation`, `length`, `structure`, `audit:<skill>` or `review`. `verdict` is
+  `confirmed` (a test or the gate proved it), `refuted` (a test showed it is not a bug, or
+  you disagree with an audit point, with the reason in `"note"`) or `unconfirmed`.
+- `pr <number>` right after the PR is created, or `end "<why>"` when the run stops before one.
+
 ## Flow Examples
 
 - **`/ship` on a dirty feature branch** → commits, asks "create a PR?" → "merge it?" → "cut a release?". Decline at any point to stop.
@@ -354,6 +381,8 @@ check; on a pick, run `/add-rule` with that mistake. Never write a rule here.
 - NEVER skip a skill because the diff "looks fine" — skip it only when no file in the ship scope matches it, and say which you skipped.
 - ALWAYS fix what the audit finds, re-running `ship-gate.sh` afterwards because the edits invalidate its receipt; a violation needing a design decision stops the ship rather than being noted and passed.
 - ALWAYS run `/code-review medium origin/<base>...<branch>` once after the skills audit, and NEVER a second round on its own fixes.
+- NEVER change code for a review finding before a test shows the bug; a finding no test can show is listed, not fixed.
+- With the ship log on, log every finding once, with its verdict, and close the log with `pr` or `end`.
 - ALWAYS run `diary-check.mjs` at the end of every run, `--mark` before asking, and hand a picked repeat to `/add-rule`; NEVER write a rule in `/ship`.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.

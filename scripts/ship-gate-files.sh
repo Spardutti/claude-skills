@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Sourced by ship-gate.sh: which changed files a Stryker run can skip, and what its output says.
 
 TEST_RE='(\.|_)(test|spec)\.[^.]+$|(^|/)tests?/'
 
@@ -90,20 +89,25 @@ files_record() {  # files_record <context> <owner> <findings>
 # NoCoverage is printed exactly like Survived and means something worse: not
 # "a test missed this mutation" but "no test executes this line at all". The
 # gate matched only [Survived], so a diff whose files have no tests came back
-# PASS — 306 uncovered mutants reported as proven on one commit. It is judged
-# only for files that went in WITH a range: a glob-shaped path is mutated
-# whole, so its untouched lines would report uncovered forever, and a finding
-# nobody can close is what teaches people to --force.
+# PASS — 306 uncovered mutants reported as proven on one commit. A glob-shaped
+# path is mutated whole, so only its changed lines are judged: the rest would
+# report forever, and a finding nobody can close is what teaches people to --force.
 #
 # The status line carries no file name; the line under it does, as
 # file:line:column. They are paired here rather than grepped separately.
-stryker_findings() {  # stryker_findings <output> <globbed paths, comma-wrapped>
+stryker_findings() {  # stryker_findings <output> <",path:ranges," per globbed file>
   printf '%s\n' "$1" | awk -v globbed="$2" '
+    function changed(rs, l,   parts, ab, i) {
+      for (i = split(rs, parts, " "); i > 0; i--) { split(parts[i], ab, "-"); if (l >= ab[1] + 0 && l <= ab[2] + 0) return 1 }
+      return 0
+    }
+    BEGIN { for (i = split(globbed, g, ","); i > 0; i--) if (g[i] != "") { k = g[i]; sub(/:[^:]*$/, "", k); r = g[i]; sub(/^.*:/, "", r); ranges[k] = r } }
     /^\[Survived\]/   { pend = $0; kind = "s"; next }
     /^\[NoCoverage\]/ { pend = $0; kind = "n"; next }
     pend != "" {
       file = $0; sub(/:[0-9]+:[0-9]+$/, "", file)
-      if (kind == "s" || index(globbed, "," file ",") == 0) print pend "  " $0
+      line = $0; sub(/:[0-9]+$/, "", line); sub(/^.*:/, "", line)
+      if (!(file in ranges) || changed(ranges[file], line + 0)) print pend "  " $0
       pend = ""
     }
     # A survivor with no location under it is still a survivor, never dropped.
@@ -120,12 +124,62 @@ stryker_zero_tests() {  # stryker_zero_tests <output> <label> <seconds>
   echo "      On Vitest 5 this is stryker-js#6210: pin vitest@4 until a fixed runner ships."
 }
 
+# Read by header name, so a reordered column cannot shift the numbers.
+stryker_counts() {  # stryker_counts <output> <label>
+  printf '%s\n' "$1" | awk -F'|' -v label="$2" '
+    /# killed/ { for (i = 1; i <= NF; i++) { h = $i; gsub(/^ +| +$/, "", h); col[h] = i } next }
+    /^ *All files/ && col["# killed"] {
+      for (k in col) { v = $col[k]; gsub(/ /, "", v); n[k] = v + 0 }
+      t = n["# killed"] + n["# survived"] + n["# timeout"] + n["# no cov"] + n["# errors"]
+      printf "  %s stryker — %d mutants: %d killed, %d survived, %d uncovered, %d timed out, %d errors\n",
+        label, t, n["# killed"], n["# survived"], n["# no cov"], n["# timeout"], n["# errors"]
+      exit
+    }'
+}
+
 # Sets ALL from a Stryker run. Fails when a broken run leaves nothing provable.
 stryker_judge() {  # uses OUT GLOBBED FCTX RC owner label T from ship-gate.sh
+  echo "  $label stryker — mutated: $(while IFS= read -r f; do printf '%s ' "${f#"$owner"/}"; done <<< "$OWNED")"
+  stryker_counts "$OUT" "$label"
   ALL=$(stryker_findings "$OUT" "$GLOBBED")
   if stryker_zero_tests "$OUT" "$label" "$T"; then
     ALL=$(grep -v '^\[Survived\]' <<< "$ALL"); [ -n "$ALL" ]; return
   fi
   [ -n "$FCTX" ] && [ "$RC" -eq 0 ] && files_record "$FCTX" "$owner" "$ALL"
   return 0
+}
+
+# Files that decide whether Stryker can run the suite at all; none of them is code it mutates.
+SETUP_RE='(^|/)(stryker\.conf[^/]*|stryker\.config\.[^/]*|vitest\.(config|workspace)\.[^/]*|vite\.config\.[^/]*|jest\.config\.[^/]*|tsconfig[^/]*\.json|package(-lock)?\.json|pnpm-(lock|workspace)\.yaml|yarn\.lock|bun\.lockb?|\.npmrc)$|(^|/)patches/'
+
+# A version bump touches package.json on every release and proves nothing about Stryker.
+setup_files() {
+  printf '%s\n' "$CHANGED" | grep -E "$SETUP_RE" | while IFS= read -r f; do
+    [ -n "$({ git diff "$BASE" -- "$f"; git ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || sed 's/^/+/' "$f"; } 2>/dev/null \
+      | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' | grep -v '"version"')" ] && printf '%s\n' "$f"
+  done
+}
+
+# A PR can break Stryker (a dropped patch, a test config) with no code to mutate, so a trial
+# runs the suite under it. A project with code to mutate skips it: its real run starts the same way.
+setup_check() {
+  [ -z "$GAUNTLET_MUTATE" ] || return 0
+  local o b bin label key out rc t0 mutated
+  mutated=$(printf '%s\n' "$FILES" | grep -vE "$GAUNTLET_NO_MUTATE" | while IFS= read -r f; do [ -n "$f" ] && owner_of "$f"; done)
+  for o in $(setup_files | while IFS= read -r f; do owner_of "$f"; done | sort -u); do
+    grep -qxF "$o" <<< "$mutated" && continue
+    b=""; [ "$o" != . ] && b="$o/"; [ "$o" = . ] && label="<repo root>" || label="$o/"
+    grep -qs '@stryker-mutator/core' "${b}package.json" || continue
+    key="/tmp/claude-shipgate-project-$(project_key "$o" dryrun)"
+    [ -f "$key" ] && { echo "  $label stryker setup — ok, not re-run: its trial run passed"; continue; }
+    bin=$(stryker_bin "$b"); t0=$SECONDS; out=$(cd "${b:-.}" && $bin run --dryRunOnly --concurrency "$(gate_workers)" 2>&1); rc=$?
+    if [ $rc -eq 0 ]; then echo "  $label stryker setup ($((SECONDS - t0))s) — ok, its trial run passed"; touch "$key"
+    elif grep -qE 'initial test run|DryRunExecutor' <<< "$out"; then
+      echo "  $label stryker setup ($((SECONDS - t0))s) — this change breaks Stryker's own test run:"
+      printf '%s\n' "$out" | tail -12 | sed 's/^/      /'; STATUS=1
+    else
+      echo "  $label stryker setup ($((SECONDS - t0))s) — UNPROVEN, the trial run could not start:"
+      printf '%s\n' "$out" | tail -6 | sed 's/^/      /'; stryker_elsewhere stryker "$b"; [ "$STATUS" = 0 ] && STATUS=2
+    fi
+  done
 }

@@ -21,10 +21,13 @@ import { homedir } from "node:os";
 //   gate-config.sh            sourced by ship-gate.sh — shared helpers
 //   ship-gate-projects.sh     sourced by ship-gate.sh — project detection, reuse
 //   ship-gate-hook.sh         PreToolUse on Bash — no commit without a receipt
+//   ship-mark.sh              written by /ship — no PR on a branch /ship never ran on
 //   version-check.sh          SessionStart — a line when a newer catalog exists
 //   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
 //   skill-report.mjs          read by /skill-report — tallies that log
 //   diary-check.mjs           run by /ship — says when /add-rule has repeats to look at
+//   ship-log.mjs              the /ship log, when GAUNTLET_SHIP_LOG=1 — every gate run
+//                             and finding, one file per ship, in one folder
 //   edit-check.sh             PostToolUse — line-limit.sh, lint-ratchet.mjs and
 //                             text-rules.mjs on each edited file
 
@@ -48,6 +51,10 @@ const TEXT_RULES_FILENAME = "text-rules.mjs";
 const RATCHET_BASELINE_FILENAME = "ratchet-baseline.mjs";
 const DIARY_CHECK_FILENAME = "diary-check.mjs";
 const DIARY_LIB_FILENAME = "diary-lib.mjs";
+const SHIP_LOG_FILENAME = "ship-log.mjs";
+const SHIP_LOG_PARSE_FILENAME = "ship-log-parse.mjs";
+const SHIP_LOG_REPORT_FILENAME = "ship-log-report.mjs";
+const SHIP_MARK_FILENAME = "ship-mark.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -152,6 +159,10 @@ export async function setupHook(targetDir = process.cwd()) {
     RATCHET_BASELINE_FILENAME,
     DIARY_CHECK_FILENAME,
     DIARY_LIB_FILENAME,
+    SHIP_LOG_FILENAME,
+    SHIP_LOG_PARSE_FILENAME,
+    SHIP_LOG_REPORT_FILENAME,
+    SHIP_MARK_FILENAME,
   ]) {
     const dest = join(hooksDir, name);
     await writeFile(dest, await readHookSource(name), { mode: 0o755 });

@@ -63,6 +63,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 # Adding a case means editing the file that owns the subject, not this one.
 . "$HERE/selftest-gauntlet-hook.sh"      # the Stop hook: skips, detection, runners
 . "$HERE/selftest-ship-gate-stryker.sh"  # the JS half of the ship gate
+. "$HERE/selftest-ship-gate-glob.sh"     # a [id] route is judged on its changed lines only
 . "$HERE/selftest-ship-gate-stryker-zero.sh"  # survivors from a run that tested nothing
 . "$HERE/selftest-ship-gate-page-tests.sh"  # page tests passed off as proof for logic
 . "$HERE/selftest-ship-gate-mutmut.sh"   # the Python half, and the git receipt
@@ -73,6 +74,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-reuse.sh"    # not re-running a project that already passed
 . "$HERE/selftest-ship-gate-file-reuse.sh"  # not re-mutating a file that already passed
 . "$HERE/selftest-ship-gate-stryker-run.sh"  # Stryker run elsewhere, through .stryker-run
+. "$HERE/selftest-ship-gate-setup.sh"    # a change to Stryker's own setup gets a trial run
 . "$HERE/selftest-ship-gate-structure.sh"  # where a new file may live
 . "$HERE/selftest-ship-gate-fail-fast.sh"  # no mutation run after a cheap check fails
 . "$HERE/selftest-ship-gate-length.sh"  # the length check honours .line-limit-baseline
@@ -80,6 +82,8 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-timing.sh"             # how long the Stop hook and the ship gate took
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
 . "$HERE/selftest-ship-gate-base.sh"     # which branch the ship gate measures from
+. "$HERE/selftest-ship-log.sh"           # the /ship log: every gate run, findings, PR size
+. "$HERE/selftest-ship-mark.sh"          # a PR opens only after /ship starts on its branch
 . "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
 . "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders
 . "$HERE/selftest-ship-gate-tooling.sh"  # .claude/ tooling and deleted files are never UNPROVEN

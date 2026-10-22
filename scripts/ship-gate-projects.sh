@@ -92,7 +92,7 @@ changed_files() {
 # Ignored extensions are left out; see the comment where ship-gate.sh first calls this.
 receipt_key() {
   { printf '%s\n' "$PROJECT_DIR"
-    changed_files | grep -viE "\.($GAUNTLET_IGNORE_EXT)$" | while IFS= read -r f; do
+    { changed_files | grep -viE "\.($GAUNTLET_IGNORE_EXT)$"; setup_files; } | LC_ALL=C sort -u | while IFS= read -r f; do
       [ -n "$f" ] || continue
       printf '%s\n' "$f"
       [ -f "$f" ] && cat "$f"

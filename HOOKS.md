@@ -13,6 +13,7 @@ are for; this covers how they behave when one gets in your way.
 - [Configuration Reference](#configuration-reference)
 - [The Edit Check](#the-edit-check)
 - [The Ship Gate](#the-ship-gate)
+- [The Ship Log](#the-ship-log)
 - [Manual Install](#manual-install)
 
 ## What Gets Installed
@@ -31,7 +32,7 @@ Two guard the **back** — nothing finishes or ships until the code passes:
 - `gauntlet.sh` — a `Stop` hook running the fast gates on your changed files
 - `ship-gate-hook.sh` — a `PreToolUse` gate on `Bash` that refuses `gh pr create`,
   `gh pr merge`, and a `git push` from a protected branch without a receipt from
-  `ship-gate.sh`
+  `ship-gate.sh`. It also refuses a PR on a branch where `/ship` never started
 
 One checks each edit as it lands — see [The Edit Check](#the-edit-check):
 
@@ -273,6 +274,8 @@ GAUNTLET_SOURCE_EXT='ts|tsx|py'      # what counts as SOURCE — not the same qu
 GAUNTLET_MUTATE='bash mutate.sh'     # replace per-project mutation detection
 GAUNTLET_IGNORE_FILES='*.gen.ts'     # globs that are never gated — see below
 GAUNTLET_NO_MUTATE='\.(tsx|jsx)$'    # gated and length-checked, but never mutated
+GAUNTLET_SHIP_LOG=1                  # log every /ship — see The Ship Log
+GAUNTLET_SHIP_LOG_DIR=~/ship-logs    # where; default ~/.claude/ship-logs
 ```
 
 `GAUNTLET_IGNORE_FILES` holds files nobody wrote, so the line limit and mutation
@@ -351,6 +354,20 @@ than riding on the previous verdict. `ship-gate.sh --force` writes a FORCED
 receipt, which makes skipping a visible command rather than a private judgement
 call.
 
+**A route folder like `[id]` is mutated whole, but judged on its changed lines.** Stryker
+cannot take a line range on a path with brackets, so the gate drops gaps on old lines.
+
+**A change to Stryker's own setup gets a trial run.** A PR can touch no code and still
+break Stryker: a dropped patch, a new test config. When `stryker.config.*`, a Vitest, Vite
+or Jest config, `tsconfig*.json`, `package.json`, a lockfile or `patches/` changes, the gate
+runs `stryker run --dryRunOnly`. A failing test run is a FAIL; one that cannot start is
+UNPROVEN. A version bump alone, and a project the gate already mutates, skip it.
+
+**A PR needs `/ship`, not just the gate.** `/ship` runs `ship-mark.sh begin` when it
+starts, and the hook opens or merges no PR on a branch without a mark from the last 12 hours. A gate run
+by hand skips the skills audit and the code review, and Claude did exactly that
+when it remembered the steps. The gate's pass is reused, so only those two cost time.
+
 **A file that passed is not mutated again** while nothing it rests on moves: the
 file itself, other code of its kind, the base, and the gate. Tests are the
 exception. A test that only gained lines keeps the verdict, because adding a test
@@ -359,6 +376,31 @@ after a run with findings, the next one mutates only the files you fixed. A chan
 in a file it calls is not re-checked, and the output says so. Stryker only.
 
 **Known hole:** a PR opened in the GitHub web UI meets no gate.
+
+## The Ship Log
+
+Off unless `GAUNTLET_SHIP_LOG=1`. Set it in `~/.claude/gauntlet.conf` to log every project;
+a project's own `.claude/gauntlet.conf` can set it back to `""`. Every project writes to one
+folder, `~/.claude/ship-logs/`, so ships from different repos can be compared.
+
+One file per ship, named `<app>_<date>_pr<number>.json` (or `_<branch>.json` when the run
+stopped before a PR). Until then it sits in `open/`; a ship left open when the next `/ship`
+starts is saved as abandoned. It holds:
+
+- **Every gate run**, PASS, FAIL, UNPROVEN, FORCED or INTERRUPTED (cancelled before its verdict): its time, the files it mutated, the files
+  it reused from an earlier pass, Stryker's mutant counts, each survivor, and the whole report.
+- **The PR size** from the fork point: files and lines added and removed, split into code, tests
+  and other.
+- **The skills audit and the bug review**: how long each took.
+- **Every finding**, from any check: who found it, whether a test confirmed or refuted it, and
+  whether it was fixed.
+
+The gate writes its own runs; `/ship` adds the rest. A log that cannot be written never
+changes the gate's verdict. Compare every ship:
+
+```bash
+node .claude/hooks/ship-log.mjs report
+```
 
 ## Manual Install
 

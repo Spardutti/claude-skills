@@ -42,6 +42,21 @@ case "$CMD" in
   *) exit 0 ;;
 esac
 
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '"%s"' "$s"
+}
+
+deny() {
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' "$(json_escape "$1")"
+  exit 0
+}
+
 GATE="$PROJECT_DIR/.claude/hooks/ship-gate.sh"
 [ -x "$GATE" ] || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
@@ -84,6 +99,18 @@ BRANCH=$(pr_branch)
 KEY=$(CLAUDE_PROJECT_DIR="$TARGET" bash "$GATE" --key 2>/dev/null)
 [ -z "$KEY" ] && exit 0
 
+# A gate run by hand skips /ship's audit and review, so the PR waits for /ship itself.
+# A merge whose branch gh cannot name is left to the receipt alone.
+MARKER="$PROJECT_DIR/.claude/hooks/ship-mark.sh"
+case "$CMD" in *"gh pr create"*) MARK_BRANCH=${BRANCH:-$(git branch --show-current)} ;; *) MARK_BRANCH=$BRANCH ;; esac
+if [ -f "$MARKER" ] && [ -n "$MARK_BRANCH" ] && ! CLAUDE_PROJECT_DIR="$TARGET" bash "$MARKER" check "$MARK_BRANCH"; then
+  deny "BLOCKED: /ship has not run on branch $MARK_BRANCH.
+
+Load the /ship command with the Skill tool and follow it from the start. A gate run
+by hand is not enough: /ship also runs the skills audit and the code review.
+The gate's earlier pass is reused, so only those two steps cost time."
+fi
+
 RECEIPT="/tmp/claude-shipgate-$KEY"
 if [ -f "$RECEIPT" ]; then
   exit 0
@@ -111,15 +138,4 @@ To publish without the gate, say so out loud and run:
 
   bash .claude/hooks/ship-gate.sh --force"
 
-json_escape() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\n'/\\n}"
-  s="${s//$'\r'/\\r}"
-  s="${s//$'\t'/\\t}"
-  printf '"%s"' "$s"
-}
-
-printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' "$(json_escape "$MSG")"
-exit 0
+deny "$MSG"

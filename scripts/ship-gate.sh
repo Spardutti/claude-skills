@@ -100,11 +100,7 @@ CHANGED=$(changed_files)
 RECEIPT_KEY=$(receipt_key); RECEIPT="/tmp/claude-shipgate-$RECEIPT_KEY"
 
 if [ "$MODE" = key ]; then printf '%s\n' "$RECEIPT_KEY"; exit 0; fi
-if [ "$MODE" = force ]; then
-  printf 'FORCED %s\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
-  echo "ship-gate: FORCED — receipt written without running any check."
-  exit 0
-fi
+[ "$MODE" = force ] && gate_force
 gate_report "$RECEIPT_KEY"
 SOURCED=$(printf '%s\n' "$CHANGED" | grep -E "\.($GAUNTLET_SOURCE_EXT)$" \
         | grep -vE "$TEST_RE|(^|/)\.stryker-tmp/" | while read -r f; do
@@ -134,7 +130,7 @@ if [ -n "$IGNORED" ]; then
 fi
 
 [ -n "$FILES" ] && echo "ship-gate: $(printf '%s\n' "$FILES" | wc -l) changed code file(s), base $(git rev-parse --short "$BASE")"
-STATUS=0; structure_check || { STATUS=1; [ -z "$FILES" ] && structure_fail; }
+STATUS=0; structure_check || STATUS=1; [ "$STATUS" = 1 ] || setup_check; [ "$STATUS" = 1 ] && [ -z "$FILES" ] && structure_fail
 if [ -z "$FILES" ]; then
   # "I recognised nothing" is not "there is nothing", and the gate used to report
   # both as a PASS. A Godot repo changed only .gd files, which no extension in
@@ -154,9 +150,7 @@ if [ -z "$FILES" ]; then
     printf 'UNPROVEN %s unknown-extensions\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
     exit 2
   fi
-  echo "ship-gate: no changed code files — nothing to check"
-  printf 'PASS %s no-code-changes\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
-  exit 0
+  no_code_exit
 fi
 
 # ------------------------------------------------- check 1: file length (hard)
@@ -224,7 +218,7 @@ for owner in $OWNERS; do
     # superset of the diff, slower than a range but never less than what changed.
     case "$rel" in
       *[][*?{}]*) FLAGS="$FLAGS,$(printf '%s' "$rel" | sed 's/[][*?{}]/?/g')"
-                  GLOBBED="$GLOBBED$rel," ;;
+                  GLOBBED="$GLOBBED$rel:$(echo $hunks)," ;;
       *) for r in $hunks; do FLAGS="$FLAGS,$rel:$r"; done ;;
     esac
   done <<< "$OWNED"

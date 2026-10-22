@@ -21,7 +21,7 @@ edit() {  # edit <file> — runs the installed hook as Claude Code would after a
   printf '{"tool_input":{"file_path":"%s/%s"}}' "$PWD" "$1" | CLAUDE_PROJECT_DIR="$PWD" bash .claude/hooks/edit-check.sh 2>&1
 }
 
-ok=1; for f in edit-check.sh line-limit.sh lint-ratchet.mjs text-rules.mjs ratchet-baseline.mjs diary-check.mjs diary-lib.mjs; do [ -x ".claude/hooks/$f" ] || ok=0; done
+ok=1; for f in edit-check.sh line-limit.sh lint-ratchet.mjs text-rules.mjs ratchet-baseline.mjs diary-check.mjs diary-lib.mjs ship-log.mjs ship-log-parse.mjs ship-log-report.mjs ship-mark.sh; do [ -x ".claude/hooks/$f" ] || ok=0; done
 ie "the edit-check files and the diary check are installed, executable" $ok "$(ls .claude/hooks)"
 WANT='[{"matcher":"Skill","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh"}]},{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/edit-check.sh"}]}]'
 ie "an upgrade adds the edit hook beside the old PostToolUse entry" "$([ "$(post)" = "$WANT" ] && echo 1)" "$(post)"

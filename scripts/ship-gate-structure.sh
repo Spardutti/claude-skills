@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Sourced by ship-gate.sh: a new file must sit in the folder named for its kind.
-# Only ADDED files are judged, so a repo laid out the old way cannot get worse and need not move.
 
 STRUCTURE_JS_KINDS="components|hooks|api|queries|schemas|types|utils|stores|test"
 STRUCTURE_KIND_FILE='(^|[._])(router|routes|controller|service|schema|model)s?\.[cm]?[jt]s$|(Router|Routes|Controller|Service|Schema|Model)s?\.[cm]?[jt]s$'
@@ -69,6 +67,7 @@ py_misplaced() {  # py_misplaced <path>
   fi
 }
 
+# Only ADDED files are judged, so a repo laid out the old way cannot get worse and need not move.
 structure_check() {
   bad=""; count=0
   while IFS= read -r f; do
@@ -115,13 +114,44 @@ gate_report() {
 # A FAIL goes to the diary /add-rule reads, so a test gap the gate keeps finding can become a rule.
 gate_exit() {
   echo "ship-gate: full output in $REPORT"
-  [ "$1" = 1 ] || return 0
+  [ "$1" = 1 ] || [ "$GAUNTLET_SHIP_LOG" = 1 ] || return 0
   exec 1>&3 2>&4
   # A child left running (a dev server) can hold tee open forever; give it 2s, not a hang.
   for _ in 1 2 3 4 5 6 7 8 9 10; do [ -n "$TEE_PID" ] && kill -0 "$TEE_PID" 2>/dev/null || break; sleep 0.2; done
+  [ "$1" = 1 ] && gate_diary
+  ship_log "$REPORT" "$1"
+  return 0
+}
+
+gate_diary() {
   local diary; diary=$(diary_dir "$HERE")
   mkdir -p "$diary"
   printf '{"ts":"%s","branch":"%s","status":"FAIL","report":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "$(git branch --show-current 2>/dev/null | json_string)" "$(json_string < "$REPORT")" \
     >> "$diary/gate-findings.jsonl"
+}
+
+# Every run goes to the /ship log when it is on; a broken log never changes the verdict.
+ship_log() {  # ship_log <report> <exit code>
+  [ "$GAUNTLET_SHIP_LOG" = 1 ] && command -v node >/dev/null || return 0
+  SHIP_LOG_TEST_RE="$TEST_RE" SHIP_LOG_SOURCE_EXT="$GAUNTLET_SOURCE_EXT" node "$HERE/ship-log.mjs" gate "$1" "$2" "$SECONDS" "$BASE" >/dev/null 2>&1 || true
+}
+
+gate_force() {
+  printf 'FORCED %s\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
+  echo "ship-gate: FORCED — receipt written without running any check."
+  local r; r=$(mktemp); echo "ship-gate: FORCED" > "$r"
+  ship_log "$r" 0; rm -f "$r"
+  exit 0
+}
+
+# Nothing to mutate, but a Stryker trial run may still have been unable to start.
+no_code_exit() {
+  echo "ship-gate: no changed code files — nothing to check"
+  if [ "$STATUS" = 2 ]; then
+    printf 'ship-gate: UNPROVEN in %ss — nothing is wrong, but nothing was proven either\n' "$SECONDS"
+    printf 'UNPROVEN %s setup-trial\n' "$(date -u +%FT%TZ)" > "$RECEIPT"; exit 2
+  fi
+  printf 'PASS %s no-code-changes\n' "$(date -u +%FT%TZ)" > "$RECEIPT"
+  exit 0
 }
