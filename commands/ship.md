@@ -111,7 +111,10 @@ live here, because they are the ones that genuinely need a model.
 line ranges (`git diff -U0`, reading `@@ -a,b +c,d @@` as lines `c` to `c+d-1`). Every
 check below is scoped to those files and ranges. Never scan the whole repo.
 
-Print the scope, then run the checks cheapest first, stopping at the first that stops you.
+Print the scope. Then start all three at once, because run one after another they cost a ship
+5 to 8 minutes: in **one message**, launch the skills audit agents (2) and the bug review (4).
+While they work, run the script (1 and 3). When all three are back, fix everything they found
+in one pass, then re-run the script once. A length or structure stop still stops the ship.
 
 ### 1 and 3 — file length, folder structure and mutation: run the script, obey the exit code
 
@@ -190,8 +193,8 @@ met a skill. The ship scope is where that is caught, or nowhere.
    `metadata.gate-paths` names its globs when it has them; otherwise use its
    `description`. A skill with no file in scope is not run — say which you skipped and
    why, in one line.
-3. Launch every remaining skill's audit **in a single message** so they run at once, one
-   `gauntlet-skills` agent per skill. Pass each exactly what its Input section asks for:
+3. Launch every remaining skill's audit **in the same message as the bug review (4)**, so
+   they all run at once, one `gauntlet-skills` agent per skill. Pass each exactly what its Input section asks for:
    the `SKILL.md` path, the changed files that skill applies to with their line ranges,
    and the unified diff for those files. One skill per agent — an agent given two skills
    half-reads both.
@@ -218,7 +221,7 @@ not apply — which is exactly the failure this step exists to catch.
 The other checks ask whether the code follows the rules and whether the tests notice a
 change. None asks whether the logic is right: a test that expects the wrong answer passes mutation.
 
-Run it once, after the skills audit, through the Skill tool:
+Run it once, in the same message that launches the skills audit, through the Skill tool:
 
 ```
 /code-review medium origin/<base>...<branch>

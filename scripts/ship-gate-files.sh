@@ -14,14 +14,13 @@ changed_tests() {  # changed_tests <family>
   done
 }
 
-# Everything a file's verdict rests on besides the file itself and the tests.
-# Tests are left out: adding to them can only kill more, so only a lost line counts.
+# Everything a file's verdict rests on besides the file itself and the tests: the base, the gate,
+# and the test setup. Other code is left out, so one fix no longer re-mutates every clean file.
 files_context() {  # files_context <owner> <owned files>
   fam=$(family_of "$1/.")
   { printf '%s\n' "$PROJECT_DIR" "$1" "$(git rev-parse "$BASE" 2>/dev/null)"
     cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-files.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh"
-    printf '%s\n' "$CHANGED" | grep -vE '\.(md|mdx|txt|rst|adoc)$' | grep -vE "$TEST_RE" \
-      | grep -vxF -f <(printf '%s\n' "$2") | while IFS= read -r f; do
+    printf '%s\n' "$CHANGED" | grep -E "$SETUP_RE" | while IFS= read -r f; do
       [ -n "$f" ] || continue
       case "$(family_of "$f")" in "$fam"|any) printf '%s\n' "$f"; [ -f "$f" ] && cat "$f" ;; esac
     done; } | git hash-object --stdin

@@ -369,7 +369,8 @@ by hand skips the skills audit and the code review, and Claude did exactly that
 when it remembered the steps. The gate's pass is reused, so only those two cost time.
 
 **A file that passed is not mutated again** while nothing it rests on moves: the
-file itself, other code of its kind, the base, and the gate. Tests are the
+file itself, the test setup (Stryker, Vitest or Jest config, tsconfig, package.json, a
+lockfile), the base, and the gate. Fixing one file re-mutates that file, not every file. Tests are the
 exception. A test that only gained lines keeps the verdict, because adding a test
 cannot let a mutant through. A test that lost a line re-mutates every file. So
 after a run with findings, the next one mutates only the files you fixed. A change

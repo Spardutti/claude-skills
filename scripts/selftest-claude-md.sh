@@ -17,3 +17,4 @@ md_has "the tooling block is written once, even on a rerun" 1 "<!-- claude-skill
 md_has "it says custom skills go under \"custom\""           1 'to `"custom"` in `.claude/.claude-skills.json`'
 md_has "it names GAUNTLET_BASE"                             1 'GAUNTLET_BASE'
 md_has "the user's own text survives"                        1 "Keep this."
+md_has "it says the Stop hook runs the tests, so Claude need not"  1 "The Stop hook runs the changed files' tests when you end your turn"

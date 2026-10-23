@@ -48,6 +48,8 @@ mutated "the first run mutates every changed file" 1 "src/a.ts:2-2,src/b.ts:2-2"
 b 3
 mutated "after fixing one file, only that file is mutated" 0 "src/b.ts:2-3"
 sg "and the kept file is named with the gap it leaves" "A change in a file they call is not re-checked" 0
+echo "export const C = () => null" > src/C.tsx; echo "alter table t add x int;" > src/m.sql
+mutated "a component or migration fixed beside them keeps every clean file" 0
 
 echo "three" >> src/a.test.ts
 mutated "a test that only gained lines keeps every clean file" 0
@@ -101,14 +103,14 @@ c=$(git commit-tree "$(printf '100644 blob %s\tb.ts\n' "$(git rev-parse develop:
 git update-ref refs/heads/develop "$c"; git reset -q --soft "$c"
 mutated "a moved base keeps nothing" 0 "src/a.ts:1-4,src/b.ts:2-8"
 
-# Two apps share a kind: a change in one re-runs the other, as a whole project did.
+# Two apps share a kind, but a change in one leaves the other's clean files alone.
 file_repo sg_file_sibling
 mkdir -p lib
 printf '{"devDependencies":{"@stryker-mutator/core":"8"}}\n' > lib/package.json
 echo "export const l = 1" > lib/l.ts
 mutated "two apps' first run" 0 "src/a.ts:2-2,src/b.ts:2-2" "l.ts:1-1"
 echo "export const l2 = 2" >> lib/l.ts
-mutated "a change in a sibling app re-mutates this one" 0 "src/a.ts:2-2,src/b.ts:2-2" "l.ts:1-2"
+mutated "a change in a sibling app keeps this one's clean files" 0 "l.ts:1-2"
 
 # Page tests make every run UNPROVEN, including one that mutates nothing.
 file_repo sg_file_page

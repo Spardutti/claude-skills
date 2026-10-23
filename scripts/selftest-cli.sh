@@ -93,7 +93,13 @@ fi
 mkdir -p "$CP/.claude/hooks"
 printf '#!/bin/sh\n# old\n' > "$CP/.claude/hooks/skill-gate.sh"
 printf '#!/bin/sh\n# old\n' > "$CP/.claude/hooks/skill-gate-automark.sh"
+printf '# Mine\n\n<!-- claude-skills:tooling:start -->\n- **Ship gate:** old advice\n<!-- claude-skills:tooling:end -->\n' > "$CP/CLAUDE.md"
 cli_run "$CP" --sync >/dev/null
+N=$((N+1))
+if grep -q "The Stop hook runs" "$CP/CLAUDE.md" && ! grep -q "old advice" "$CP/CLAUDE.md" && grep -q "^# Mine" "$CP/CLAUDE.md"; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "--sync rewrites the CLAUDE.md tooling block, keeping the rest"
+else FAIL=$((FAIL+1)); printf '  FAIL %s\n%s\n' "--sync rewrites the CLAUDE.md tooling block, keeping the rest" "$(cat "$CP/CLAUDE.md")"; fi
+rm -f "$CP/CLAUDE.md"
 N=$((N+1))
 if cmp -s "$CP/.claude/hooks/skill-gate-automark.sh" "$REPO/scripts/skill-gate-automark.sh" \
    && cmp -s "$CP/.claude/hooks/skill-gate.sh" "$REPO/scripts/skill-gate.sh"; then

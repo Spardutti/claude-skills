@@ -4,6 +4,7 @@ import { readdir } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { installSkills, installCommands, installRequiredAgents } from "./install.mjs";
 import { setupHook } from "./setup-hook.mjs";
+import { setupClaudeMd } from "./setup-claude-md.mjs";
 import { readManifest, writeManifest, computeOrphans, removeArtifacts, MANIFEST_FILE } from "./manifest.mjs";
 
 const SEARCH_DEPTH = 5;
@@ -28,7 +29,7 @@ export async function runSync(dir, catalog, version) {
   if (skills.length > 0) { console.log(); await installSkills(skills, dir); }
   if (commands.length > 0) { console.log(); await installCommands(commands, dir); }
   const { installed } = await installRequiredAgents(commands, catalog.agents, dir);
-  if (existsSync(join(dir, ".claude", "hooks", "skill-gate.sh"))) { console.log(); await setupHook(dir); }
+  if (existsSync(join(dir, ".claude", "hooks", "skill-gate.sh"))) { console.log(); await setupHook(dir); await setupClaudeMd(dir); }
 
   await writeManifest(dir, {
     catalogVersion: version,

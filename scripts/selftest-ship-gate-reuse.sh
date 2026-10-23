@@ -57,7 +57,7 @@ echo "y=3" >> apps/api/app/slugs.py
 ran_in "a Python change re-runs only the Python project" "api"
 
 echo "export const c = 3" >> apps/admin/src/a.ts
-ran_in "a change in one JS app re-runs every JS app" "admin web"
+ran_in "a change in one JS app re-runs only that app" "admin"
 
 echo "test" > apps/web/src/a.test.ts
 ran_in "a new test file re-runs nothing: adding a test cannot revive a mutant" ""
@@ -67,9 +67,9 @@ ran_in "a docs change re-runs nothing" ""
 
 echo "export const d = 4" >> apps/web/src/a.ts
 printf '[Survived] StringLiteral\nsrc/a.ts:2:1\n' > "$STRYKER_OUT"
-ran_in "a failing run is tested" "admin web"
+ran_in "a failing run is tested" "web"
 : > "$STRYKER_OUT"
-ran_in "and is not recorded, so the next run tests it again" "admin web"
+ran_in "and is not recorded, so the next run tests it again" "web"
 
 ran_in "--baseline on an unchanged tree replays the last run" "" --baseline
 echo "y=4" >> apps/api/app/slugs.py

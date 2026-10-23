@@ -27,6 +27,7 @@ The hooks and skills in \`.claude/\` come from \`@spardutti/claude-skills\`. Fac
 - **Make it mandatory on some files:** put \`gate-paths: "src/**/*.tsx"\` under \`metadata:\`, quoted. A bare top-level \`paths:\` makes Claude Code drop the skill. Add \`tracks: react@19\` to fire only when the project depends on that package.
 - **Hook settings** live in \`.claude/gauntlet.conf\` (shell syntax): \`GAUNTLET_TEST\`, \`GAUNTLET_TYPECHECK\`, \`GAUNTLET_BASE\` (the trunk branch, if not develop/dev/main), \`GAUNTLET_MAX_LINES\`, \`GAUNTLET_IGNORE_FILES\`, \`GAUNTLET_OFF=1\`.
 - **Shipping:** open, merge or release a PR only through the \`/ship\` command; load it every time, even when you remember the steps. Never run \`ship-gate.sh\` with \`--force\` or \`--baseline\` unless the user asks.
+- **Tests:** The Stop hook runs the changed files' tests when you end your turn. Don't run them yourself to check; run one test file only to see a new test fail first.
 - **Never edit \`.claude/hooks/\`** — a sync overwrites it. Update with \`npx @spardutti/claude-skills --sync\`.`;
 
 const BLOCKS = [
