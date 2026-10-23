@@ -84,7 +84,7 @@ function baseline(only, newOnly) {
   const lint = existsSync(ESLINT) ? LINT.filter(pick) : [];
   const text = TEXT.filter(pick);
   if (newOnly && was.exists && lint.length + text.length === 0) return 0;
-  if (newOnly) console.log(`  Recording old code as baseline debt for: ${[...lint, ...text].map((r) => r.id).join(" ")}`);
+  if (newOnly && lint.length + text.length) console.log(`  Recording old code as baseline debt for: ${[...lint, ...text].map((r) => r.id).join(" ")}`);
   const { results, ran } = lint.length ? eslint(lint, ".") : { results: [], ran: [] };
   if (!results) {
     console.error("lint-ratchet: eslint gave no JSON; baseline not written.");

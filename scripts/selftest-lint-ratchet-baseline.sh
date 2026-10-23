@@ -71,3 +71,13 @@ case "$rc:$out" in
   "2:"*"big.py — 250 lines"*) PASS=$((PASS+1)); echo "  ok   a folder above the project never matches the skip list" ;;
   *) FAIL=$((FAIL+1)); echo "  FAIL a folder above the project never matches the skip list — exit $rc: $out" ;;
 esac
+
+echo "a first install with nothing to record"
+EB="$TMP/eb"; rm -rf "$EB"; mkdir -p "$EB/src"; cp -r "$LR/scripts" "$EB/"
+N=$((N+1))
+out=$(env -C "$EB" node "$EB/scripts/lint-ratchet.mjs" --baseline-new 2>&1); rc=$?
+case "$rc:$out" in
+  *"Recording old code"*) FAIL=$((FAIL+1)); echo "  FAIL no rule to record prints no empty \"Recording\" line — $out" ;;
+  0:*) PASS=$((PASS+1)); echo "  ok   no rule to record prints no empty \"Recording\" line" ;;
+  *) FAIL=$((FAIL+1)); echo "  FAIL no rule to record prints no empty \"Recording\" line — exit $rc: $out" ;;
+esac
