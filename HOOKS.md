@@ -390,12 +390,14 @@ starts is saved as abandoned. It holds:
 - **Every gate run**, PASS, FAIL, UNPROVEN, FORCED or INTERRUPTED (cancelled before its verdict): its time, the files it mutated, the files
   it reused from an earlier pass, Stryker's mutant counts, each survivor, and the whole report.
 - **The PR size** from the fork point: files and lines added and removed, split into code, tests
-  and other.
-- **The skills audit and the bug review**: how long each took.
+  and other. Baseline files (`.lint-baseline` and the like) are left out.
+- **The skills audit and the bug review**: how long each took. A step that logged only its end
+  is timed from the step or gate run before it.
 - **Every finding**, from any check: who found it, whether a test confirmed or refuted it, and
   whether it was fixed.
 
-The gate writes its own runs; `/ship` adds the rest. A log that cannot be written never
+The gate writes its own runs, but only while a `/ship` is open, so a gate run by hand or on a
+release leaves no log. `/ship` adds the rest. A log that cannot be written never
 changes the gate's verdict. Compare every ship:
 
 ```bash

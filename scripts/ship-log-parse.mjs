@@ -93,7 +93,7 @@ export function prSize(base, testRe, sourceExt) {
   const rows = git(["diff", "--numstat", "--no-renames", fork]).split("\n").filter(Boolean).map((l) => l.split("\t"));
   const size = { files: 0, added: 0, removed: 0, code: { files: 0, added: 0, removed: 0 }, tests: { files: 0, added: 0, removed: 0 }, other: { files: 0, added: 0, removed: 0 } };
   for (const [a, r, f] of [...rows, ...untracked()]) {
-    if (/(^|\/)\.claude\//.test(f)) continue;
+    if (/(^|\/)\.claude\/|(^|\/)\.(line-limit|lint|mutmut)-baseline$/.test(f)) continue;
     const add = Number(a) || 0, rem = Number(r) || 0, bucket = size[kindOf(f, testRe, sourceExt)];
     size.files++; size.added += add; size.removed += rem;
     bucket.files++; bucket.added += add; bucket.removed += rem;

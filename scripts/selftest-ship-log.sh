@@ -31,11 +31,14 @@ git add -A; git commit -qm base; git branch -q develop; git checkout -qb feat/x
 
 { printf '[Survived] EqualityOperator\nsrc/a.ts:2:10\n'; sl_table 3 1; } > "$SLOUT"
 printf 'export const a2 = a >= 1\n' >> src/a.ts
-printf 'notes\n' > NOTES.txt
+printf 'notes\n' > NOTES.txt; printf 'old debt\n' > .lint-baseline
 bash "$SG" >/dev/null 2>&1
 sl_ok "with the log off, the gate writes nothing" test ! -e "$SLOGS"
 
 mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
+bash "$SG" >/dev/null 2>&1
+sl_ok "a gate run outside /ship writes no log" test ! -e "$SLOPEN"
+node "$SL" start
 bash "$SG" >/dev/null 2>&1; rc=$?
 sl_ok "a FAIL keeps its exit code with the log on" test "$rc" = 1
 sl_is "the run is logged under the app and branch" "$SLOPEN" 'r.app === "sg_log" && r.branch === "feat/x" && r.gate.length === 1 && r.gate[0].verdict === "FAIL" && r.gate[0].exit === 1'
@@ -60,6 +63,8 @@ err=$(node "$SL" finding '{"by":"review","what":"x","verdict":"maybe","fixed":fa
 sl_ok "a finding with an unknown verdict is refused" test "$rc" = 1 -a -n "$(printf '%s' "$err" | grep 'a finding needs')"
 node "$SL" step review start; node "$SL" step review end
 sl_is "a step is timed" "$SLOPEN" 'typeof r.steps.review.seconds === "number"'
+node "$SL" step audit end
+sl_is "a step that only logged its end starts where the last one ended" "$SLOPEN" 'r.steps.audit.start === r.steps.review.end && r.steps.audit.seconds >= 0'
 
 node "$SL" pr 142 >/dev/null
 SLPR="$SLOGS/sg_log_${DAY}_pr142.json"
@@ -67,7 +72,7 @@ sl_ok "the PR closes the log under app, date and PR number" test -f "$SLPR" -a !
 sl_is "and sums it up" "$SLPR" 'r.status === "pr-opened" && r.summary.gateRuns === 3 && r.summary.findings.review.refuted === 1 && r.summary.findings.mutation.fixed === 1'
 
 git add -A; git commit -qm x; git checkout -qb feat/y; printf 'export const y = 1\n' > src/y.ts
-bash "$SG" --force >/dev/null 2>&1
+node "$SL" start; bash "$SG" --force >/dev/null 2>&1
 sl_is "a forced receipt is logged too" "$SLOGS/open/sg_log__feat-y.json" 'r.gate[0].verdict === "FORCED"'
 node "$SL" end "stopped at commit" >/dev/null
 sl_is "a ship that stops before the PR is saved with why" "$SLOGS/sg_log_${DAY}_feat-y.json" 'r.status === "stopped" && r.reason === "stopped at commit"'
@@ -104,7 +109,7 @@ node "$SL" on; rc=$?
 sl_ok "a conf that prints or ends on a false test still turns the log on" test "$rc" = 0
 git mv src/r.ts src/renamed.ts; printf 'export const r2 = 2\n' >> src/renamed.ts; git commit -qam mv
 sl_table 1 0 > "$SLOUT"; touch "$TMP/sl-mark"
-bash "$SG" >/dev/null 2>&1
+node "$SL" start; bash "$SG" >/dev/null 2>&1
 sl_is "a renamed file still counts as code" "$SL2" 'r.size.code.files === 2 && r.size.other.files === 0'
 find /tmp -maxdepth 1 -name 'claude-shipgate-file-*' -newer "$TMP/sl-mark" -delete 2>/dev/null
 bash "$SG" >/dev/null 2>&1

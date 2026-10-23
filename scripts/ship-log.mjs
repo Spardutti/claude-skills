@@ -76,10 +76,16 @@ function addFinding(record, json) {
   record.findings.push({ ts: now(), ...f });
 }
 
+function lastEvent(record, skip) {
+  const ends = Object.entries(record.steps).filter(([k]) => k !== skip).map(([, s]) => s.end);
+  return [record.started, ...record.gate.map((g) => g.ts), ...ends].filter(Boolean).sort().at(-1);
+}
+
 function addStep(record, [name, edge]) {
   if (!name || !["start", "end"].includes(edge)) throw new Error("usage: step <name> start|end");
   const step = (record.steps[name] ??= {});
   step[edge] = now();
+  if (edge === "end" && !step.start) step.start = lastEvent(record, name);
   if (step.start && step.end) step.seconds = Math.round((Date.parse(step.end) - Date.parse(step.start)) / 1000);
 }
 
@@ -90,6 +96,8 @@ function run(mode, args) {
   if (!c.on) return 0;
   const id = identity(c.root), path = openPath(c.dir, id), record = load(path, id);
   if (mode === "start") return restart(c.dir, path, record, id), 0;
+  // A gate run by hand or on a release is not a ship; only /ship's start opens one.
+  if (mode === "gate" && !existsSync(path)) return 0;
   if (mode === "gate") addGateRun(record, args);
   else if (mode === "finding") addFinding(record, args[0]);
   else if (mode === "step") addStep(record, args);
