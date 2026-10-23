@@ -35,31 +35,40 @@ test_then() {  # test_then <snapshot> <test>: its content when the snapshot was 
   else git show "$BASE:$2" 2>/dev/null; fi
 }
 
-# Never `| grep -q` under pipefail: diff exits 1 on any difference, and an early
-# grep exit fails the writer, so a match reads as none.
-tests_lost_lines() {  # tests_lost_lines <snapshot> <family>
+# The repo-relative paths a test names in quotes (./, ../, @/ or ~/), extension dropped.
+test_names() {  # test_names <test path> <owner prefix> < test text
+  grep -oE "['\"](\.{1,2}/|@/|~/)[^'\"]+['\"]" | tr -d "'\"" | while IFS= read -r s; do
+    case "$s" in @/*|~/*) printf '%s%s\n' "$2" "${s#?/}" ;; *) printf '%s/%s\n' "$(dirname "$1")" "$s" ;; esac
+  done | awk -F/ '{ n = 0; for (i = 1; i <= NF; i++) { if ($i == "..") n--; else if ($i != "." && $i != "") p[++n] = $i }
+                    o = p[1]; for (i = 2; i <= n; i++) o = o "/" p[i]; print o }' | sed -E 's/\.(m|c)?[jt]sx?$//; s#/index$##'
+}
+
+# A test that lost a line can revive mutants only in the files it names, so only those lose their pass.
+# Never `| grep -q` under pipefail: diff exits 1 on any difference, and an early grep exit fails the writer.
+tests_lost_lines() {  # tests_lost_lines <snapshot> <family> <file> <owner prefix>
   [ -f "$1/manifest" ] || return 0
+  local f="${3%.*}"; f=${f%/index}
   while IFS= read -r t; do
     [ -n "$t" ] || continue
-    case "$(diff <(test_then "$1" "$t") <(cat "$t" 2>/dev/null))" in *$'\n<'*) return 0 ;; esac
+    case "$(diff <(test_then "$1" "$t") <(cat "$t" 2>/dev/null))" in *$'\n<'*) ;; *) continue ;; esac
+    [ -n "$({ test_then "$1" "$t"; cat "$t" 2>/dev/null || true; } | test_names "$t" "$4" | grep -xF "$f")" ] && return 0
   done <<< "$({ cat "$1/manifest"; changed_tests "$2"; } | sort -u)"
   return 1
 }
 
 # Sets OWNED to the files that still need mutating.
 files_split() {  # files_split <context> <owner> <label>
-  fam=$(family_of "$2/."); kept=""; rest=""
+  fam=$(family_of "$2/."); kept=""; rest=""; b=""; [ "$2" != "." ] && b="$2/"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     r=$(file_receipt "$1" "$f")
-    if [ -f "$r" ] && ! tests_lost_lines "$(cat "$r")" "$fam"; then kept="$kept ${f#"$2"/}"
+    if [ -f "$r" ] && ! tests_lost_lines "$(cat "$r")" "$fam" "$f" "${b}"; then kept="$kept ${f#"$2"/}"
     else rest="$rest$f"$'\n'; fi
   done <<< "$OWNED"
   OWNED=${rest%$'\n'}
   [ -n "$kept" ] || return 0
   echo "  $3 stryker — ok, not re-run: passed and unchanged since:$kept"
   echo "      A change in a file they call is not re-checked."
-  b=""; [ "$2" != "." ] && b="$2/"
   [ -z "$OWNED" ] && stryker_page_tests "$b" "$3"
   return 0
 }

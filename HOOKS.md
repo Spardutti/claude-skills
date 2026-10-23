@@ -372,7 +372,7 @@ when it remembered the steps. The gate's pass is reused, so only those two cost 
 file itself, the test setup (Stryker, Vitest or Jest config, tsconfig, package.json, a
 lockfile), the base, and the gate. Fixing one file re-mutates that file, not every file. Tests are the
 exception. A test that only gained lines keeps the verdict, because adding a test
-cannot let a mutant through. A test that lost a line re-mutates every file. So
+cannot let a mutant through. A test that lost a line re-mutates the files it imports (by a relative path or `@/`). So
 after a run with findings, the next one mutates only the files you fixed. A change
 in a file it calls is not re-checked, and the output says so. Stryker only.
 

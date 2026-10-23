@@ -13,7 +13,7 @@ file_repo() {
   printf '{"devDependencies":{"@stryker-mutator/core":"8"}}\n' > package.json
   echo "export const a = 1" > src/a.ts
   echo "export const b = 1" > src/b.ts
-  printf 'one\ntwo\n' > src/a.test.ts
+  printf 'import { a } from "./a"\ntwo\n' > src/a.test.ts
   cat > bin/npx <<'X'
 #!/bin/sh
 for a in "$@"; do printf 'arg[%s]\n' "$a"; done >> "$FARGS"
@@ -56,9 +56,9 @@ mutated "a test that only gained lines keeps every clean file" 0
 b 4
 mutated "a run after a test gained lines" 0 "src/b.ts:2-4"
 git checkout -q src/a.test.ts
-mutated "putting a test back loses the lines it gained" 0 "src/b.ts:2-4"
-sed -i '1d' src/a.test.ts
-mutated "a test that lost a line re-mutates every file" 0 "src/a.ts:2-2,src/b.ts:2-4"
+mutated "putting back a test that names only a.ts keeps b.ts" 0
+sed -i '2d' src/a.test.ts
+mutated "a test that lost a line re-mutates only the files it imports" 0 "src/a.ts:2-2"
 
 b 5
 mutated "a run that leaves a snapshot" 0 "src/b.ts:2-5"
@@ -69,7 +69,7 @@ mutated "a receipt whose snapshot is gone keeps nothing" 0 "src/a.ts:2-2,src/b.t
 echo "export default {}" > vitest.config.ts
 mutated "a changed runner config re-mutates every file" 0 "src/a.ts:2-2,src/b.ts:2-5"
 rm src/a.test.ts
-mutated "a deleted test re-mutates every file" 0 "src/a.ts:2-2,src/b.ts:2-5"
+mutated "a deleted test re-mutates the files it imported" 0 "src/a.ts:2-2"
 
 # A survivor Stryker printed without a location cannot be pinned on one file.
 echo "export const a3 = 3" >> src/a.ts; b 6
@@ -117,3 +117,11 @@ file_repo sg_file_page
 echo "test" > src/a.test.tsx
 mutated "page tests are UNPROVEN" 2 "src/a.ts:2-2,src/b.ts:2-2"
 mutated "still UNPROVEN when every file is kept" 2
+
+# Next.js and Vite projects import through @/, so an alias names a file as well as a relative path.
+file_repo sg_file_alias
+mutated "an alias repo's first run" 0 "src/a.ts:2-2,src/b.ts:2-2"
+printf 'import { a } from "./a"\nimport { b } from "@/src/b"\ntwo\n' > src/a.test.ts
+mutated "a test that only gained an import keeps both" 0
+sed -i '3d' src/a.test.ts
+mutated "a test naming b.ts through @/ re-mutates it when it loses a line" 0 "src/a.ts:2-2,src/b.ts:2-2"

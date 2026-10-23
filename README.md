@@ -36,7 +36,7 @@ npx @spardutti/claude-skills
 ```
 
 ```text
-  Claude Skills Installer v2.55.0
+  Claude Skills Installer v2.55.1
 
   ── Frontend ──────────────────────────────
   ◉ react              ◯ tanstack-query
@@ -200,7 +200,7 @@ scripts/       validate-skills.mjs — checks skill length caps and reference in
                edit-check.sh — PostToolUse check on each edited file: line-limit.sh, lint-ratchet.mjs, .edit-rules.json
                diary-check.mjs — run at the end of /ship; says when the diaries hold enough for /add-rule
                line-limit.sh — the 200-line ratchet, shared by the edit check, the ship gate and preflight
-               gauntlet-selftest.sh — behavioural tests for the hooks (runs on pre-push)
+               gauntlet-selftest.sh — behavioural tests for the hooks (runs in preflight)
                gauntlet-survey.sh — what the hook would do in every repo under a directory
                preflight.sh — everything that must pass before a release
                check-freshness.mjs — compares each skill's `tracks:` versions to the registries
@@ -226,7 +226,7 @@ Skills live in `skills/<name>/SKILL.md`. Authoring conventions are in [CLAUDE.md
 - Before any release, run `bash scripts/preflight.sh` — validator, self-tests, a check that the
   hook scripts embedded in the CLI still match `scripts/`, detection against every repo under
   `~/projects`, and that the version is ahead of the registry. Do not publish while it is red.
-- Changing `scripts/gauntlet.sh`? Run `bash scripts/gauntlet-selftest.sh` (also on `pre-push`),
+- Changing `scripts/gauntlet.sh`? Run `bash scripts/gauntlet-selftest.sh` (also in preflight),
   and run `bash scripts/gauntlet-survey.sh ~/projects` before releasing. Detection is where
   this hook keeps breaking, because real repos are shaped in ways invented test repos aren't —
   the survey is a dry run that reports what each of your repos would get without executing

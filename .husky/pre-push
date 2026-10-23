@@ -1,3 +1,2 @@
 npm run validate-skills
 npm run lint
-bash scripts/gauntlet-selftest.sh

@@ -111,12 +111,19 @@ live here, because they are the ones that genuinely need a model.
 line ranges (`git diff -U0`, reading `@@ -a,b +c,d @@` as lines `c` to `c+d-1`). Every
 check below is scoped to those files and ranges. Never scan the whole repo.
 
-Print the scope. Then start all three at once, because run one after another they cost a ship
-5 to 8 minutes: in **one message**, launch the skills audit agents (2) and the bug review (4).
-While they work, run the script (1 and 3). When all three are back, fix everything they found
-in one pass, then re-run the script once. A length or structure stop still stops the ship.
+Print the scope. Then run the checks **in this order, and no other** — run one after another,
+they cost a ship 5 to 8 minutes:
 
-### 1 and 3 — file length, folder structure and mutation: run the script, obey the exit code
+1. **In one message**, launch every skills audit agent and the bug review. They run in the
+   background. Do not wait for them.
+2. **While they run**, run the gate script. Fix its survivors and re-run it until it passes.
+   A file over the limit or in the wrong folder still stops the ship.
+3. **When the audit and the review are back**, fix what they found, in one pass.
+4. **Run the gate script once more**, because those fixes changed files.
+
+The sections below say how to do each check. They are not an order.
+
+### The gate script — file length, folder structure and mutation: obey the exit code
 
 ```bash
 bash .claude/hooks/ship-gate.sh
@@ -174,7 +181,7 @@ when the implementation is removed**. A test that passes without the code assert
 nothing and is worse than the gap it filled: throw it out and report the gap instead.
 Re-run the script rather than declaring it fixed. Stop after **two** attempts at a gap.
 
-### 2 — skills audit: one `gauntlet-skills` agent per applicable skill
+### The skills audit — one `gauntlet-skills` agent per applicable skill
 
 This step was described in this file for months and never written, so it never ran. Four
 forms shipped on `useActionState` in a repo whose React skill routes to a `FORMS.md`
@@ -193,14 +200,14 @@ met a skill. The ship scope is where that is caught, or nowhere.
    `metadata.gate-paths` names its globs when it has them; otherwise use its
    `description`. A skill with no file in scope is not run — say which you skipped and
    why, in one line.
-3. Launch every remaining skill's audit **in the same message as the bug review (4)**, so
+3. Launch every remaining skill's audit **in the same message as the bug review**, so
    they all run at once, one `gauntlet-skills` agent per skill. Pass each exactly what its Input section asks for:
    the `SKILL.md` path, the changed files that skill applies to with their line ranges,
    and the unified diff for those files. One skill per agent — an agent given two skills
    half-reads both.
 4. Wait for all of them. Each returns JSON with `violations`.
 
-Then **fix what they found**, in the code, the same way stage 1 and 3 fixes what the
+Then **fix what they found**, in the code, the same way you fix what the
 script found. Do not hand the user a list and continue.
 
 - Apply each violation's `fix` where you agree with it. Editing a file invalidates the
@@ -216,7 +223,7 @@ Never audit a skill yourself instead of launching its agent. The point of the su
 that it reads the skill fresh, with no memory of having decided earlier that the skill did
 not apply — which is exactly the failure this step exists to catch.
 
-### 4 — bug review: one `/code-review` round
+### The bug review — one `/code-review` round
 
 The other checks ask whether the code follows the rules and whether the tests notice a
 change. None asks whether the logic is right: a test that expects the wrong answer passes mutation.
