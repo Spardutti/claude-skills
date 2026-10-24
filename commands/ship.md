@@ -239,6 +239,18 @@ last, and with no range it compares against `main`, not the dev branch. Use `ori
 base that is behind re-reviews work already merged. Name the branch, not `HEAD`: in a worktree,
 `HEAD` is whatever folder the session sits in.
 
+**Sort before you test.** A finding of one of these kinds gets no test. List it for the user
+as `skipped: <kind>` with the one-line reason:
+
+- **Decided** — it argues against a choice the plan, the ticket or the user made. Name where.
+  A finding that the code does not do what was chosen is not decided: test it.
+- **Old code** — it is in a file the diff does not touch.
+- **Cost, not a wrong result** — slower or bigger, but the output is right.
+- **Out of scope** — a new feature, or a change in another repo.
+- **Tooling** — the CLAUDE.md block the sync writes. A grown baseline is never tooling.
+
+If you are not sure it fits, it does not: test it.
+
 **No proof, no fix.** A finding is what a reviewer said, not evidence. Before changing code
 for one, write the test that shows the bug, and run it:
 
@@ -366,7 +378,8 @@ you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs
   `{"by":"review","what":"<one line>","file":"<path>","verdict":"confirmed","fixed":true}`.
   `by` is `mutation`, `length`, `structure`, `audit:<skill>` or `review`. `verdict` is
   `confirmed` (a test or the gate proved it), `refuted` (a test showed it is not a bug, or
-  you disagree with an audit point, with the reason in `"note"`) or `unconfirmed`.
+  you disagree with an audit point, with the reason in `"note"`), `unconfirmed` (no test can
+  show it) or `skipped` (sorted out before testing, with `"note":"<kind> — <reason>"`).
 - `pr <number>` right after the PR is created, or `end "<why>"` when the run stops before one.
 
 ## Flow Examples
@@ -392,6 +405,7 @@ you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs
 - ALWAYS fix what the audit finds, re-running `ship-gate.sh` afterwards because the edits invalidate its receipt; a violation needing a design decision stops the ship rather than being noted and passed.
 - ALWAYS run `/code-review medium origin/<base>...<branch>` once after the skills audit, and NEVER a second round on its own fixes.
 - NEVER change code for a review finding before a test shows the bug; a finding no test can show is listed, not fixed.
+- ALWAYS sort review findings before testing: decided, old code, cost, out of scope and tooling are listed as skipped, never tested. Not sure it fits → test it.
 - With the ship log on, log every finding once, with its verdict, and close the log with `pr` or `end`.
 - ALWAYS run `diary-check.mjs` at the end of every run, `--mark` before asking, and hand a picked repeat to `/add-rule`; NEVER write a rule in `/ship`.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.

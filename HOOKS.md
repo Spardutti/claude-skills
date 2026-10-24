@@ -394,7 +394,7 @@ starts is saved as abandoned. It holds:
   and other. Baseline files (`.lint-baseline` and the like) are left out.
 - **The skills audit and the bug review**: how long each took. A step that logged only its end
   is timed from the step or gate run before it.
-- **Every finding**, from any check: who found it, whether a test confirmed or refuted it, and
+- **Every finding**, from any check: who found it, whether a test confirmed or refuted it or it was skipped untested, and
   whether it was fixed.
 
 The gate writes its own runs, but only while a `/ship` is open, so a gate run by hand or on a

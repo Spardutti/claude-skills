@@ -61,6 +61,8 @@ node "$SL" finding '{"by":"mutation","what":"boundary 1","verdict":"confirmed","
 sl_is "findings are recorded" "$SLOPEN" 'r.findings.length === 2 && r.findings[0].verdict === "refuted"'
 err=$(node "$SL" finding '{"by":"review","what":"x","verdict":"maybe","fixed":false}' 2>&1); rc=$?
 sl_ok "a finding with an unknown verdict is refused" test "$rc" = 1 -a -n "$(printf '%s' "$err" | grep 'a finding needs')"
+node "$SL" finding '{"by":"review","what":"old cap","verdict":"skipped","fixed":false,"note":"skipped: old code"}' 2>/dev/null
+sl_is "a finding sorted out before testing is logged as skipped" "$SLOPEN" 'r.findings.length === 3 && r.findings[2].verdict === "skipped"'
 node "$SL" step review start; node "$SL" step review end
 sl_is "a step is timed" "$SLOPEN" 'typeof r.steps.review.seconds === "number"'
 node "$SL" step audit end
@@ -69,7 +71,7 @@ sl_is "a step that only logged its end starts where the last one ended" "$SLOPEN
 node "$SL" pr 142 >/dev/null
 SLPR="$SLOGS/sg_log_${DAY}_pr142.json"
 sl_ok "the PR closes the log under app, date and PR number" test -f "$SLPR" -a ! -e "$SLOPEN"
-sl_is "and sums it up" "$SLPR" 'r.status === "pr-opened" && r.summary.gateRuns === 3 && r.summary.findings.review.refuted === 1 && r.summary.findings.mutation.fixed === 1'
+sl_is "and sums it up" "$SLPR" 'r.status === "pr-opened" && r.summary.gateRuns === 3 && r.summary.findings.review.refuted === 1 && r.summary.findings.review.skipped === 1 && r.summary.findings.review.unconfirmed === 0 && r.summary.findings.mutation.fixed === 1'
 
 git add -A; git commit -qm x; git checkout -qb feat/y; printf 'export const y = 1\n' > src/y.ts
 node "$SL" start; bash "$SG" --force >/dev/null 2>&1

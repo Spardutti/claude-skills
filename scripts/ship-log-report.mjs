@@ -14,7 +14,7 @@ function records(dir) {
 export function tally(findings) {
   const by = {};
   for (const f of findings) {
-    const s = (by[f.by.split(":")[0]] ??= { found: 0, confirmed: 0, refuted: 0, unconfirmed: 0, fixed: 0 });
+    const s = (by[f.by.split(":")[0]] ??= { found: 0, confirmed: 0, refuted: 0, unconfirmed: 0, skipped: 0, fixed: 0 });
     s.found++; s[f.verdict]++; if (f.fixed) s.fixed++;
   }
   return by;

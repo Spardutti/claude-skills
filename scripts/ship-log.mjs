@@ -6,7 +6,7 @@ import { git, parseReport, prSize } from "./ship-log-parse.mjs";
 import { printReport, tally } from "./ship-log-report.mjs";
 
 const HERE = dirname(resolve(process.argv[1]));
-const VERDICTS = ["confirmed", "refuted", "unconfirmed"];
+const VERDICTS = ["confirmed", "refuted", "unconfirmed", "skipped"];
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
 // gate-config.sh owns the config files and their order, so the gate and this agree on "on".
