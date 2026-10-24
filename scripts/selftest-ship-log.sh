@@ -88,6 +88,20 @@ out=$(node "$SL" report)
 sl_ok "the report lists every ship" test -n "$(printf '%s' "$out" | grep '#142')" -a -n "$(printf '%s' "$out" | grep 'feat/y')"
 sl_ok "a ship that ran no check and found nothing is left out of the report" test -z "$(printf '%s' "$out" | grep 'feat/merge-only')"
 
+git checkout -qb feat/z; printf 'export const z = 1\n' > src/z.ts
+node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y
+cat > bin/gh <<EOF
+#!/bin/sh
+printf '%s\n' "\$*" >> "$TMP/gh-args"
+case "\$*" in *"--head feat/z "*) echo '[{"number":151,"createdAt":"2026-01-02T03:04:05Z"}]' ;; *) echo '[]' ;; esac
+EOF
+chmod +x bin/gh; rm -f "$TMP/gh-args"
+bash "$HERE/ship-mark.sh" begin
+sl_is "a log left open after its PR opened is closed by the next /ship" "$SLOGS/sg_log_2026-01-02_pr151.json" 'r.status === "pr-opened" && r.pr === 151 && r.finished === "2026-01-02T03:04:05Z"'
+sl_ok "and leaves open/" test ! -e "$SLOGS/open/sg_log__feat-z.json"
+sl_ok "gh is asked once, for the logged branch only" test "$(cat "$TMP/gh-args")" = "pr list --head feat/z --state all --json number,createdAt --limit 1"
+rm -f bin/gh
+
 { printf '[Survived] EqualityOperator\nsrc/y.ts:1:1\n'; sl_table 0 1; } > "$SLOUT"
 : > "$TMP/not-a-dir"; echo "GAUNTLET_SHIP_LOG_DIR=$TMP/not-a-dir/logs" > .claude/gauntlet.conf
 bash "$SG" >/dev/null 2>&1; rc=$?

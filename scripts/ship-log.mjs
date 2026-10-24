@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { git, parseReport, prSize } from "./ship-log-parse.mjs";
 import { printReport, tally } from "./ship-log-report.mjs";
@@ -45,8 +45,8 @@ function summarize(record) {
   return { minutes: Math.round(minutes * 10) / 10, gateRuns: record.gate.length, gateSeconds: record.gate.reduce((n, r) => n + (r.seconds ?? 0), 0), findings: by };
 }
 
-function finalize(dir, path, record, tag, status, reason) {
-  Object.assign(record, { status, reason: reason ?? null, finished: now() });
+function finalize(dir, path, record, tag, status, reason, at) {
+  Object.assign(record, { status, reason: reason ?? null, finished: at ?? now() });
   record.summary = summarize(record);
   const stem = `${record.app}_${record.finished.slice(0, 10)}_${tag}`;
   let out = join(dir, `${stem}.json`);
@@ -56,8 +56,25 @@ function finalize(dir, path, record, tag, status, reason) {
   console.log(`ship-log: saved ${out}`);
 }
 
+function prOf(branch) {
+  const r = spawnSync("gh", ["pr", "list", "--head", branch, "--state", "all", "--json", "number,createdAt", "--limit", "1"], { encoding: "utf8" });
+  try { return r.status === 0 ? JSON.parse(r.stdout)[0] : undefined; } catch { return undefined; }
+}
+
+// Agents skip the `pr` call, so a log whose branch has a PR by now is closed at that PR.
+function closeOpened(dir, app) {
+  const open = join(dir, "open");
+  for (const f of existsSync(open) ? readdirSync(open).filter((n) => n.startsWith(`${app}__`)) : []) {
+    const path = join(open, f), record = JSON.parse(readFileSync(path, "utf8"));
+    if (!record.gate.length && !record.findings.length) continue;
+    const pr = prOf(record.branch);
+    if (pr) finalize(dir, path, Object.assign(record, { pr: pr.number }), `pr${pr.number}`, "pr-opened", null, pr.createdAt);
+  }
+}
+
 // A ship that never reached pr or end was abandoned; keep it, but never fold it into the next one.
 function restart(dir, path, record, id) {
+  closeOpened(dir, id.app);
   if (existsSync(path)) finalize(dir, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "abandoned");
   save(path, load(path, id));
 }

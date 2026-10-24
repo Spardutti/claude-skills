@@ -114,12 +114,18 @@ check below is scoped to those files and ranges. Never scan the whole repo.
 Print the scope. Then run the checks **in this order, and no other** — run one after another,
 they cost a ship 5 to 8 minutes:
 
-1. **In one message**, launch every skills audit agent and the bug review. They run in the
-   background. Do not wait for them.
+1. **In one message**, launch every skills audit agent and the bug review, and run
+   `node .claude/hooks/ship-log.mjs step audit start; node .claude/hooks/ship-log.mjs step review start`.
+   They run in the background. Do not wait for them.
 2. **While they run**, run the gate script. Fix its survivors and re-run it until it passes.
    A file over the limit or in the wrong folder still stops the ship.
-3. **When the audit and the review are back**, fix what they found, in one pass.
+3. **When the audit and the review are back**, run `step audit end` and `step review end`, then
+   fix what they found, in one pass.
 4. **Run the gate script once more**, because those fixes changed files.
+
+**Log every finding the moment you settle it** — survivor, audit point or review finding:
+`node .claude/hooks/ship-log.mjs finding '<json>'` (shape in The ship log). With the log off
+these commands do nothing, so never skip them.
 
 The sections below say how to do each check. They are not an order.
 
@@ -302,7 +308,7 @@ gh pr create --base <base> --title '<conventional title, ≤70 chars>' --body-fi
 
 No other sections — no Review notes, Related, Decisions, Verification, Background. No tooling words a teammate would not know: say "a test gap the mutation tool found", not "a surviving mutant". A body that needs a sentence over 25 words is explaining, not describing — cut it.
 
-5. Show the PR URL.
+5. Run `node .claude/hooks/ship-log.mjs pr <number>`, then show the PR URL.
 
 ## Stage: merge
 
@@ -365,11 +371,11 @@ that came back on two or more branches **with at least one entry after that date
 repeat was already offered. Nothing qualifies → say nothing. Otherwise ask which to turn into a
 check; on a pick, run `/add-rule` with that mistake. Never write a rule here.
 
-## The ship log — only when it is on
+## The ship log
 
-`node .claude/hooks/ship-log.mjs on` exits 0 when the user turned the log on
-(`GAUNTLET_SHIP_LOG=1`). Otherwise skip this section. The gate logs each of its own runs;
-you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs`:
+The log is on when the user set `GAUNTLET_SHIP_LOG=1`; when it is off, every call below does
+nothing. The gate logs each of its own runs; you add what only you know, as it happens, with
+`node .claude/hooks/ship-log.mjs`:
 
 - `ship-mark.sh begin` opens the log for you; never run `start` yourself. A ship left open
   by an interrupted run is saved as abandoned, so it never mixes into this one.
@@ -381,6 +387,7 @@ you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs
   you disagree with an audit point, with the reason in `"note"`), `unconfirmed` (no test can
   show it) or `skipped` (sorted out before testing, with `"note":"<kind> — <reason>"`).
 - `pr <number>` right after the PR is created, or `end "<why>"` when the run stops before one.
+  A log left open is closed at its PR by the next `/ship` in this repo.
 
 ## Flow Examples
 
@@ -406,7 +413,7 @@ you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs
 - ALWAYS run `/code-review medium origin/<base>...<branch>` once after the skills audit, and NEVER a second round on its own fixes.
 - NEVER change code for a review finding before a test shows the bug; a finding no test can show is listed, not fixed.
 - ALWAYS sort review findings before testing: decided, old code, cost, out of scope and tooling are listed as skipped, never tested. Not sure it fits → test it.
-- With the ship log on, log every finding once, with its verdict, and close the log with `pr` or `end`.
+- ALWAYS log every finding once, with its verdict, the moment you settle it, and close the log with `pr` or `end`. The calls do nothing when the log is off.
 - ALWAYS run `diary-check.mjs` at the end of every run, `--mark` before asking, and hand a picked repeat to `/add-rule`; NEVER write a rule in `/ship`.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.
