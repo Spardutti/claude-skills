@@ -6,7 +6,9 @@ function records(dir) {
   return [...read(dir), ...read(join(dir, "open"))].flatMap((f) => {
     try {
       const r = JSON.parse(readFileSync(f, "utf8"));
-      return r?.v === 1 && Array.isArray(r.gate) && Array.isArray(r.findings) ? [r] : [];
+      const log = r?.v === 1 && Array.isArray(r.gate) && Array.isArray(r.findings);
+      // A /ship that only merged opens a log and never fills it.
+      return log && (r.gate.length || r.findings.length) ? [r] : [];
     } catch { return []; }
   });
 }

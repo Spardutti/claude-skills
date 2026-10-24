@@ -335,7 +335,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
    - **Always confirm the version with the user.**
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
 3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
-4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull && bash .claude/hooks/ship-mark.sh begin`, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
+4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull && bash .claude/hooks/ship-mark.sh begin --no-log`, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
 5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on. **Never `--delete-branch`** here: the head branch is dev.
 6. **Tag + GitHub release**:
 
@@ -371,8 +371,8 @@ check; on a pick, run `/add-rule` with that mistake. Never write a rule here.
 (`GAUNTLET_SHIP_LOG=1`). Otherwise skip this section. The gate logs each of its own runs;
 you add what only you know, as it happens, with `node .claude/hooks/ship-log.mjs`:
 
-- `start` once, before the first check of the run. A ship left open by an interrupted run is
-  saved as abandoned, so it never mixes into this one.
+- `ship-mark.sh begin` opens the log for you; never run `start` yourself. A ship left open
+  by an interrupted run is saved as abandoned, so it never mixes into this one.
 - `step audit start` before the skills audit and `step audit end` after it; the same with `review`.
 - `finding '<json>'` once for every finding you fixed, refuted or left, from any check:
   `{"by":"review","what":"<one line>","file":"<path>","verdict":"confirmed","fixed":true}`.

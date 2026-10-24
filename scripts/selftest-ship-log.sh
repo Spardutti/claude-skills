@@ -38,7 +38,12 @@ sl_ok "with the log off, the gate writes nothing" test ! -e "$SLOGS"
 mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
 bash "$SG" >/dev/null 2>&1
 sl_ok "a gate run outside /ship writes no log" test ! -e "$SLOPEN"
-node "$SL" start
+git checkout -qb feat/rel; bash "$HERE/ship-mark.sh" begin --no-log
+sl_ok "a release's mark is set" bash "$HERE/ship-mark.sh" check
+git checkout -q feat/x
+sl_ok "a release's mark opens no log" test ! -e "$SLOGS/open/sg_log__feat-rel.json"
+bash "$HERE/ship-mark.sh" begin
+sl_ok "the /ship mark opens the log, so it never hangs on the agent" test -f "$SLOPEN"
 bash "$SG" >/dev/null 2>&1; rc=$?
 sl_ok "a FAIL keeps its exit code with the log on" test "$rc" = 1
 sl_is "the run is logged under the app and branch" "$SLOPEN" 'r.app === "sg_log" && r.branch === "feat/x" && r.gate.length === 1 && r.gate[0].verdict === "FAIL" && r.gate[0].exit === 1'
@@ -78,8 +83,10 @@ node "$SL" start; bash "$SG" --force >/dev/null 2>&1
 sl_is "a forced receipt is logged too" "$SLOGS/open/sg_log__feat-y.json" 'r.gate[0].verdict === "FORCED"'
 node "$SL" end "stopped at commit" >/dev/null
 sl_is "a ship that stops before the PR is saved with why" "$SLOGS/sg_log_${DAY}_feat-y.json" 'r.status === "stopped" && r.reason === "stopped at commit"'
+git checkout -qb feat/merge-only; bash "$HERE/ship-mark.sh" begin; git checkout -q feat/y
 out=$(node "$SL" report)
 sl_ok "the report lists every ship" test -n "$(printf '%s' "$out" | grep '#142')" -a -n "$(printf '%s' "$out" | grep 'feat/y')"
+sl_ok "a ship that ran no check and found nothing is left out of the report" test -z "$(printf '%s' "$out" | grep 'feat/merge-only')"
 
 { printf '[Survived] EqualityOperator\nsrc/y.ts:1:1\n'; sl_table 0 1; } > "$SLOUT"
 : > "$TMP/not-a-dir"; echo "GAUNTLET_SHIP_LOG_DIR=$TMP/not-a-dir/logs" > .claude/gauntlet.conf

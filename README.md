@@ -36,7 +36,7 @@ npx @spardutti/claude-skills
 ```
 
 ```text
-  Claude Skills Installer v2.56.0
+  Claude Skills Installer v2.56.1
 
   ── Frontend ──────────────────────────────
   ◉ react              ◯ tanstack-query

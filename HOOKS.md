@@ -397,7 +397,7 @@ starts is saved as abandoned. It holds:
 - **Every finding**, from any check: who found it, whether a test confirmed or refuted it or it was skipped untested, and
   whether it was fixed.
 
-The gate writes its own runs, but only while a `/ship` is open, so a gate run by hand or on a
+The gate writes its own runs, but only while a `/ship` is open (`ship-mark.sh begin` opens it), so a gate run by hand or on a
 release leaves no log. `/ship` adds the rest. A log that cannot be written never
 changes the gate's verdict. Compare every ship:
 
