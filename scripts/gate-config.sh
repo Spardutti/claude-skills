@@ -18,6 +18,11 @@ load_gauntlet_conf() {  # load_gauntlet_conf <project conf> <fallback conf>
   if [ -f "$conf" ]; then . "$conf"; fi
 }
 
+json_field() {  # json_field <json> <key> — a flat string value; \" is unescaped, \n is kept as two characters
+  printf '%s' "$1" | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"" | head -1 \
+    | sed -E 's/^[^:]*:[[:space:]]*"//; s/"$//; s/\\"/"/g'
+}
+
 # set -f: unquoted, the list is glob-expanded before it is split, and */components/ui/*.tsx
 # expanded into the very path it should match.
 is_ignored() {

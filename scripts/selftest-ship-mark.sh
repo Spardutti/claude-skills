@@ -31,3 +31,28 @@ echo "const w=1" > "$WT/w.ts"; git -C "$WT" add -A; git -C "$WT" commit -qm wt
 CLAUDE_PROJECT_DIR="$WT" bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
 CLAUDE_PROJECT_DIR="$WT" bash "$MARK" begin
 hook "a mark made in a worktree covers its PR" allow "gh pr create --head feat/wt --fill"
+out=$(echo "{\"cwd\":\"$WT\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"gh pr create --fill\"}}" | bash "$H")
+N=$((N+1)); case "$out" in *'"deny"'*) FAIL=$((FAIL+1)); printf '  FAIL a PR from a worktree session without --head is read from that worktree\n       got %s\n' "$out" ;;
+  *) PASS=$((PASS+1)); echo "  ok   a PR from a worktree session without --head is read from that worktree" ;; esac
+
+git checkout -q feat/m
+cp "$HERE"/ship-log*.mjs .claude/hooks/
+mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
+bash "$MARK" begin; echo "const m2=1" >> a.ts
+node -e 'process.stdout.write(JSON.stringify({ ts: new Date().toISOString().replace(/\.\d+Z$/, "Z"), branch: "feat/m", reply: "```json\n[{\"summary\":\"b\",\"failure_scenario\":\"x\"}]\n```" }) + "\n")' > .claude/review-findings.jsonl
+out=$(echo '{"tool_name":"Bash","tool_input":{"command":"gh pr create --fill"}}' | bash "$H")
+N=$((N+1))
+case "$out" in *"no ship-gate receipt"*) PASS=$((PASS+1)); echo "  ok   a PR missing the receipt and the log hears about the receipt first" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL a PR missing the receipt and the log hears about the receipt first\n       got %s\n' "$out" ;; esac
+bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
+hook "with the log on, a PR waits for the log to be filled in" deny "gh pr create --fill"
+out=$(echo '{"tool_name":"Bash","tool_input":{"command":"gh pr create --fill"}}' | bash "$H")
+N=$((N+1))
+case "$out" in *"step review end"*) PASS=$((PASS+1)); echo "  ok   the block names the missing log step" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL the block names the missing log step\n       got %s\n' "$out" ;; esac
+node .claude/hooks/ship-log.mjs step review end
+node .claude/hooks/ship-log.mjs finding '{"by":"review","what":"b","verdict":"refuted","fixed":false}'
+hook "and opens once it is" allow "gh pr create --fill"
+printf '{' > "$HOME/.claude/ship-logs/open/sg-mark__feat-m.json"
+hook "a log that cannot be read never blocks the PR with an empty list" allow "gh pr create --fill"
+rm -rf "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs" .claude/review-findings.jsonl

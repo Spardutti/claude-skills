@@ -19,9 +19,10 @@
 # now: the cost is paid once, at the point work actually ships.
 
 INPUT=$(cat)
+. "$(cd "$(dirname "$0")" && pwd)/gate-config.sh" 2>/dev/null || exit 0
 
-CMD=$(printf '%s' "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' \
-      | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+CMD=$(json_field "$INPUT" command)
+CWD=$(json_field "$INPUT" cwd)
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
@@ -30,16 +31,31 @@ cd "$PROJECT_DIR" 2>/dev/null || exit 0
 # protected branch — that is a direct ship with no PR in front of it. The branch
 # is read from git rather than parsed out of the command, because `git push` with
 # no arguments names no branch at all.
+push_dirs() {  # one "<cd dir><TAB><-C dir>" line per push in the command
+  local dir=. seg re_c='^git -C +"?([^" ]+)"? +push( |$)' re_cd='^cd +"?([^" ]+)"?$' re_push='^git push( |$)'
+  while IFS= read -r seg; do
+    seg=$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*(\$\(|\()?[[:space:]]*//; s/[[:space:]]*$//')
+    if [[ $seg =~ $re_cd ]]; then dir=${BASH_REMATCH[1]}
+    elif [[ $seg =~ $re_c ]]; then printf '%s\t%s\n' "$dir" "${BASH_REMATCH[1]}"
+    elif [[ $seg =~ $re_push ]]; then printf '%s\t\n' "$dir"
+    fi
+  done < <(printf '%s\n' "$CMD" | sed -E 's/\\n|&&|\|\||;|\|/\n/g')
+}
+
+push_branch() {  # push_branch <cd dir> <-C dir>; a folder git cannot read falls back to the main folder
+  git -C "${CWD:-.}" -C "$1" ${2:+-C "$2"} branch --show-current 2>/dev/null || git branch --show-current 2>/dev/null
+}
+
 case "$CMD" in
   *"gh pr create"*|*"gh pr merge"*) ;;
-  *"git push"*)
-    BRANCH=$(git branch --show-current 2>/dev/null)
-    case "$BRANCH" in
-      main|master|develop|development|dev) ;;
-      *) exit 0 ;;
-    esac
+  *)
+    PUSHES=$(push_dirs); [ -n "$PUSHES" ] || exit 0
+    PROTECTED=""
+    while IFS=$'\t' read -r d c; do
+      case "$(push_branch "$d" "$c")" in main|master|develop|development|dev) PROTECTED=1 ;; esac
+    done <<< "$PUSHES"
+    [ -n "$PROTECTED" ] || exit 0
     ;;
-  *) exit 0 ;;
 esac
 
 json_escape() {
@@ -63,7 +79,7 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 pr_branch() {
   case "$CMD" in
-    *"gh pr create"*) printf '%s\n' "$CMD" | sed -nE 's/.*(--head[ =]|-H )([^ ;&|]+).*/\2/p' ;;
+    *"gh pr create"*) printf '%s\n' "$CMD" | sed -nE 's/.*(--head[ =]|-H )"?([^ ;&|"]+).*/\2/p' ;;
     *"gh pr merge"*) merge_branch ;;
   esac
 }
@@ -91,6 +107,9 @@ worktree_of() {
 # A PR from a worktree ships that folder's diff, so its receipt is keyed there,
 # not in the folder this session started in.
 TARGET="$PROJECT_DIR"
+case "$CMD" in *"gh pr create"*)
+  CWD_TOP=$(git -C "${CWD:-.}" rev-parse --show-toplevel 2>/dev/null) && [ -n "$CWD_TOP" ] && TARGET="$CWD_TOP" ;;
+esac
 BRANCH=$(pr_branch)
 [ -n "$BRANCH" ] && WT=$(worktree_of "$BRANCH") && [ -n "$WT" ] && TARGET="$WT"
 
@@ -102,7 +121,7 @@ KEY=$(CLAUDE_PROJECT_DIR="$TARGET" bash "$GATE" --key 2>/dev/null)
 # A gate run by hand skips /ship's audit and review, so the PR waits for /ship itself.
 # A merge whose branch gh cannot name is left to the receipt alone.
 MARKER="$PROJECT_DIR/.claude/hooks/ship-mark.sh"
-case "$CMD" in *"gh pr create"*) MARK_BRANCH=${BRANCH:-$(git branch --show-current)} ;; *) MARK_BRANCH=$BRANCH ;; esac
+case "$CMD" in *"gh pr create"*) MARK_BRANCH=${BRANCH:-$(git -C "$TARGET" branch --show-current)} ;; *) MARK_BRANCH=$BRANCH ;; esac
 if [ -f "$MARKER" ] && [ -n "$MARK_BRANCH" ] && ! CLAUDE_PROJECT_DIR="$TARGET" bash "$MARKER" check "$MARK_BRANCH"; then
   deny "BLOCKED: /ship has not run on branch $MARK_BRANCH.
 
@@ -111,8 +130,20 @@ by hand is not enough: /ship also runs the skills audit and the code review.
 The gate's earlier pass is reused, so only those two steps cost time."
 fi
 
+SHIP_LOG="$PROJECT_DIR/.claude/hooks/ship-log.mjs"
+log_ready() {
+  case "$CMD" in *"gh pr create"*) ;; *) return 0 ;; esac
+  [ -f "$SHIP_LOG" ] && command -v node >/dev/null || return 0
+  TODO=$(SHIP_LOG_ROOT="$TARGET" node "$SHIP_LOG" ready 2>/dev/null) || [ -z "$TODO" ] || deny "BLOCKED: the ship log is not filled in for this /ship. Do these, then create the PR again:
+$TODO
+
+A finding's shape is in The ship log section of /ship. Log each one with the verdict
+you already reached; never log a finding you did not settle."
+}
+
 RECEIPT="/tmp/claude-shipgate-$KEY"
 if [ -f "$RECEIPT" ]; then
+  log_ready
   exit 0
 fi
 

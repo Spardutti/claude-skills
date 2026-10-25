@@ -164,16 +164,7 @@ bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
 git add -A >/dev/null 2>&1; git commit -qm work >/dev/null 2>&1
 hook "the receipt survives the commit" allow "gh pr create --fill"
 
-# A push to a feature branch ships nothing. A push while standing on a protected
-# branch is a direct ship with no PR in front of it, so that one is gated. The
-# branch comes from git, not from the command — `git push` names no branch.
-BASEBR=$(git branch --show-current)
-git checkout -qb feature/gate-scope 2>/dev/null
-echo "const d=4" >> a.ts
-hook "a push from a feature branch is not gated" allow "git push origin HEAD"
-git checkout -q "$BASEBR" 2>/dev/null
-hook "a push from the protected branch is gated" deny "git push origin HEAD"
-git checkout -q feature/gate-scope 2>/dev/null
+. "$HERE/selftest-ship-gate-push.sh"
 
 printf "GAUNTLET_MUTATE='echo \"[Survived] x\"'\n" > .claude/gauntlet.conf
 echo "const c=3" >> a.ts

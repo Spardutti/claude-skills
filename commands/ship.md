@@ -388,6 +388,8 @@ nothing. The gate logs each of its own runs; you add what only you know, as it h
   show it) or `skipped` (sorted out before testing, with `"note":"<kind> — <reason>"`).
 - `pr <number>` right after the PR is created, or `end "<why>"` when the run stops before one.
   A log left open is closed at its PR by the next `/ship` in this repo.
+- The PR hook refuses `gh pr create` until `step review end` and every review finding are
+  logged, and names what is missing.
 
 ## Flow Examples
 

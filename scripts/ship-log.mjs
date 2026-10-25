@@ -12,10 +12,10 @@ const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 // gate-config.sh owns the config files and their order, so the gate and this agree on "on".
 function conf() {
   const root = git(["rev-parse", "--show-toplevel"]) || process.cwd();
-  const script = 'cd "$2" && . "$1/gate-config.sh" || exit 1; load_gauntlet_conf .claude/gauntlet.conf "$1/../gauntlet.conf"; printf "\\nSHIP_LOG_ON=%s\\nSHIP_LOG_DIR=%s\\n" "$GAUNTLET_SHIP_LOG" "$GAUNTLET_SHIP_LOG_DIR"';
+  const script = 'cd "$2" && . "$1/gate-config.sh" || exit 1; load_gauntlet_conf .claude/gauntlet.conf "$1/../gauntlet.conf"; printf "\\nSHIP_LOG_ON=%s\\nSHIP_LOG_DIR=%s\\nDIARY_DIR=%s\\n" "$GAUNTLET_SHIP_LOG" "$GAUNTLET_SHIP_LOG_DIR" "$(diary_dir "$1")"';
   const out = spawnSync("bash", ["-c", script, "_", HERE, root], { encoding: "utf8" }).stdout;
   const value = (key) => out.split("\n").findLast((l) => l.startsWith(`${key}=`))?.slice(key.length + 1) ?? "";
-  return { on: value("SHIP_LOG_ON") === "1", dir: value("SHIP_LOG_DIR") || join(process.env.HOME ?? "", ".claude", "ship-logs"), root };
+  return { on: value("SHIP_LOG_ON") === "1", dir: value("SHIP_LOG_DIR") || join(process.env.HOME ?? "", ".claude", "ship-logs"), diary: value("DIARY_DIR"), root };
 }
 
 function identity(root) {
@@ -106,6 +106,33 @@ function addStep(record, [name, edge]) {
   if (step.start && step.end) step.seconds = Math.round((Date.parse(step.end) - Date.parse(step.start)) / 1000);
 }
 
+// Worktrees share one diary, so only this branch's latest review since the ship started counts.
+function lastReview(diary, branch, since) {
+  const file = join(diary, "review-findings.jsonl");
+  const rows = existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean) : [];
+  const last = rows.map((l) => { try { return JSON.parse(l); } catch { return null; } })
+    .filter((r) => r?.branch === branch && r.ts >= since && typeof r.reply === "string").at(-1);
+  const json = last?.reply.match(/```json\s*([\s\S]*?)```/)?.[1];
+  try {
+    const list = json && JSON.parse(json);
+    return Array.isArray(list) ? { ts: last.ts, count: list.length } : null;
+  } catch { return null; }
+}
+
+// Agents skipped the log's steps even when the text sat inside them, so the PR hook asks this.
+// A ship with no review (a release, a forced run) is never held.
+function missing(record, c) {
+  const review = lastReview(c.diary, record.branch, record.started);
+  if (!review) return [];
+  const quote = (s) => `'${s.replaceAll("'", "'\\''")}'`;
+  const cmd = (args) => `SHIP_LOG_ROOT=${quote(c.root)} node ${quote(join(HERE, "ship-log.mjs"))} ${args}`;
+  const out = [];
+  if (!record.steps.review?.end) out.push(cmd("step review end"));
+  const have = record.findings.filter((f) => f.by === "review" && f.ts >= review.ts).length;
+  if (have < review.count) out.push(`${cmd("finding '<json>'")} for every review finding: ${have} of ${review.count} logged; a duplicate is verdict "skipped", note "duplicate of <what>"`);
+  return out;
+}
+
 function run(mode, args) {
   const c = conf();
   if (mode === "report") return printReport(args[0] ?? c.dir);
@@ -113,6 +140,11 @@ function run(mode, args) {
   if (!c.on) return 0;
   const id = identity(c.root), path = openPath(c.dir, id), record = load(path, id);
   if (mode === "start") return restart(c.dir, path, record, id), 0;
+  if (mode === "ready") {
+    const todo = existsSync(path) ? missing(record, c) : [];
+    if (todo.length) console.log(todo.map((t) => `  - ${t}`).join("\n"));
+    return todo.length ? 1 : 0;
+  }
   // A gate run by hand or on a release is not a ship; only /ship's start opens one.
   if (mode === "gate" && !existsSync(path)) return 0;
   if (mode === "gate") addGateRun(record, args);
@@ -123,12 +155,13 @@ function run(mode, args) {
     return finalize(c.dir, path, record, `pr${args[0]}`, "pr-opened"), 0;
   }
   else if (mode === "end") return finalize(c.dir, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "stopped", args.join(" ") || null), 0;
-  else throw new Error("usage: ship-log.mjs on | start | gate <report> <exit> <seconds> <base> | step <name> start|end | finding '<json>' | pr <number> | end [reason] | report [dir]");
+  else throw new Error("usage: ship-log.mjs on | start | ready | gate <report> <exit> <seconds> <base> | step <name> start|end | finding '<json>' | pr <number> | end [reason] | report [dir]");
   save(path, record);
   return 0;
 }
 
 try {
+  if (process.env.SHIP_LOG_ROOT) process.chdir(process.env.SHIP_LOG_ROOT);
   process.exit(run(process.argv[2], process.argv.slice(3)) ?? 0);
 } catch (err) {
   console.error(`ship-log: ${err.message}`);

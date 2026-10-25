@@ -67,6 +67,13 @@ ok=0; [ "$(wc -l < "$REVLOG")" -eq 1 ] && ok=1
 sf "a subagent reply with no findings is not logged" $ok "$(cat "$REVLOG")"
 ok=0; grep -q '"branch":"' "$REVLOG" && ok=1
 sf "a logged review names the branch it was run on" $ok "$(head -c 200 "$REVLOG")"
+git worktree add -q "$TMP/sf-wt" -b feat/wt-review >/dev/null 2>&1
+sf_lines=$(wc -l < "$REVLOG")
+node -e 'process.stdout.write(JSON.stringify({session_id:"s",cwd:process.argv[1],hook_event_name:"SubagentStop",agent_type:"general-purpose",last_assistant_message:process.argv[2],stop_hook_active:false}))' "$TMP/sf-wt" "$R1" \
+  | bash .claude/hooks/skill-flags-record.sh
+ok=0; tail -1 "$REVLOG" | grep -q '"branch":"feat/wt-review"' && ok=1
+sf "a review run in a worktree names the worktree's branch" $ok "$(tail -1 "$REVLOG" | head -c 200)"
+head -n "$sf_lines" "$REVLOG" > "$REVLOG.tmp" && mv "$REVLOG.tmp" "$REVLOG"; git worktree remove --force "$TMP/sf-wt" >/dev/null 2>&1
 stop general-purpose 'The review JSON has a failure_scenario field per finding.'
 ok=0; [ "$(wc -l < "$REVLOG")" -eq 1 ] && ok=1
 sf "a reply that only mentions failure_scenario in prose is not logged" $ok "$(tail -1 "$REVLOG")"

@@ -68,11 +68,27 @@ err=$(node "$SL" finding '{"by":"review","what":"x","verdict":"maybe","fixed":fa
 sl_ok "a finding with an unknown verdict is refused" test "$rc" = 1 -a -n "$(printf '%s' "$err" | grep 'a finding needs')"
 node "$SL" finding '{"by":"review","what":"old cap","verdict":"skipped","fixed":false,"note":"skipped: old code"}' 2>/dev/null
 sl_is "a finding sorted out before testing is logged as skipped" "$SLOPEN" 'r.findings.length === 3 && r.findings[2].verdict === "skipped"'
-node "$SL" step review start; node "$SL" step review end
+node "$SL" ready >/dev/null 2>&1; rc=$?
+sl_ok "a ship with no review yet, like a release, is never held for the log" test "$rc" = 0
+printf '%s\n' '{"ts":"2999-01-01T00:00:00Z","branch":"feat/x","reply":"```json\n{\"findings\":[1,2]}\n```"}' > .claude/review-findings.jsonl
+node "$SL" ready >/dev/null 2>&1; rc=$?
+sl_ok "a review reply that is not a list skips the whole check, not half of it" test "$rc" = 0
+sleep 1
+node -e 'const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+  const f = (ts, branch, n) => JSON.stringify({ ts, branch, reply: "```json\n" + JSON.stringify(Array.from({ length: n }, (_, i) => ({ summary: "bug " + i, failure_scenario: "x" }))) + "\n```" });
+  process.stdout.write([f("2020-01-01T00:00:00Z", "feat/x", 9), f(now, "feat/x", 3), f(now, "feat/other", 9), JSON.stringify({ ts: now, branch: "feat/x" })].join("\n") + "\n")' > .claude/review-findings.jsonl
+out=$(node "$SL" ready 2>&1); rc=$?
+sl_ok "after a review, a PR waits for the review step" test "$rc" = 1 -a -n "$(printf '%s' "$out" | grep 'step review end')"
+sl_ok "and for every finding of this branch's latest review, logged after it" test -n "$(printf '%s' "$out" | grep '0 of 3')"
+sl_ok "and says how to log a duplicate" test -n "$(printf '%s' "$out" | grep 'duplicate of')"
+sl_ok "and names a command that runs from any folder, with no cd" test -n "$(printf '%s' "$out" | grep -F "SHIP_LOG_ROOT='$PWD' node '$SL' step review end")" -a -z "$(printf '%s' "$out" | grep 'cd ')"
+(cd / && SHIP_LOG_ROOT="$OLDPWD" node "$SL" step review start && SHIP_LOG_ROOT="$OLDPWD" node "$SL" step review end)
 sl_is "a step is timed" "$SLOPEN" 'typeof r.steps.review.seconds === "number"'
 node "$SL" step audit end
 sl_is "a step that only logged its end starts where the last one ended" "$SLOPEN" 'r.steps.audit.start === r.steps.review.end && r.steps.audit.seconds >= 0'
-
+for i in 0 1 2; do node "$SL" finding "{\"by\":\"review\",\"what\":\"bug $i\",\"verdict\":\"confirmed\",\"fixed\":true}" 2>/dev/null; done
+node "$SL" ready >/dev/null 2>&1; rc=$?
+sl_ok "and opens once they are" test "$rc" = 0
 node "$SL" pr 142 >/dev/null
 SLPR="$SLOGS/sg_log_${DAY}_pr142.json"
 sl_ok "the PR closes the log under app, date and PR number" test -f "$SLPR" -a ! -e "$SLOPEN"
