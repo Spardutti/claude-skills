@@ -80,11 +80,18 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 pr_branch() {
   case "$CMD" in
     *"gh pr create"*) printf '%s\n' "$CMD" | sed -nE 's/.*(--head[ =]|-H )"?([^ ;&|"]+).*/\2/p' ;;
-    *"gh pr merge"*) merge_branch ;;
+    *"gh pr merge"*) merge_field headRefName ;;
   esac
 }
 
-merge_branch() {
+pr_base() {
+  case "$CMD" in
+    *"gh pr create"*) printf '%s\n' "$CMD" | sed -nE 's/.*(--base[ =]|-B )"?([^ ;&|"]+).*/\2/p' ;;
+    *"gh pr merge"*) merge_field baseRefName ;;
+  esac
+}
+
+merge_field() {  # merge_field <gh pr field>
   local pr="" repo="" next=""
   for t in $(printf '%s\n' "$CMD" | sed 's/.*gh pr merge//; s/[;&|].*//'); do
     if [ "$next" = repo ]; then repo=$t; next=""; continue; fi
@@ -96,7 +103,7 @@ merge_branch() {
     esac
   done
   [ -n "$pr" ] || return 0
-  gh pr view "$pr" ${repo:+-R "$repo"} --json headRefName -q .headRefName 2>/dev/null
+  gh pr view "$pr" ${repo:+-R "$repo"} --json "$1" -q ".$1" 2>/dev/null
 }
 
 worktree_of() {
@@ -111,6 +118,11 @@ case "$CMD" in *"gh pr create"*)
   CWD_TOP=$(git -C "${CWD:-.}" rev-parse --show-toplevel 2>/dev/null) && [ -n "$CWD_TOP" ] && TARGET="$CWD_TOP" ;;
 esac
 BRANCH=$(pr_branch)
+# A release PR carries only work each feature PR already gated, and the gate on the
+# trunk measures it against itself, so a receipt there proves nothing.
+case "$BRANCH" in dev|develop|development)
+  case "$(pr_base)" in main|master) exit 0 ;; esac ;;
+esac
 [ -n "$BRANCH" ] && WT=$(worktree_of "$BRANCH") && [ -n "$WT" ] && TARGET="$WT"
 
 # Ask the gate for the key rather than recomputing it here. Two implementations

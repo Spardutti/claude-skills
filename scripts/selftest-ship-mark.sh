@@ -57,3 +57,10 @@ hook "and opens once it is" allow "gh pr create --fill"
 printf '{' > "$HOME/.claude/ship-logs/open/sg-mark__feat-m.json"
 hook "a log that cannot be read never blocks the PR with an empty list" allow "gh pr create --fill"
 rm -rf "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs" .claude/review-findings.jsonl
+
+git checkout -qb develop
+printf '#!/bin/sh\ncase "$*" in *baseRefName*) echo "${GH_BASE:-}" ;; *) echo "${GH_BRANCH:-}" ;; esac\n' > bin/gh
+hook "a release PR from the trunk into main needs no receipt or mark" allow "gh pr create --base main --head develop --title 'release: v1'"
+hook "a trunk PR into another branch still needs them" deny "gh pr create --base staging --head develop --fill"
+GH_BRANCH=develop GH_BASE=main hook "merging a release PR into main needs no receipt or mark" allow "gh pr merge 9 --merge"
+GH_BRANCH=develop GH_BASE=staging hook "merging the trunk anywhere else still needs them" deny "gh pr merge 9 --merge"
