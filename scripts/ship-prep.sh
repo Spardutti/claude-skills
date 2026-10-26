@@ -17,6 +17,8 @@ start() {
   local branch base dirty behind ahead
   branch=$(git branch --show-current)
   [ -n "$branch" ] || stop "Detached HEAD — check out a branch first."
+  # Before any output: `start | head -3` closed the pipe and killed the script before a last-line mark.
+  bash "$HERE/ship-mark.sh" begin || stop "ship-mark.sh begin failed."
   if git remote | grep -qx origin; then git fetch -q origin 2>/dev/null; else echo "remote none: pr, merge and release cannot run"; fi
   base=$(base_branch)
   echo "branch $branch"
@@ -35,7 +37,6 @@ start() {
   else
     echo "gh NOT logged in: pr, merge and release cannot run"
   fi
-  bash "$HERE/ship-mark.sh" begin || stop "ship-mark.sh begin failed."
 }
 
 skills_report() {  # skills_report <files...>
