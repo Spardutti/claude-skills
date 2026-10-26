@@ -2,20 +2,31 @@
 
 INPUT=$(cat | tr -d '\n')
 
-case "$INPUT" in
-  *'"agent_type":"gauntlet-skills"'*) LOG=skill-flags.jsonl ;;
-  *'\"failure_scenario\"'*) LOG=review-findings.jsonl ;;
-  *) exit 0 ;;
-esac
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"agent_transcript_path":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
+
+# The SubagentHandback tool carries the report and leaves last_assistant_message empty.
+handback() {
+  node -e 'for (const s of require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n").reverse()) {
+    let c; try { c = JSON.parse(s).message; } catch { continue; }
+    if (c?.role !== "assistant" || !Array.isArray(c.content)) continue;
+    const h = c.content.find((x) => x.type === "tool_use" && x.name === "SubagentHandback");
+    const t = h ? h.input?.message : c.content.filter((x) => x.type === "text").map((x) => x.text).join("");
+    if (t) { process.stdout.write(JSON.stringify(t).slice(1, -1)); break; }
+  }' "$1" 2>/dev/null
+}
 
 # Kept JSON-escaped as it arrived, so the line stays valid JSON without a parser.
 REPLY=$(printf '%s' "$INPUT" | sed -nE 's/.*"last_assistant_message":"(([^"\\]|\\.)*)".*/\1/p')
+[ -z "$REPLY" ] && [ -f "$TRANSCRIPT" ] && REPLY=$(handback "$TRANSCRIPT")
 [ -z "$REPLY" ] && exit 0
 
-TRANSCRIPT=$(printf '%s' "$INPUT" | grep -o '"agent_transcript_path":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')
+case "$INPUT" in
+  *'"agent_type":"gauntlet-skills"'*) LOG=skill-flags.jsonl ;;
+  *) case "$REPLY" in *'\"failure_scenario\"'*) LOG=review-findings.jsonl ;; *) exit 0 ;; esac ;;
+esac
+
 MODEL=""
 [ -f "$TRANSCRIPT" ] && MODEL=$(grep -o '"model":"[^"]*"' "$TRANSCRIPT" | tail -1 | sed 's/.*:"//; s/"$//')
 

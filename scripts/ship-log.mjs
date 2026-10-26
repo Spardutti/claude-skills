@@ -62,13 +62,17 @@ function prOf(branch) {
 }
 
 // Agents skip the `pr` call, so a log whose branch has a PR by now is closed at that PR.
+// A PR older than the log was only updated by it, so that log ends at its own last event.
 function closeOpened(dir, app) {
   const open = join(dir, "open");
   for (const f of existsSync(open) ? readdirSync(open).filter((n) => n.startsWith(`${app}__`)) : []) {
     const path = join(open, f), record = JSON.parse(readFileSync(path, "utf8"));
     if (!record.gate.length && !record.findings.length) continue;
     const pr = prOf(record.branch);
-    if (pr) finalize(dir, path, Object.assign(record, { pr: pr.number }), `pr${pr.number}`, "pr-opened", null, pr.createdAt);
+    if (!pr) continue;
+    const opened = pr.createdAt >= record.started;
+    finalize(dir, path, Object.assign(record, { pr: pr.number }), `pr${pr.number}`,
+      opened ? "pr-opened" : "pr-updated", null, opened ? pr.createdAt : lastEvent(record));
   }
 }
 

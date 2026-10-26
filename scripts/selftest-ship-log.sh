@@ -112,13 +112,17 @@ node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y
 cat > bin/gh <<EOF
 #!/bin/sh
 printf '%s\n' "\$*" >> "$TMP/gh-args"
-case "\$*" in *"--head feat/z "*) echo '[{"number":151,"createdAt":"2026-01-02T03:04:05Z"}]' ;; *) echo '[]' ;; esac
+case "\$*" in *"--head feat/z "*) echo '[{"number":151,"createdAt":"2999-01-02T03:04:05Z"}]' ;;
+  *"--head feat/w "*) echo '[{"number":152,"createdAt":"2000-01-02T03:04:05Z"}]' ;; *) echo '[]' ;; esac
 EOF
 chmod +x bin/gh; rm -f "$TMP/gh-args"
 bash "$HERE/ship-mark.sh" begin
-sl_is "a log left open after its PR opened is closed by the next /ship" "$SLOGS/sg_log_2026-01-02_pr151.json" 'r.status === "pr-opened" && r.pr === 151 && r.finished === "2026-01-02T03:04:05Z"'
+sl_is "a log left open after its PR opened is closed by the next /ship" "$SLOGS/sg_log_2999-01-02_pr151.json" 'r.status === "pr-opened" && r.pr === 151 && r.finished === "2999-01-02T03:04:05Z"'
 sl_ok "and leaves open/" test ! -e "$SLOGS/open/sg_log__feat-z.json"
 sl_ok "gh is asked once, for the logged branch only" test "$(cat "$TMP/gh-args")" = "pr list --head feat/z --state all --json number,createdAt --limit 1"
+git checkout -qb feat/w; node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y
+bash "$HERE/ship-mark.sh" begin
+sl_is "a ship on a branch whose PR already existed is an update, never a negative time" "$(ls "$SLOGS"/sg_log_*_pr152.json 2>/dev/null | head -1)" 'r.status === "pr-updated" && r.finished >= r.started && r.summary.minutes >= 0'
 rm -f bin/gh
 
 { printf '[Survived] EqualityOperator\nsrc/y.ts:1:1\n'; sl_table 0 1; } > "$SLOUT"
