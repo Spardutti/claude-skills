@@ -26,6 +26,18 @@ Do the scan yourself — no subagents. Across 8 past features, one agent found t
 three scout subagents did, in half the time and at a fifth of the cost, and the build later needs
 those files in context anyway. Read every file before you cite it; a name match is never enough.
 
+**Registry — the systems this project says to extend.** Run this first:
+
+```bash
+node .claude/hooks/registry.mjs      # scripts/registry.mjs in the claude-skills repo
+```
+
+It prints every `*.registry.yaml`. Read each `summary` against the brief by meaning, not by
+shared words: "fires at the nearby enemy" is the aiming system even though no word matches.
+For each entry that applies, read its `example` and follow its `extend_by`. `registry none`
+means the project has no entries; go on. A `registry stale` line after the entries means one no
+longer matches its code: tell the user in Step 3, and never trust that entry's names.
+
 **Reuse — what already exists.**
 1. Take the domain nouns and verbs ("export invoices to CSV" → export, invoice, csv, download).
 2. Grep and glob for each: components, hooks (`use<Noun>`), utilities in `utils/` `lib/` `helpers/`,
@@ -93,6 +105,10 @@ Print only what code cannot say. Never list reuse, extend or add targets here �
 ```markdown
 # Plan notes — <feature name>
 
+## Registry
+- <entry name>: reuse
+- <entry name>: skip — <why this feature does not touch it>
+
 ## Pattern to follow
 <1–3 bullets pointing at an existing feature to mirror, with file paths>
 
@@ -110,7 +126,20 @@ Print only what code cannot say. Never list reuse, extend or add targets here �
 
 **No type checker?** Then the stubs prove nothing, so also add `## Reuse`, `## Extend` and `## Add` lists (`<symbol>` at `path:line`, `<file>` — what changes) to the notes.
 
-If the user passed a path or asked for a file (e.g. "save to PLAN.md"), write the notes there. Otherwise just print them.
+**Registry.** List every entry the registry printed, each marked `reuse` or `skip` with a reason. Leave the section out only when it printed `registry none`.
+
+Always save the notes to `PLAN.md` at the repo root, then print them. The registry check reads that file, and `/ship` deletes it before the commit. If git already tracks a `PLAN.md`, it belongs to the project: ask the user before overwriting it.
+
+**Registry check.** Run it with the plan file and every file the stubs created or touched:
+
+```bash
+node .claude/hooks/registry.mjs --plan PLAN.md <stub files…>
+```
+
+- `registry FAIL` — an entry is missing from the list, or marked `reuse` while no stub uses a name from its `extend_by`. Fix the plan or the stubs and run it again until no FAIL is left.
+- `registry ASK` — a skipped entry whose words appear in the stubs. Put the line to the user as a question in Step 5. Never decide it yourself.
+
+**A new system.** If the stubs add an interface or base type that several kinds will implement, add one line to Open questions: "This is a new system — record it with `/registry` after the build?"
 
 ## Step 5 — Stop, Then Build It Yourself
 
@@ -134,6 +163,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and a
 - Always print the plan and stop before Step 5 — never build until the user approves it.
 - Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/ship`.
 - Never produce a plan that proposes building something the scan found as reusable, unless the user explicitly rejected reuse.
+- Always run the registry first, mark every entry `reuse` or `skip` in `PLAN.md`, and stop only when `--plan` shows no FAIL — every ASK goes to the user.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If the scan finds nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
 - Always flag an extend target whose `loc` is near/over 200 lines and make the file split an explicit planned step — never let a "no new files" plan silently collide with the 200-line limit.

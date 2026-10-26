@@ -275,7 +275,9 @@ Precondition: uncommitted changes exist; the current branch is **not** protected
    `*.key`) and added lines for key signatures (`AKIA…`, `-----BEGIN … KEY-----`, `xoxb-…`, bearer
    tokens). Exit 1 → STOP and show the user its lines. It cannot judge a high-entropy string: while
    you read the diff to group it, stop on one.
-2. Read `git diff` and `git diff --staged` to group the work.
+2. Delete `PLAN.md` at the repo root if git does not track it — `/plan-feature` left it, and it is
+   never committed. A tracked `PLAN.md` belongs to the project; leave it. Then read
+   `git diff` and `git diff --staged` to group the work.
 3. Group changes into **logical units of work**. Stage each group's files **explicitly** — never `git add .` / `git add -A`.
 4. Commit each group: `type(scope): imperative description`. Types: `feat` `fix` `refactor` `docs` `style` `test` `chore` `perf` `ci` `build` `revert`. Breaking change → `type!:` + a `BREAKING CHANGE:` footer.
 5. Show a summary — branch name and the commits created.

@@ -102,6 +102,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-lint-ratchet-baseline.sh"  # baselines never bank growth, and edge cases
 . "$HERE/selftest-diary-check.sh"       # when /ship suggests /add-rule
 . "$HERE/selftest-edit-blocks.sh"       # edit-hook blocks, logged and tallied
+. "$HERE/selftest-registry.sh"          # *.registry.yaml: the listing, the plan check and stale entries
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
 . "$HERE/selftest-fetch.sh"              # the CLI talking to GitHub
 . "$HERE/selftest-install.sh"            # installing over an existing install
