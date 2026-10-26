@@ -12,6 +12,14 @@ being shipped to consumer projects, not a workflow rule for editing the skills
 themselves. When working in this repo, your job is to author and maintain
 skill content, the CLI, and the hook — not to run skills against your own edits.
 
+**Checking work here is read-only.** Review and verify by reading code and running only
+`bash scripts/gauntlet-selftest.sh` (it works inside a throwaway folder) or
+`bash scripts/preflight.sh` (it also packs `cli/`, which rewrites `cli/README.md` and
+`cli/hooks/` and restores them with `git checkout` — commit edits there first). Never run
+another script (`ship-prep.sh`, `line-limit.sh --baseline`, the CLI's hook setup) or a git
+command that writes. Self-tests run on their own twice wrote into this repo: commits on
+`main`, ten branches, and a lost `.claude/review-findings.jsonl`.
+
 **The CLI is a picker, not a bulk installer.** Consumers run the CLI and
 choose which skills to install per-project. So a full-stack project (e.g.
 Python + React) will legitimately install many skills at once. When reasoning

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # Cases for logging /ship skills-audit verdicts and the /skill-report tally.
 # Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
 
@@ -34,7 +35,7 @@ GOT=$(printf '%s' "$LINE" | node -e "let d='';process.stdin.on('data',c=>d+=c).o
 ok=0; [ "$GOT" = "claude-opus-5-5|$V1" ] && ok=1
 sf "a verdict with quotes, a fence and newlines is logged intact, with its model" $ok "$GOT"
 
-stop plan-feature-reuse '{"skill":"react","violations":[],"checked":1}'
+stop discover-critic '{"skill":"react","violations":[],"checked":1}'
 ok=0; [ "$(wc -l < "$FLAGLOG")" -eq 1 ] && ok=1
 sf "other agents are not logged" $ok "$(cat "$FLAGLOG")"
 

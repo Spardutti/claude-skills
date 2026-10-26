@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # ship-gate with a repo's own GAUNTLET_MUTATE command. Sourced by gauntlet-selftest.sh.
 # It once got no $FILES at all, so a wrapper script mutated nothing and every run passed.
 

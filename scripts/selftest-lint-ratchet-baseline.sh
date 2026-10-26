@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
 echo "baselines never bank growth"
 LB="$TMP/lb"; rm -rf "$LB"; mkdir -p "$LB/src" "$LB/node_modules/.bin"

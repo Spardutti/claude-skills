@@ -16,6 +16,8 @@ G="$HERE/gauntlet.sh"
 SG="$HERE/ship-gate.sh"
 SGH="$HERE/ship-gate-hook.sh"
 TMP=$(mktemp -d)
+SELFTEST_SANDBOX="$TMP"
+cd "$TMP" || exit 1
 export HOME="$TMP/home"; mkdir -p "$HOME"
 RUN="$$-$(date +%s 2>/dev/null || echo 0)"
 LOG="$TMP/ran.log"
@@ -107,6 +109,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end
 . "$HERE/selftest-stryker.sh"            # scaffolding Stryker into a project
+. "$HERE/selftest-standalone.sh"         # no test file runs on its own, in a real repo
 
 cd /
 rm -rf "$TMP"

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # How long the Stop hook and the ship gate took. Sourced by gauntlet-selftest.sh.
 # Past 600s Claude Code kills the Stop hook and the turn passes, so a slow run must be said out loud.
 

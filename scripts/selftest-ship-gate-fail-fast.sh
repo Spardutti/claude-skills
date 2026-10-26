@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # ship-gate cases for stopping before mutation. Sourced by gauntlet-selftest.sh.
 # A length or structure fix changes the files, so a mutation run before it is always thrown away.
 

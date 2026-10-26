@@ -161,7 +161,9 @@ function run(mode, args) {
 }
 
 try {
-  if (process.env.SHIP_LOG_ROOT) process.chdir(process.env.SHIP_LOG_ROOT);
+  // Like ship-mark, ship-gate and ship-prep, a worktree ship names its folder in CLAUDE_PROJECT_DIR.
+  const root = process.env.SHIP_LOG_ROOT || process.env.CLAUDE_PROJECT_DIR;
+  if (root) process.chdir(root);
   process.exit(run(process.argv[2], process.argv.slice(3)) ?? 0);
 } catch (err) {
   console.error(`ship-log: ${err.message}`);

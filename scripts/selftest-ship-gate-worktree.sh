@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # ship-gate cases for a PR shipped from a git worktree. Sourced by gauntlet-selftest.sh.
 # A forced receipt in the main folder once let a worktree's PR through ungated.
 

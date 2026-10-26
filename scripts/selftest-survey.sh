@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # gauntlet-survey.sh against grouped folders. Sourced by gauntlet-selftest.sh.
 # Repos moved into personal/ and work/ were skipped, and preflight passed a survey of 0 repos.
 

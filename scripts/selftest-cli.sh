@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # Smoke tests for cli/bin/cli.mjs, which had no coverage at all.
 # Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
 #
@@ -147,6 +148,18 @@ if [ -d "$CP/.claude/skills/gone-skill" ]; then
   FAIL=$((FAIL+1)); printf '  FAIL %s\n' "and its directory is gone"
 else
   PASS=$((PASS+1)); printf '  ok   %s\n' "and its directory is gone"
+fi
+
+# /plan-feature scouted through three subagents until 2.58.0; an upgrade removes them.
+CPA="$TMP/cli_scouts"; rm -rf "$CPA"; mkdir -p "$CPA/.claude/agents"
+for a in plan-feature-reuse plan-feature-pattern plan-feature-touch-points; do printf -- '---\nname: %s\n---\n' "$a" > "$CPA/.claude/agents/$a.md"; done
+printf '{ "catalogVersion": "2.57.0", "skills": [], "commands": ["plan-feature.md"], "agents": ["plan-feature-pattern.md", "plan-feature-reuse.md", "plan-feature-touch-points.md"] }\n' > "$CPA/.claude/.claude-skills.json"
+OUT=$(cli_run "$CPA" --sync)
+N=$((N+1))
+if ! ls "$CPA"/.claude/agents/plan-feature-*.md >/dev/null 2>&1 && ! grep -q 'plan-feature-' "$CPA/.claude/.claude-skills.json" && [ -f "$CPA/.claude/commands/plan-feature.md" ]; then
+  PASS=$((PASS+1)); printf '  ok   %s\n' "a sync removes the retired plan-feature scouts and keeps the command"
+else
+  FAIL=$((FAIL+1)); printf '  FAIL %s\n       agents: %s\n' "a sync removes the retired plan-feature scouts and keeps the command" "$(ls "$CPA/.claude/agents" 2>&1 | tr '\n' ' ')"
 fi
 
 echo "cli --sync-all"

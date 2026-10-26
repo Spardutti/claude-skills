@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # ship-gate on diffs with nothing of the project's to check. Sourced by gauntlet-selftest.sh.
 # A repo that stopped committing .claude/ staged its hook deletions, and the gate called them UNPROVEN.
 

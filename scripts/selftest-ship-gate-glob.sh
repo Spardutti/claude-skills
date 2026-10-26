@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
 echo "ship-gate bracket paths"
 # The whole file is mutated, so old lines report too; only the lines this diff changed are its findings.

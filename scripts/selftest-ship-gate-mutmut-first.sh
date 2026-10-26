@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # ship-gate's first mutmut run on a module. Sourced by gauntlet-selftest.sh after the scope cases.
 # A first run with no baseline mutated the whole API: over 30 minutes to ship one changed file.
 

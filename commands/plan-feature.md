@@ -1,9 +1,8 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — 3 parallel subagents scan for reusable code, established patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go the same agent fills them in"
+description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — you scan the repo yourself for reusable code, established patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go you fill them in"
 category: Workflow
-allowed-tools: Read, Grep, Glob, Task, Write, Edit, Bash
-requires-agents: [plan-feature-reuse, plan-feature-pattern, plan-feature-touch-points]
+allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 argument-hint: "<short feature description>"
 ---
 
@@ -21,21 +20,36 @@ Its Open questions are the exception: those are genuinely unresolved, and one of
 
 Take `$ARGUMENTS` (the user's brief) plus the discovery log if present. In 1–2 sentences, restate what the feature is in your own words. If the brief is too vague to scan for (e.g. "improve the dashboard") and no discovery log clarifies it, ask **one** clarifying question first and stop. Otherwise continue.
 
-## Step 2 — Spawn 3 Parallel Subagents
+## Step 2 — Scout the Repo Yourself
 
-Launch all 3 agents in a **single message** using the Task tool so they run concurrently. Each agent runs on Haiku (cheap, fast, just grep+read). Pass each one the restated feature description.
+Do the scan yourself — no subagents. Across 8 past features, one agent found the same files the
+three scout subagents did, in half the time and at a fifth of the cost, and the build later needs
+those files in context anyway. Read every file before you cite it; a name match is never enough.
 
-| Agent type | Finds |
-|------------|-------|
-| `plan-feature-reuse` | Existing components, hooks, utilities, services, styles, types whose domain overlaps the feature — anything that would be duplicated if ignored |
-| `plan-feature-pattern` | How similar features are already wired — routing, state, data fetching, error handling, file layout, naming conventions |
-| `plan-feature-touch-points` | Specific files/modules that will need to be modified or extended (not created from scratch) for this feature to land |
+**Reuse — what already exists.**
+1. Take the domain nouns and verbs ("export invoices to CSV" → export, invoice, csv, download).
+2. Grep and glob for each: components, hooks (`use<Noun>`), utilities in `utils/` `lib/` `helpers/`,
+   services and API clients, styles and tokens, types and schemas. Skip tests, fixtures, stories, migrations.
+3. Sort the hits: drop-in reusable, or a near miss that needs a small extension.
 
-Each agent returns a JSON object with its findings. Wait for all 3 before continuing.
+**Pattern — how the closest feature is wired.**
+1. Classify the feature: list page, detail page, form, mutation, background job, API endpoint, UI element, other.
+2. Read the entry file of 2–3 existing features of that type, plus 1–2 supporting files each.
+3. Note file layout, routing, state and data, error handling, validation, styling, naming — each backed by a real file.
+
+**Touch points — existing files that must change.**
+1. Infer the layers: UI, routing, state, API, DB, permissions, navigation, i18n, config.
+2. Find the registries and aggregators each layer needs: routers, DB schema, navigation, permissions,
+   API roots and specs, i18n files, flags and config, type and event registries.
+3. Read each to confirm the feature must register there, and note its line count (`loc`).
+   Only files the feature must edit — never files it only reads, never every consumer.
+
+Keep the findings short — symbol and `path:line` for reuse, exemplar files for the pattern, and
+`file`, `loc` and why for each touch point. Steps 3 and 4 build on them.
 
 ## Step 3 — Ask Grounded Clarifying Questions
 
-Now, and only now, ask the user clarifying questions — **batched in a single message, max 5 questions**. Every question must be grounded in something a subagent found, not generic product questions. Examples:
+Now, and only now, ask the user clarifying questions — **batched in a single message, max 5 questions**. Every question must be grounded in something the scan found, not generic product questions. Examples:
 
 - "There's already a `<Card variant="outlined">` in `src/ui/Card.tsx` — does the new card use this, or do you need a new variant?"
 - "Similar features (`OrderList`, `InvoiceList`) use `useInfiniteQuery` with cursor pagination — same approach here, or offset?"
@@ -92,7 +106,7 @@ Print only what code cannot say. Never list reuse, extend or add targets here �
 <anything unresolved in Step 3, plus ordering, transaction or side-effect risks a stub cannot show — or [] if none>
 ```
 
-**Size check.** Each `must_modify` touch-point carries a `loc`. If extending a file pushes it near or over 200 lines, or it is already over, list the split under Splits so it is approved up front, not found mid-build.
+**Size check.** Each touch point you noted carries a `loc`. If extending a file pushes it near or over 200 lines, or it is already over, list the split under Splits so it is approved up front, not found mid-build.
 
 **No type checker?** Then the stubs prove nothing, so also add `## Reuse`, `## Extend` and `## Add` lists (`<symbol>` at `path:line`, `<file>` — what changes) to the notes.
 
@@ -115,15 +129,13 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and a
 ## Rules
 
 - Always check for a `DISCOVERY.md` (or a path in `$ARGUMENTS`) before Step 1, and treat its scope, non-goals, edge cases and success criteria as resolved input — never re-ask what it already settled, and never revive a framing it rejected.
-- Always run the 3 subagents in parallel in a single Task message.
-- Always wait for all 3 to return before asking the user anything.
+- Always scan the repo yourself before asking the user anything — never spawn subagents to scan or to write code.
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.
-- Never spawn more than the 3 declared subagents, and never spawn one to write code — you build the plan yourself.
 - Always print the plan and stop before Step 5 — never build until the user approves it.
 - Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/ship`.
-- Never produce a plan that proposes building something a subagent already found as reusable, unless the user explicitly rejected reuse.
+- Never produce a plan that proposes building something the scan found as reusable, unless the user explicitly rejected reuse.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
-- If a subagent returns nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
+- If the scan finds nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
 - Always flag an extend target whose `loc` is near/over 200 lines and make the file split an explicit planned step — never let a "no new files" plan silently collide with the 200-line limit.
 - Cap the notes at ~40 lines. If it grows beyond that, the feature is too big — tell the user to split it.
 - Never write stubs on the default branch — branch each touched repo first.

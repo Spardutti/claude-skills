@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
 echo "the /ship log"
 SL="$HERE/ship-log.mjs"; SLOGS="$HOME/.claude/ship-logs"; SLOUT="$TMP/ship-log-stryker.out"; DAY=$(date -u +%F)
@@ -68,6 +69,8 @@ err=$(node "$SL" finding '{"by":"review","what":"x","verdict":"maybe","fixed":fa
 sl_ok "a finding with an unknown verdict is refused" test "$rc" = 1 -a -n "$(printf '%s' "$err" | grep 'a finding needs')"
 node "$SL" finding '{"by":"review","what":"old cap","verdict":"skipped","fixed":false,"note":"skipped: old code"}' 2>/dev/null
 sl_is "a finding sorted out before testing is logged as skipped" "$SLOPEN" 'r.findings.length === 3 && r.findings[2].verdict === "skipped"'
+(cd / && CLAUDE_PROJECT_DIR="$OLDPWD" node "$SL" finding '{"by":"audit:x","what":"from a worktree session","verdict":"refuted","fixed":false}' 2>/dev/null)
+sl_is "CLAUDE_PROJECT_DIR points the log at that folder, like the other ship scripts" "$SLOPEN" 'r.findings.length === 4 && r.findings[3].by === "audit:x"'
 node "$SL" ready >/dev/null 2>&1; rc=$?
 sl_ok "a ship with no review yet, like a release, is never held for the log" test "$rc" = 0
 printf '%s\n' '{"ts":"2999-01-01T00:00:00Z","branch":"feat/x","reply":"```json\n{\"findings\":[1,2]}\n```"}' > .claude/review-findings.jsonl

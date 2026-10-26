@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # Which branch ship-gate measures from. Sourced by gauntlet-selftest.sh.
 # A repo whose trunk is `dev` got measured from main, so files already in dev were flagged.
 

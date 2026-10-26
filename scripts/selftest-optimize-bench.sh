@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # The bench.sh template /optimize copies, run as shipped. Sourced by gauntlet-selftest.sh.
 # Two real runs posted their prediction after the result; the template refusing to start is the fix.
 

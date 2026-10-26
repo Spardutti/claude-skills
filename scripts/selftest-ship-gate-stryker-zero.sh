@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
 # vitest-runner 10 on Vitest 5 filters every test out (stryker-js#6210), so each
 # mutant "survives" with 0 tests run. That is a broken run, not a weak suite.

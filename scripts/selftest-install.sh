@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # Cases for installing over an EXISTING install rather than a fresh one: a
 # skill that gained reference files, hooks registered under an old matcher,
 # the once-a-day version notice, and what a project still needs.

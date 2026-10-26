@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 # The blocks the installer writes into a project's CLAUDE.md. Sourced by gauntlet-selftest.sh.
 # An agent asked to write a custom skill did not know it had to be listed under "custom".
 
