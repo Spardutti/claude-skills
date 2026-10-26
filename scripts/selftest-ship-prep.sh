@@ -76,6 +76,9 @@ sl_ok "a path with a space reaches the diff" test -n "$(grep -l '^+m$' "$DIFF" 2
 out=$(CLAUDE_PROJECT_DIR="$PWD/src" bash "$SP" scope 2>&1); SUBDIFF=$(printf '%s\n' "$out" | sed -n 's/^diff //p')
 sl_ok "from a project in a subfolder the diff still holds the files" test -n "$(grep -l 'b2' "$SUBDIFF" 2>/dev/null)"
 sl_is "the audit and review steps are started" "$HOME/.claude/ship-logs/open/prep-origin__feat-p.json" 'r.steps.audit.start && r.steps.review.start'
+git checkout -qb chore/release-v9; bash "$SP" start >/dev/null 2>&1; bash "$SP" scope >/dev/null 2>&1
+sl_is "a release branch starts no audit or review step it will skip" "$HOME/.claude/ship-logs/open/prep-origin__chore-release-v9.json" '!r.steps.audit && !r.steps.review'
+git checkout -q feat/p
 git checkout -q --detach
 out=$(bash "$SP" start 2>&1); rc=$?
 sl_ok "a detached HEAD stops start with ship.md's message" test "$rc" = 1 -a -n "$(printf '%s' "$out" | grep 'Detached HEAD')"

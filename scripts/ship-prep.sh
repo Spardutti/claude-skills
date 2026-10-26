@@ -69,8 +69,11 @@ scope() {
   fi
   echo "diff $diff"
   echo "review /code-review medium origin/$(base_branch)...$branch"
-  node "$HERE/ship-log.mjs" step audit start >/dev/null 2>&1
-  node "$HERE/ship-log.mjs" step review start >/dev/null 2>&1
+  # A release branch skips the audit and the review, so starting them left steps that never end.
+  case "$branch" in chore/release-*) ;; *)
+    node "$HERE/ship-log.mjs" step audit start >/dev/null 2>&1
+    node "$HERE/ship-log.mjs" step review start >/dev/null 2>&1 ;;
+  esac
   return 0
 }
 

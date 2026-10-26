@@ -45,7 +45,19 @@ function summarize(record) {
   return { minutes: Math.round(minutes * 10) / 10, gateRuns: record.gate.length, gateSeconds: record.gate.reduce((n, r) => n + (r.seconds ?? 0), 0), findings: by };
 }
 
+// Survivors fixed but never logged: a FAIL that a later PASS cleared, with no mutation finding since.
+function settleSurvivors(record) {
+  const i = record.gate.findLastIndex((g) => g.verdict === "FAIL" && g.projects?.some((p) => p.survivors?.length));
+  if (i < 0 || !record.gate.slice(i + 1).some((g) => g.verdict === "PASS")) return;
+  if (record.findings.some((f) => f.by === "mutation" && f.ts >= record.gate[i].ts)) return;
+  for (const s of record.gate[i].projects.flatMap((p) => p.survivors ?? [])) {
+    record.findings.push({ ts: now(), by: "mutation", what: `${s.mutator ?? s.kind} at ${s.at}`, file: s.at.split(":")[0],
+      verdict: "confirmed", fixed: true, note: "logged by ship-log: a later gate run passed" });
+  }
+}
+
 function finalize(dir, path, record, tag, status, reason, at) {
+  settleSurvivors(record);
   Object.assign(record, { status, reason: reason ?? null, finished: at ?? now() });
   record.summary = summarize(record);
   const stem = `${record.app}_${record.finished.slice(0, 10)}_${tag}`;
