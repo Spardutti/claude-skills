@@ -52,13 +52,13 @@ prep_has "and whether gh is logged in" "$out" "gh logged in"
 prep_has "and this branch's PR" "$out" "pr OPEN #12 https://x/pull/12"
 sl_ok "start exits 0" test "$rc" = 0
 sl_ok "start sets the /ship mark" bash "$HERE/ship-mark.sh" check
-rm -f "/tmp/claude-ship-$(printf '%s %s' "$(cd "$(git rev-parse --git-common-dir)" && pwd)" feat/p | cksum | cut -d' ' -f1)"
-bash "$SP" start | head -1 >/dev/null
-sl_ok "start piped into head still sets the mark" bash "$HERE/ship-mark.sh" check
 sl_ok "and opens the ship log" test -f "$HOME/.claude/ship-logs/open/prep-origin__feat-p.json"
 sl_ok "gh is asked exactly these, in order" test "$(cat "$TMP/prep-gh-args")" = "$(printf 'auth status\npr view --json state,number,url -q .state+" #"+(.number|tostring)+" "+.url')"
 out=$(PREP_GH_AUTH=1 bash "$SP" start 2>&1)
 prep_has "a missing gh login is named, not a stop" "$out" "gh NOT logged in: pr, merge and release cannot run"
+rm -f "/tmp/claude-ship-$(printf '%s %s' "$(cd "$(git rev-parse --git-common-dir)" && pwd)" feat/p | cksum | cut -d' ' -f1)"
+bash "$SP" start | head -1 >/dev/null
+sl_ok "start piped into head still sets the mark" bash "$HERE/ship-mark.sh" check
 
 mkdir -p .claude/skills/ts .claude/skills/sql .claude/skills/plain
 printf -- '---\nname: ts\nmetadata:\n  gate-paths: "*.ts"\n---\n' > .claude/skills/ts/SKILL.md
