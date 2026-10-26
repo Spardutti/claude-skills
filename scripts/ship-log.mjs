@@ -145,8 +145,8 @@ function run(mode, args) {
     if (todo.length) console.log(todo.map((t) => `  - ${t}`).join("\n"));
     return todo.length ? 1 : 0;
   }
-  // A gate run by hand or on a release is not a ship; only /ship's start opens one.
-  if (mode === "gate" && !existsSync(path)) return 0;
+  // A gate run or a review outside /ship is not a ship; only /ship's start opens one.
+  if ((mode === "gate" || mode === "step") && !existsSync(path)) return 0;
   if (mode === "gate") addGateRun(record, args);
   else if (mode === "finding") addFinding(record, args[0]);
   else if (mode === "step") addStep(record, args);

@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 //   ship-gate-projects.sh     sourced by ship-gate.sh — project detection, reuse
 //   ship-gate-hook.sh         PreToolUse on Bash — no commit without a receipt
 //   ship-mark.sh              written by /ship — no PR on a branch /ship never ran on
+//   ship-prep.sh              run by /ship — prechecks, scope and skills in one call
 //   version-check.sh          SessionStart — a line when a newer catalog exists
 //   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
 //   skill-report.mjs          read by /skill-report — tallies that log
@@ -55,6 +56,7 @@ const SHIP_LOG_FILENAME = "ship-log.mjs";
 const SHIP_LOG_PARSE_FILENAME = "ship-log-parse.mjs";
 const SHIP_LOG_REPORT_FILENAME = "ship-log-report.mjs";
 const SHIP_MARK_FILENAME = "ship-mark.sh";
+const SHIP_PREP_FILENAME = "ship-prep.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -163,6 +165,7 @@ export async function setupHook(targetDir = process.cwd()) {
     SHIP_LOG_PARSE_FILENAME,
     SHIP_LOG_REPORT_FILENAME,
     SHIP_MARK_FILENAME,
+    SHIP_PREP_FILENAME,
   ]) {
     const dest = join(hooksDir, name);
     await writeFile(dest, await readHookSource(name), { mode: 0o755 });

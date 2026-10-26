@@ -83,6 +83,8 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
 . "$HERE/selftest-ship-gate-base.sh"     # which branch the ship gate measures from
 . "$HERE/selftest-ship-log.sh"           # the /ship log: every gate run, findings, PR size
+. "$HERE/selftest-ship-prep.sh"         # ship-gate --scope and the one-call /ship setup
+. "$HERE/selftest-ship-prep-stages.sh"  # commit, merge and release facts in one call each
 . "$HERE/selftest-ship-mark.sh"          # a PR opens only after /ship starts on its branch
 . "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
 . "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders

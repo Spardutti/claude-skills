@@ -4,6 +4,7 @@
 INPUT=$(cat)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/gate-config.sh"
 PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 if ! find "$PROJECT_DIR" -path '*/.claude/skills/*/SKILL.md' 2>/dev/null | grep -q .; then
@@ -130,25 +131,14 @@ if [ -n "$TARGETS" ]; then
     #
     # The value must be quoted in YAML either way: a scalar opening with * is
     # an alias indicator.
-    UNQUOTE='s/^["'"'"']//; s/["'"'"']$//'
-    SPATHS=$(sed -n 's/^[[:space:]]*gate-paths:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
-    STRACKS=$(sed -n 's/^tracks:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
-    SNAME=$(sed -n 's/^name:[[:space:]]*//p' "$SKILL_FILE" | head -1 | sed "$UNQUOTE")
+    SPATHS=$(skill_field "$SKILL_FILE" '[[:space:]]*gate-paths')
+    STRACKS=$(skill_field "$SKILL_FILE" tracks)
+    SNAME=$(skill_field "$SKILL_FILE" name)
     [ -z "$SPATHS" ] && continue
     [ -z "$SNAME" ] && continue
     case "$INSTALLED" in *"\"$SNAME\""*) ;; *) continue ;; esac  # automark marks only installed and custom skills
-
-    HIT=""
-    for G in $(printf '%s' "$SPATHS" | tr ',' ' '); do
-      # Claude Code writes these gitignore-style. A case glob has no **, but *
-      # already crosses / here, so dropping the **/ prefix is equivalent.
-      G=$(printf '%s' "$G" | sed 's!\*\*/!!g')
-      case "$G" in \**|/*) ;; *) G="*$G" ;; esac
-      for T in $TARGETS; do
-        case "$T" in $G) HIT=1 ;; esac
-      done
-    done
-    [ -z "$HIT" ] && continue
+    # shellcheck disable=SC2086
+    [ -n "$(skill_hits "$SPATHS" $TARGETS)" ] || continue
 
     # A .tsx file is not proof of React — it could be Astro, Solid or Preact.
     # The packages the skill tracks are the proof, so the manifests decide.

@@ -77,3 +77,18 @@ head -n "$sf_lines" "$REVLOG" > "$REVLOG.tmp" && mv "$REVLOG.tmp" "$REVLOG"; git
 stop general-purpose 'The review JSON has a failure_scenario field per finding.'
 ok=0; [ "$(wc -l < "$REVLOG")" -eq 1 ] && ok=1
 sf "a reply that only mentions failure_scenario in prose is not logged" $ok "$(tail -1 "$REVLOG")"
+
+mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
+node .claude/hooks/ship-log.mjs start; git checkout -qb feat/steps 2>/dev/null; node .claude/hooks/ship-log.mjs start
+SFLOG="$HOME/.claude/ship-logs/open/sg_flags__feat-steps.json"
+stop gauntlet-skills "$V1"
+ok=0; node -e 'process.exit(require(process.argv[1]).steps.audit?.end ? 0 : 1)' "$SFLOG" 2>/dev/null && ok=1
+sf "a finished audit agent ends the audit step by itself" $ok "$(cat "$SFLOG" 2>&1 | head -c 300)"
+stop general-purpose "$R1"
+ok=0; node -e 'process.exit(require(process.argv[1]).steps.review?.end ? 0 : 1)' "$SFLOG" 2>/dev/null && ok=1
+sf "a finished review ends the review step by itself" $ok "$(cat "$SFLOG" 2>&1 | head -c 300)"
+git checkout -qb feat/no-ship 2>/dev/null
+stop general-purpose "$R1"
+ok=0; [ ! -e "$HOME/.claude/ship-logs/open/sg_flags__feat-no-ship.json" ] && ok=1
+sf "a review outside /ship opens no log" $ok "$(ls "$HOME/.claude/ship-logs/open" 2>&1)"
+rm -rf "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs"

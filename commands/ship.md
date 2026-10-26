@@ -33,32 +33,21 @@ Rules that always hold:
 
 ## Step 0 — Prechecks and Start Detection
 
-### Prechecks (run first; abort cleanly on any)
+### Prechecks — one call
 
 ```bash
-git rev-parse --is-inside-work-tree   # not a git repo → STOP
-git branch --show-current             # empty = detached HEAD → STOP, ask user to checkout a branch
-git rev-parse HEAD                    # fails = repo has no commits
-git remote                            # empty = no remote configured
+bash .claude/hooks/ship-prep.sh start      # in a worktree: CLAUDE_PROJECT_DIR=<worktree> bash …
 ```
 
-- **Detached HEAD** (empty branch name) → STOP: "Detached HEAD — check out a branch first."
-- **No commits yet** → if there are changes, the only possible stage is commit; otherwise STOP ("nothing to ship").
-- **No remote** → the pr/merge/release stages cannot run; STOP before them with "No `origin` remote configured."
-- **`gh` not installed or not authenticated** → required for the pr, merge, and release stages. Check `gh auth status` before any of them; if it fails, explain setup and STOP.
+It fetches, prints the facts below, and sets the `/ship` mark (the PR hook opens and merges no
+PR on a branch without it). Each command you run costs time to approve, so **read these facts
+from its output; never look them up again**:
 
-### Mark the start
+- `branch`, `base <dev or main> (main <main>)`, `ahead N, behind N of origin/<base>`
+- `uncommitted N` and the files, `gh logged in` or not, `pr <STATE #N url>` or `pr none`
 
-Right after the prechecks, run `bash .claude/hooks/ship-mark.sh begin`. The PR hook opens and merges no PR on a branch without this mark, so a gate run by hand cannot skip the audit and the review.
-
-### Identify branches
-
-```bash
-git status --porcelain
-git branch -r | grep -E 'origin/(main|master|develop|development|dev)$'
-```
-
-**main** branch: prefer `main` > `master`. **dev** branch: prefer `develop` > `development` > `dev`. The PR base is the dev branch if one exists, otherwise main.
+It stops on a detached HEAD or a folder that is not a git repo. `commits none` means only the
+commit stage can run. `remote none` or `gh NOT logged in` → STOP before pr, merge and release.
 
 ### Detect the start — first match wins, in this order
 
@@ -106,21 +95,27 @@ else does, and **it fixes what it finds** rather than handing you a list.
 Two of the four live in `ship-gate.sh` behind an exit code, and two — the skills audit and the bug review —
 live here, because they are the ones that genuinely need a model.
 
-**Scope** — everything about to ship, and nothing else: `git diff <base>...HEAD` plus
-`git diff HEAD` and untracked files. Collect the changed source files and their changed
-line ranges (`git diff -U0`, reading `@@ -a,b +c,d @@` as lines `c` to `c+d-1`). Every
-check below is scoped to those files and ranges. Never scan the whole repo.
+**Scope** — everything about to ship, and nothing else, in one call after any commits:
 
-Print the scope. Then run the checks **in this order, and no other** — run one after another,
+```bash
+bash .claude/hooks/ship-prep.sh scope      # in a worktree: CLAUDE_PROJECT_DIR=<worktree> bash …
+```
+
+It prints `base <sha>`, one line per changed source file with its new-side lines
+(`view/a.gd 8-21,75`, `(new)` for a new file), one `skill <name>: audit <files>` / `skip, …` /
+`decide from its description` line per skill, `diff <file>` and the `review` command, and it
+starts the audit and review steps in the ship log. Every check below uses exactly this scope;
+never rebuild it, never scan the whole repo.
+
+Then run the checks **in this order, and no other** — run one after another,
 they cost a ship 5 to 8 minutes:
 
-1. **In one message**, launch every skills audit agent and the bug review, and run
-   `node .claude/hooks/ship-log.mjs step audit start; node .claude/hooks/ship-log.mjs step review start`.
+1. **In one message**, launch every skills audit agent and the bug review.
    They run in the background. Do not wait for them.
 2. **While they run**, run the gate script. Fix its survivors and re-run it until it passes.
    A file over the limit or in the wrong folder still stops the ship.
-3. **When the audit and the review are back**, run `step audit end` and `step review end`, then
-   fix what they found, in one pass.
+3. **When the audit and the review are back**, fix what they found, in one pass. Their
+   steps end in the ship log by themselves.
 4. **Run the gate script once more**, because those fixes changed files.
 
 **Log every finding the moment you settle it** — survivor, audit point or review finding:
@@ -198,20 +193,15 @@ hook fires on Write/Edit/Bash, so a file that arrived in the tree some other way
 before the gate existed, by another session, or by hand — reaches the commit having never
 met a skill. The ship scope is where that is caught, or nowhere.
 
-1. List the installed skills: `ls .claude/skills/*/SKILL.md`. If there are none, say so
-   and skip to Result.
-2. Drop every path under `.claude/` from the scope first. That is this tooling, installed
-   into the repo, not the project's code, and no skill audits it.
-   For each skill, decide whether the ship scope contains a file it applies to. A skill's
-   `metadata.gate-paths` names its globs when it has them; otherwise use its
-   `description`. A skill with no file in scope is not run — say which you skipped and
-   why, in one line.
-3. Launch every remaining skill's audit **in the same message as the bug review**, so
+1. Take the skills from `ship-prep.sh scope`. No `skill` lines → say so and skip to Result.
+   `audit` → run it on the files it names. `skip` → not run; say so in one line.
+   `decide from its description` → read that skill's `description` and decide against the scope.
+2. Launch every audited skill **in the same message as the bug review**, so
    they all run at once, one `gauntlet-skills` agent per skill. Pass each exactly what its Input section asks for:
    the `SKILL.md` path, the changed files that skill applies to with their line ranges,
-   and the unified diff for those files. One skill per agent — an agent given two skills
+   and the `diff` file. One skill per agent — an agent given two skills
    half-reads both.
-4. Wait for all of them. Each returns JSON with `violations`.
+3. Wait for all of them. Each returns JSON with `violations`.
 
 Then **fix what they found**, in the code, the same way you fix what the
 script found. Do not hand the user a list and continue.
@@ -280,8 +270,12 @@ keeps finding older code, not new bugs. Re-run `ship-gate.sh` if anything change
 
 Precondition: uncommitted changes exist; the current branch is **not** protected. If on a protected branch (`main`/`master`/`dev`/`develop`/`development`), STOP — ask whether this is a hotfix (create `hotfix/<desc>`) or which branch to create.
 
-1. Review everything: `git status`, `git diff`, `git diff --staged`.
-2. **Scan for secrets** before staging. Skip files by name (`.env`, `*.pem`, `*credentials*`, `*.key`) **and** scan the diff content for in-file secrets — high-entropy strings and key signatures (`AKIA…`, `-----BEGIN … KEY-----`, `xoxb-…`, bearer tokens). If anything matches, STOP and tell the user; recommend `gitleaks` / `git-secrets` as a pre-commit guard.
+1. **Scan for secrets** before staging: `bash .claude/hooks/ship-prep.sh secrets`. It stops on a
+   protected branch, prints `git status`, and checks files by name (`.env`, `*.pem`, `*credentials*`,
+   `*.key`) and added lines for key signatures (`AKIA…`, `-----BEGIN … KEY-----`, `xoxb-…`, bearer
+   tokens). Exit 1 → STOP and show the user its lines. It cannot judge a high-entropy string: while
+   you read the diff to group it, stop on one.
+2. Read `git diff` and `git diff --staged` to group the work.
 3. Group changes into **logical units of work**. Stage each group's files **explicitly** — never `git add .` / `git add -A`.
 4. Commit each group: `type(scope): imperative description`. Types: `feat` `fix` `refactor` `docs` `style` `test` `chore` `perf` `ci` `build` `revert`. Breaking change → `type!:` + a `BREAKING CHANGE:` footer.
 5. Show a summary — branch name and the commits created.
@@ -314,16 +308,11 @@ No other sections — no Review notes, Related, Decisions, Verification, Backgro
 
 Precondition: an open PR exists for the current branch; `gh` is authenticated.
 
-1. Check it is safe to merge:
-
-```bash
-gh pr view --json number,title,isDraft,mergeable,reviewDecision,statusCheckRollup
-```
-
-2. STOP and report — do not merge — if: `isDraft` is true, `mergeable` is `CONFLICTING`, CI is failing, or required reviews are missing.
-3. Confirm the merge method (squash is the default for feature → dev — one clean commit per PR).
-4. Merge and clean up: `gh pr merge <number> --squash --delete-branch`.
-5. Sync local: `git checkout <dev>` (or main if no dev), `git pull`.
+1. `bash .claude/hooks/ship-prep.sh merge <number>` — one line: `merge ok #N`, or `merge STOP #N:` and
+   every reason (draft, conflicts, CI failing or still running, review required). On STOP, report it — do not merge.
+2. Confirm the merge method (squash is the default for feature → dev — one clean commit per PR).
+3. `bash .claude/hooks/ship-prep.sh land <number>` — checks again, squash-merges, deletes the branch,
+   and returns to the base. From a worktree it stays put; the session's exit removes the worktree.
 
 ## Stage: release
 
@@ -334,7 +323,8 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
 - **`/ship release` from a feature branch** → run steps 1-3 on that branch before its **pr** stage and commit them as `chore(release): <version>`. The feature PR carries the bump into dev.
 - **Everything already merged, on dev** → `git checkout -b chore/release-<version>`, run steps 1-3, commit, then pr → merge into dev as usual.
 
-1. **Version** — `git fetch --tags`; `git tag --sort=-v:refname | head -5`; `git log <latest-tag>..HEAD --oneline`. If there are **no commits since the last tag**, STOP — nothing to release. Suggest the next semver:
+1. **Version** — `bash .claude/hooks/ship-prep.sh release` prints the last tag, the commits since it and
+   a suggested version by these rules (it stops when nothing is new since the tag):
    - **1.x and above:** MAJOR for any `!` / `BREAKING CHANGE`, MINOR for any `feat`, else PATCH.
    - **0.x (pre-1.0):** a breaking change bumps MINOR (`0.3.x → 0.4.0`); `feat` and `fix` bump PATCH. Reserve `v1.0.0` for the first stable release.
    - No tags yet → suggest `v0.1.0`.
@@ -342,7 +332,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
 3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
 4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull && bash .claude/hooks/ship-mark.sh begin --no-log`, run `bash .claude/hooks/ship-gate.sh` (the script only — no skills audit, see Step 0.5), then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist).
-5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`gh pr merge --merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on. **Never `--delete-branch`** here: the head branch is dev.
+5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`bash .claude/hooks/ship-prep.sh land <number> merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on. **Never `--delete-branch`** here: the head branch is dev.
 6. **Tag + GitHub release**:
 
 ```bash
@@ -377,9 +367,9 @@ The log is on when the user set `GAUNTLET_SHIP_LOG=1`; when it is off, every cal
 nothing. The gate logs each of its own runs; you add what only you know, as it happens, with
 `node .claude/hooks/ship-log.mjs`:
 
-- `ship-mark.sh begin` opens the log for you; never run `start` yourself. A ship left open
+- `ship-prep.sh start` opens the log for you; never run `start` yourself. A ship left open
   by an interrupted run is saved as abandoned, so it never mixes into this one.
-- `step audit start` before the skills audit and `step audit end` after it; the same with `review`.
+- `ship-prep.sh scope` logs `step audit start` and `step review start`; each finished audit and review logs its own end.
 - `finding '<json>'` once for every finding you fixed, refuted or left, from any check:
   `{"by":"review","what":"<one line>","file":"<path>","verdict":"confirmed","fixed":true}`.
   `by` is `mutation`, `length`, `structure`, `audit:<skill>` or `review`. `verdict` is

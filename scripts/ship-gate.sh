@@ -52,6 +52,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 MODE=""
 case "${1:-}" in
   --key)      MODE=key; shift ;;
+  --scope)    MODE=scope; shift ;;
   --force)    MODE=force; shift ;;
   --baseline) MODE=baseline; shift ;;
 esac
@@ -81,6 +82,7 @@ for B in ${GAUNTLET_BASE:-} develop dev main; do [ -n "$BASE" ] || BASE=$(git me
 [ -n "$BASE" ] || BASE=$(git rev-list --max-parents=0 HEAD | head -1)
 
 CHANGED=$(changed_files)
+[ "$MODE" = scope ] && { scope_report; exit 0; }
 
 # Only the files this gate can actually read go into the key. It used to be every
 # changed file, so a version bump in package.json or a line in a changelog threw
@@ -205,10 +207,7 @@ for owner in $OWNERS; do
   FLAGS=""
   GLOBBED=","
   while IFS= read -r f; do
-    hunks=$(git diff -U0 "$BASE" -- "$f" 2>/dev/null \
-            | grep -oE '^@@ -[0-9,]+ \+[0-9]+(,[0-9]+)?' | sed 's/.*+//' \
-            | while IFS=, read -r s l; do l=${l:-1}; [ "$l" -gt 0 ] && echo "$s-$((s+l-1))"; done)
-    [ -z "$hunks" ] && hunks="1-$(wc -l < "$f")"
+    hunks=$(file_hunks "$BASE" "$f")
     rel=${f#$owner/}
     # A Next.js route folder — [id], [[...slug]] — is a glob expression to
     # Stryker, which refuses "Cannot combine a glob expression with a mutation

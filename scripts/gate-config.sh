@@ -18,6 +18,25 @@ load_gauntlet_conf() {  # load_gauntlet_conf <project conf> <fallback conf>
   if [ -f "$conf" ]; then . "$conf"; fi
 }
 
+skill_field() {  # skill_field <SKILL.md> <key pattern> — its first value, quotes stripped
+  sed -n "s/^$2:[[:space:]]*//p" "$1" | head -1 | sed "s/^[\"']//; s/[\"']\$//"
+}
+
+# Claude Code writes gate-paths gitignore-style. A case glob has no **, but * already crosses /
+# here, so dropping the **/ prefix is equivalent. set -f keeps the globs from matching real files.
+skill_hits() {  # skill_hits <gate-paths> <files...> — the files those globs match
+  local g t globs
+  set -f
+  globs=$(printf '%s' "$1" | tr ',' ' ' | sed 's!\*\*/!!g')
+  for t in "${@:2}"; do
+    for g in $globs; do
+      case "$g" in \**|/*) ;; *) g="*$g" ;; esac
+      case "$t" in $g) printf '%s\n' "$t"; break ;; esac
+    done
+  done
+  set +f
+}
+
 json_field() {  # json_field <json> <key> — a flat string value; \" is unescaped, \n is kept as two characters
   printf '%s' "$1" | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"" | head -1 \
     | sed -E 's/^[^:]*:[[:space:]]*"//; s/"$//; s/\\"/"/g'

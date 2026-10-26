@@ -26,4 +26,7 @@ BRANCH=$(git -C "${CWD:-$PROJECT_DIR}" branch --show-current 2>/dev/null | json_
 printf '{"ts":"%s","branch":"%s","model":"%s","reply":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BRANCH" "$MODEL" "$REPLY" \
   >> "$(diary_dir "$SCRIPT_DIR")/$LOG"
 
+case "$LOG" in skill-flags.jsonl) STEP=audit ;; *) STEP=review ;; esac
+SHIP_LOG_ROOT="${CWD:-$PROJECT_DIR}" node "$SCRIPT_DIR/ship-log.mjs" step "$STEP" end >/dev/null 2>&1
+
 exit 0

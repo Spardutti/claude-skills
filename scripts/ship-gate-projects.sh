@@ -89,6 +89,25 @@ changed_files() {
     git ls-files --others --exclude-standard 2>/dev/null; } | sort -u | grep -vE '(^|/)\.claude/'
 }
 
+file_hunks() {  # file_hunks <base> <file> — its new-side line ranges, one "start-end" a line
+  local h
+  h=$(git diff -U0 "$1" -- "$2" 2>/dev/null | grep -oE '^@@ -[0-9,]+ \+[0-9]+(,[0-9]+)?' | sed 's/.*+//' \
+      | while IFS=, read -r s l; do l=${l:-1}; [ "$l" -gt 0 ] && echo "$s-$((s+l-1))"; done)
+  if [ -n "$h" ]; then printf '%s\n' "$h"; else echo "1-$(wc -l < "$2" | tr -d ' ')"; fi
+}
+
+# The audit's scope: every changed text file, minus generated, vendored and lock files. Tab-separated: paths may hold spaces.
+scope_report() {
+  local f r new
+  echo "base $BASE"
+  printf '%s\n' "$CHANGED" | grep -vE '(^|/)(package-lock\.json|pnpm-lock\.yaml|[^/]*\.lock)$' | while IFS= read -r f; do
+    [ -f "$f" ] && ! is_ignored "$f" && grep -qI . "$f" || continue
+    r=$(file_hunks "$BASE" "$f" | sed -E 's/^([0-9]+)-\1$/\1/' | paste -sd, -)
+    new=""; git cat-file -e "$BASE:$f" 2>/dev/null || new=" (new)"
+    printf '%s\t%s%s\n' "$f" "$r" "$new"
+  done
+}
+
 # Ignored extensions are left out; see the comment where ship-gate.sh first calls this.
 receipt_key() {
   { printf '%s\n' "$PROJECT_DIR"
