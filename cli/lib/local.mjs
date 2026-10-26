@@ -39,8 +39,8 @@ export function makeLocalSource(root) {
       for (const f of await listDir(join(root, "commands"))) {
         if (!f.isFile() || !f.name.endsWith(".md")) continue;
         const content = await readFile(join(root, "commands", f.name), "utf-8");
-        const { name, description, category, requiresAgents } = parseFrontmatter(content, f.name.replace(/\.md$/, ""));
-        out.push({ fileName: f.name, name, description, category, requiresAgents, content });
+        const { name, description, category, requiresAgents, requiresCommands } = parseFrontmatter(content, f.name.replace(/\.md$/, ""));
+        out.push({ fileName: f.name, name, description, category, requiresAgents, requiresCommands, content });
       }
       return out;
     },

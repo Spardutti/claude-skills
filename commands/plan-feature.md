@@ -3,6 +3,7 @@ name: plan-feature
 description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — you scan the repo yourself for reusable code, established patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go you fill them in"
 category: Workflow
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash
+requires-commands: [registry]
 argument-hint: "<short feature description>"
 ---
 

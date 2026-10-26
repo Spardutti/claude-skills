@@ -154,8 +154,8 @@ export function fetchCommands() {
     entryFilter: (e) => e.type === "file" && e.name.endsWith(".md"),
     buildRawUrl: (file) => `${RAW_COMMANDS_BASE}/${file.name}`,
     mapEntry: (file, content) => {
-      const { name, description, category, requiresAgents } = parseFrontmatter(content, file.name.replace(/\.md$/, ""));
-      return { fileName: file.name, name, description, category, requiresAgents, content };
+      const { name, description, category, requiresAgents, requiresCommands } = parseFrontmatter(content, file.name.replace(/\.md$/, ""));
+      return { fileName: file.name, name, description, category, requiresAgents, requiresCommands, content };
     },
   });
 }

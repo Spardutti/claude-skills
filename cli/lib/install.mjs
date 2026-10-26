@@ -43,6 +43,18 @@ export function installAgents(agents, targetDir = process.cwd()) {
   return installFlat(agents, "agents", targetDir);
 }
 
+// A command that names another in `requires-commands` breaks without it, so it comes along.
+export function withRequiredCommands(selected, catalogCommands) {
+  const out = [...selected];
+  for (let i = 0; i < out.length; i++) {
+    for (const name of out[i].requiresCommands ?? []) {
+      const dep = catalogCommands.find((c) => c.name === name);
+      if (dep && !out.some((c) => c.fileName === dep.fileName)) out.push(dep);
+    }
+  }
+  return out;
+}
+
 export async function installRequiredAgents(selectedCommands, availableAgents, targetDir = process.cwd()) {
   const requiredNames = new Set(
     selectedCommands.flatMap((c) => c.requiresAgents ?? [])

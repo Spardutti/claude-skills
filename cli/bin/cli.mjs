@@ -8,13 +8,13 @@ import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { fetchSkills, fetchCommands, fetchAgents } from "../lib/github.mjs";
 import { promptSkillSelection, promptCommandSelection, promptRemoval } from "../lib/prompt.mjs";
-import { installSkills, installCommands, installRequiredAgents } from "../lib/install.mjs";
+import { installSkills, installCommands, installRequiredAgents, withRequiredCommands } from "../lib/install.mjs";
 import { makeLocalSource } from "../lib/local.mjs";
 import { runPostInstall } from "../lib/post-install.mjs";
 import { runSync, runSyncAll } from "../lib/sync.mjs";
 import {
   readManifest, writeManifest, computeOrphans, computeRemovals, scanInstalled, removeArtifacts,
-  MANIFEST_FILE,
+  catalogIds, MANIFEST_FILE,
 } from "../lib/manifest.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -104,7 +104,7 @@ async function main() {
   let installedAgents = [];
   if (commands.length > 0) {
     console.log();
-    selectedCommands = await promptCommandSelection(commands, manifest?.commands ?? []);
+    selectedCommands = withRequiredCommands(await promptCommandSelection(commands, manifest?.commands ?? []), commands);
     if (selectedCommands.length > 0) {
       console.log();
       await installCommands(selectedCommands);
@@ -141,6 +141,7 @@ async function main() {
     skills: selectedSkills.map((s) => s.dirName),
     commands: selectedCommands.map((c) => c.fileName),
     agents: installedAgents.map((a) => a.fileName),
+    known: catalogIds(catalog),
   });
 
   const parts = [];

@@ -16,7 +16,7 @@
 export function parseFrontmatter(content, fallbackName) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (!match) {
-    return { name: fallbackName, description: "", category: "General", requiresAgents: [] };
+    return { name: fallbackName, description: "", category: "General", requiresAgents: [], requiresCommands: [] };
   }
   const block = match[1];
 
@@ -33,6 +33,7 @@ export function parseFrontmatter(content, fallbackName) {
     description: pick("description"),
     category: pick("category") || "General",
     requiresAgents: parseAgentList(pick("requires-agents")),
+    requiresCommands: parseAgentList(pick("requires-commands")),
   };
 }
 

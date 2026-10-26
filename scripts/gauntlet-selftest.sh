@@ -109,6 +109,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-install-edit-check.sh"  # the edit check, installed and upgraded
 . "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end
+. "$HERE/selftest-cli-requires.sh"       # commands that need another, and new catalog items
 . "$HERE/selftest-stryker.sh"            # scaffolding Stryker into a project
 . "$HERE/selftest-standalone.sh"         # no test file runs on its own, in a real repo
 

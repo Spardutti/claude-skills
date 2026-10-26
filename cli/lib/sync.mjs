@@ -2,12 +2,26 @@ import chalk from "chalk";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join, basename } from "node:path";
-import { installSkills, installCommands, installRequiredAgents } from "./install.mjs";
+import { installSkills, installCommands, installRequiredAgents, withRequiredCommands } from "./install.mjs";
 import { setupHook } from "./setup-hook.mjs";
 import { setupClaudeMd } from "./setup-claude-md.mjs";
-import { readManifest, writeManifest, computeOrphans, removeArtifacts, MANIFEST_FILE } from "./manifest.mjs";
+import { readManifest, writeManifest, computeOrphans, removeArtifacts, catalogIds, MANIFEST_FILE } from "./manifest.mjs";
 
 const SEARCH_DEPTH = 5;
+
+// Sync installs only what was picked, so a new skill or command would otherwise go unseen.
+function announceNew(manifest, catalog, have) {
+  if (!manifest.known) return;
+  const known = new Set(manifest.known);
+  const fresh = [
+    ...catalog.skills.map((s) => ({ id: s.dirName, label: s.name, about: s.description })),
+    ...catalog.commands.map((c) => ({ id: c.fileName, label: `/${c.name}`, about: c.description })),
+  ].filter((x) => !known.has(x.id) && !have.has(x.id));
+  if (fresh.length === 0) return;
+  console.log();
+  for (const x of fresh) console.log(`  ${chalk.cyan("new")} ${chalk.bold(x.label)} — ${x.about.split(" — ")[0].slice(0, 100)}`);
+  console.log(chalk.dim("  Run the CLI without --sync to pick any of them."));
+}
 
 // Re-install everything the manifest records (refreshed to the latest catalog),
 // refresh hooks the project already has, and prune anything removed upstream.
@@ -25,17 +39,21 @@ export async function runSync(dir, catalog, version) {
   }
 
   const skills = catalog.skills.filter((s) => manifest.skills.includes(s.dirName));
-  const commands = catalog.commands.filter((c) => manifest.commands.includes(c.fileName));
+  const picked = catalog.commands.filter((c) => manifest.commands.includes(c.fileName));
+  const commands = withRequiredCommands(picked, catalog.commands);
+  for (const c of commands.slice(picked.length)) console.log(`  ${chalk.green("+")} Added ${chalk.bold(`/${c.name}`)} — a command you have needs it.`);
   if (skills.length > 0) { console.log(); await installSkills(skills, dir); }
   if (commands.length > 0) { console.log(); await installCommands(commands, dir); }
   const { installed } = await installRequiredAgents(commands, catalog.agents, dir);
   if (existsSync(join(dir, ".claude", "hooks", "skill-gate.sh"))) { console.log(); await setupHook(dir); await setupClaudeMd(dir); }
+  announceNew(manifest, catalog, new Set([...skills.map((s) => s.dirName), ...commands.map((c) => c.fileName)]));
 
   await writeManifest(dir, {
     catalogVersion: version,
     skills: skills.map((s) => s.dirName),
     commands: commands.map((c) => c.fileName),
     agents: installed.map((a) => a.fileName),
+    known: catalogIds(catalog),
   });
   console.log(`\n  ${chalk.green("✔")} ${chalk.bold(`Synced to catalog v${version}.`)}\n`);
   return true;

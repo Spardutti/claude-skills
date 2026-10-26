@@ -17,6 +17,7 @@ export async function readManifest(targetDir = process.cwd()) {
       commands: data.commands ?? [],
       agents: data.agents ?? [],
       custom: data.custom ?? [],
+      known: data.known ?? null,
     };
   } catch {
     return null; // no manifest — a pre-manifest project or a fresh install
@@ -25,9 +26,10 @@ export async function readManifest(targetDir = process.cwd()) {
 
 // Record exactly what the CLI has installed. This is the CLI's source of truth —
 // it never deletes anything not listed here. `custom` is the user's own gated skills, carried over untouched.
-export async function writeManifest(targetDir, { catalogVersion, skills, commands, agents }) {
+export async function writeManifest(targetDir, { catalogVersion, skills, commands, agents, known }) {
   await mkdir(join(targetDir, ".claude"), { recursive: true });
-  const custom = (await readManifest(targetDir))?.custom ?? [];
+  const previous = await readManifest(targetDir);
+  const custom = previous?.custom ?? [];
   const data = {
     catalogVersion,
     installedAt: new Date().toISOString(),
@@ -35,8 +37,14 @@ export async function writeManifest(targetDir, { catalogVersion, skills, command
     commands: [...new Set(commands)].sort(),
     agents: [...new Set(agents)].sort(),
     custom,
+    known: [...new Set(known ?? previous?.known ?? [])].sort(),
   };
   await writeFile(manifestPath(targetDir), JSON.stringify(data, null, 2) + "\n");
+}
+
+// Every skill and command in the catalog, so the next sync can name what is new since.
+export function catalogIds(catalog) {
+  return [...catalog.skills.map((s) => s.dirName), ...catalog.commands.map((c) => c.fileName)];
 }
 
 // Manifest entries that no longer exist in the current catalog (renamed or removed upstream).

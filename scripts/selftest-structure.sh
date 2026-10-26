@@ -86,14 +86,14 @@ fm "a quoted description loses its quotes" \
 name: a
 description: "d"
 ---' \
-  '{"name":"a","description":"d","category":"General","requiresAgents":[]}'
+  '{"name":"a","description":"d","category":"General","requiresAgents":[],"requiresCommands":[]}'
 
 fm "a quoted category loses its quotes too" \
   '---
 name: c
 category: "Q"
 ---' \
-  '{"name":"c","description":"","category":"Q","requiresAgents":[]}'
+  '{"name":"c","description":"","category":"Q","requiresAgents":[],"requiresCommands":[]}'
 
 # Both spellings mean one list. github.mjs used to return [] for the bare form,
 # so a command written that way installed none of the agents it declares.
@@ -102,18 +102,18 @@ fm "a bracketed agent list parses" \
 name: a
 requires-agents: [p, q]
 ---' \
-  '{"name":"a","description":"","category":"General","requiresAgents":["p","q"]}'
+  '{"name":"a","description":"","category":"General","requiresAgents":["p","q"],"requiresCommands":[]}'
 
 fm "and a bare one parses the same" \
   '---
 name: b
 requires-agents: p, q
 ---' \
-  '{"name":"b","description":"","category":"General","requiresAgents":["p","q"]}'
+  '{"name":"b","description":"","category":"General","requiresAgents":["p","q"],"requiresCommands":[]}'
 
 fm "no frontmatter falls back to the filename" \
   'no frontmatter at all' \
-  '{"name":"fb","description":"","category":"General","requiresAgents":[]}'
+  '{"name":"fb","description":"","category":"General","requiresAgents":[],"requiresCommands":[]}'
 
 # The point of one parser is that both callers get the same answer. Assert it
 # rather than trusting the import.
