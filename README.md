@@ -149,6 +149,7 @@ The CLI installs three kinds of artifact into your project's `.claude/` director
 - **Skills** → `.claude/skills/` — playbooks Claude loads while coding.
 - **Commands** → `.claude/commands/` — slash commands you invoke directly.
 - **Subagents** → `.claude/agents/` — declared by commands via `requires-agents`, installed for you.
+  A command that needs another names it in `requires-commands`, and that one is installed too.
 
 It then offers to install the hooks. Two guard the **front**: nothing is written
 until your skills have been evaluated *and* applied to the file being written.
@@ -158,6 +159,27 @@ receipt proving the delivery gate passed on exactly that code.
 
 Full details — every hook, every marker, every config key, and what to do when one
 blocks something it shouldn't — are in **[HOOKS.md](./HOOKS.md)**.
+
+### The registry: systems a plan must reuse
+
+Grep only finds the words a request uses. Ask for "a skill that fires at the nearby
+enemy" and nothing matches the aiming code, so Claude writes new aiming code. A
+registry entry is a small file beside the system that names it once:
+
+```yaml
+# sim/aim.registry.yaml
+name: aim-rules
+summary: how a skill picks which enemy to hit
+location: sim/aim.gd
+extend_by: add a value to `Aim.Rule` and its branch in `Aim.pick`
+never: sort or filter enemies inside a skill
+```
+
+`/plan-feature` reads every entry and must mark each one `reuse` or `skip`. A plan
+fails if it says `reuse` while its stubs never use the names in `extend_by`, and an
+entry whose names left the code is flagged as stale. Nothing else reads the registry.
+`/registry aim` drafts an entry for your yes. Replayed on a real game feature, the
+targeting rule went inside the skill without an entry, and into `Aim` with one, 5 runs of 5.
 
 ### Tracking & Updates
 
@@ -172,7 +194,7 @@ Every install writes a manifest at `.claude/.claude-skills.json` recording what 
 npx @spardutti/claude-skills --sync
 ```
 
-`--sync` refreshes every tracked item, and any hooks the project already has, to the latest catalog and prunes stale ones in one shot — no menu. For a project that predates the manifest, the first normal run offers a one-time cleanup of `.claude/` content no longer in the catalog.
+`--sync` refreshes every tracked item, and any hooks the project already has, to the latest catalog and prunes stale ones in one shot — no menu. It adds any command a tracked command requires, and names each skill or command new to the catalog once, so you can pick it. For a project that predates the manifest, the first normal run offers a one-time cleanup of `.claude/` content no longer in the catalog.
 
 `--sync-all[=dir]` does the same for every project under `dir` (default: your home folder) that has a manifest, fetching the catalog once:
 
