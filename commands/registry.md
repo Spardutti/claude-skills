@@ -49,7 +49,8 @@ never: write targeting logic inside a skill
 - `triggers` — words code of this kind uses. They catch a plan that skips the
   entry while its stubs talk about targets.
 - `extend_by` — the steps, naming the real symbols (`AimStrategy`, or `` `Weapon` ``
-  in backticks for a one-word name). The checks look these names up in the code.
+  in backticks for a one-word name). A method goes with its owner, `` `Aim.first` ``, never
+  a bare `` `first` ``: a plain word matches code that never touches the system.
 - `location` — the folder, or the one file when the system shares its folder (`sim/aim.gd`).
 - `example` — a file in `location` to copy from. Optional.
 - `never` — the mistake this entry exists to stop. Optional.

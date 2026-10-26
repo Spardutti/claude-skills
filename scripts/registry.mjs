@@ -71,7 +71,11 @@ function stale() {
     if (!syms.length) say("extend_by names no symbol — write names like `AimStrategy`");
     const code = files.filter((f) => insideLocation(e, f) && !f.endsWith(REGISTRY_SUFFIX))
       .map((f) => readFileSync(join(root, f), "utf8")).join("\n");
-    for (const s of syms) if (!uses(code, s)) say(`${s} from extend_by is not found in ${e.location}`);
+    for (const s of syms) {
+      // A plain word like `first` matches `var first = enemies[0]`; `Aim.first` only matches real use.
+      if (/^[a-z][a-z0-9]*$/.test(s)) say(`\`${s}\` is too common a word to prove use — name its owner, like \`Owner.${s}\``);
+      else if (!s.split(".").every((part) => uses(code, part))) say(`${s} from extend_by is not found in ${e.location}`);
+    }
   }
   if (problems.length) fail(problems);
 }

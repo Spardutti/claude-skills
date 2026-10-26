@@ -73,7 +73,17 @@ printf 'name: shapes\nsummary: what a skill looks like\nlocation: src/sim/\nexte
 printf 'class_name Shape\n' > src/sim/shape.gd
 rg "a location can be one file, beside another system in its folder" 0 "" -- --stale
 rg "two entries in one folder are both read" 0 "== src/sim/shapes.registry.yaml ==" --
-rm -rf src/sim
+printf 'class_name Aim\nstatic func first(): pass\n' > src/sim/aim.gd
+printf 'name: aim-rules\nsummary: s\ntriggers: [nearest]\nlocation: src/sim/aim.gd\nextend_by: call `Aim.first`\n' > src/sim/aim.registry.yaml
+rg "a method named with its owner is found where it is defined" 0 "" -- --stale
+printf '## Registry\n- aiming-methods: skip\n- inventory: skip\n- shapes: skip\n- aim-rules: reuse\n' > PLAN.md
+printf 'func cast(enemies):\n\tvar first = enemies[0]\n' > src/sim/fire.gd
+rg "a plain word of the same name is not use" 1 "aim-rules: marked reuse, but no stub uses Aim.first" -- --plan PLAN.md src/sim/fire.gd
+printf 'func cast(enemies):\n\treturn Aim.first(enemies)\n' > src/sim/fire.gd
+rg "a call through the owner is use; only the skipped aiming entry still asks" 0 "registry ASK aiming-methods" -- --plan PLAN.md src/sim/fire.gd
+printf 'name: aim-rules\nsummary: s\nlocation: src/sim/aim.gd\nextend_by: call `first`\n' > src/sim/aim.registry.yaml
+rg "a bare common word is stale" 1 "`first` is too common a word to prove use" -- --stale
+rm -rf src/sim PLAN.md
 sed -i 's/AimStrategy/AimPolicy/' src/combat/aiming/AimStrategy.ts
 rg "a renamed extend_by symbol is stale" 1 "aiming/aiming.registry.yaml: AimStrategy from extend_by is not found in src/combat/aiming/" -- --stale
 rg "the plan's listing names a stale entry after the entries" 1 "registry stale src/combat/aiming/aiming.registry.yaml" -- 
