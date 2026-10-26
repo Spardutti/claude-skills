@@ -57,7 +57,8 @@ export function loadRegistry(root, files) {
 // Code-shaped words (AimStrategy, pick_target, aimRegistry) or `backticked` — never "implement".
 export function symbolsOf(extendBy = "") {
   const ticked = [...extendBy.matchAll(/`([\w.]+)`/g)].map((m) => m[1]);
-  const shaped = extendBy.match(/\b(?:[A-Z][a-z0-9]+[A-Z]\w*|[a-z]\w*[A-Z]\w*|\w+_\w+)\b/g) ?? [];
+  const bare = extendBy.replace(/`[^`]*`/g, " ");
+  const shaped = bare.match(/\b(?:[A-Z][a-z0-9]+[A-Z]\w*|[a-z]\w*[A-Z]\w*|\w+_\w+)\b/g) ?? [];
   return [...new Set([...ticked, ...shaped])];
 }
 

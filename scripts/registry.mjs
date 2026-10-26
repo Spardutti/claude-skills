@@ -9,6 +9,12 @@ const root = projectRoot();
 const files = projectFiles(root);
 const entries = loadRegistry(root, files);
 const uses = (text, word) => new RegExp(`\\b${escape(word)}\\b`).test(text);
+// Code calls a method on a value (`e.chill(2)`), so `EnemyState.chill` is the type named plus `.chill` used.
+const usesIn = (text, name) => {
+  const parts = name.split(".");
+  if (parts.length === 1 || uses(text, name)) return uses(text, name);
+  return uses(text, parts[0]) && new RegExp(`\\.${escape(parts.at(-1))}\\b`).test(text);
+};
 const fromCwd = (f) => relative(root, resolve(f));
 
 function list() {
@@ -38,7 +44,7 @@ function checkPlan(planPath, stubs) {
   for (const e of entries) {
     const mark = marks.get(e.name);
     if (!mark) fails.push(`registry FAIL ${e.name}: missing from ## Registry — mark it reuse or skip`);
-    else if (mark === "reuse" && !symbolsOf(e.extend_by).some((s) => uses(added, s))) {
+    else if (mark === "reuse" && !symbolsOf(e.extend_by).some((s) => usesIn(added, s))) {
       fails.push(`registry FAIL ${e.name}: marked reuse, but no stub uses ${symbolsOf(e.extend_by).join(", ") || "a name from extend_by"}`);
     } else if (mark === "skip") {
       const hits = triggerHits(e, added);

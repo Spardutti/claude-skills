@@ -83,6 +83,13 @@ printf 'func cast(enemies):\n\treturn Aim.first(enemies)\n' > src/sim/fire.gd
 rg "a call through the owner is use; only the skipped aiming entry still asks" 0 "registry ASK aiming-methods" -- --plan PLAN.md src/sim/fire.gd
 printf 'name: aim-rules\nsummary: s\nlocation: src/sim/aim.gd\nextend_by: call `first`\n' > src/sim/aim.registry.yaml
 rg "a bare common word is stale" 1 "`first` is too common a word to prove use" -- --stale
+printf 'name: aim-rules\nsummary: s\nlocation: src/sim/aim.gd\nextend_by: apply through `EnemyState.chill`\n' > src/sim/aim.registry.yaml
+printf 'class_name EnemyState\nfunc chill(s): pass\n' >> src/sim/aim.gd
+rg "a type with its method passes the stale check" 0 "" -- --stale
+printf 'func cast(e: EnemyState):\n\treturn e.hp\n' > src/sim/fire.gd
+rg "naming the type without calling the method is not use" 1 "aim-rules: marked reuse, but no stub uses EnemyState.chill" -- --plan PLAN.md src/sim/fire.gd
+printf 'func cast(e: EnemyState):\n\te.chill(2)\n' > src/sim/fire.gd
+rg "the type named and its method called on a value is use" 0 "registry ok" -- --plan PLAN.md src/sim/fire.gd
 rm -rf src/sim PLAN.md
 sed -i 's/AimStrategy/AimPolicy/' src/combat/aiming/AimStrategy.ts
 rg "a renamed extend_by symbol is stale" 1 "aiming/aiming.registry.yaml: AimStrategy from extend_by is not found in src/combat/aiming/" -- --stale
