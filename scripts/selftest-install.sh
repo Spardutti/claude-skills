@@ -112,6 +112,7 @@ vc() {  # vc <label> <expected substring, or empty for no output> [setup...]
 }
 
 newrepo vc1
+printf '#!/bin/sh\nexit 1\n' > bin/curl; chmod +x bin/curl  # the background refresh once overwrote the cache with real npm mid-test
 export HOME="$TMP/vchome"; mkdir -p "$HOME/.claude"
 vc "no manifest, so nothing is said" ""
 
