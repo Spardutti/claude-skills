@@ -38,11 +38,27 @@ sf "a verdict with quotes, a fence and newlines is logged intact, with its model
 stop discover-critic '{"skill":"react","violations":[],"checked":1}'
 ok=0; [ "$(wc -l < "$FLAGLOG")" -eq 1 ] && ok=1
 sf "other agents are not logged" $ok "$(cat "$FLAGLOG")"
-node -e 'const fs=require("fs");fs.writeFileSync(process.argv[1],[{message:{role:"assistant",model:"claude-opus-5-5",content:[{type:"text",text:"thinking aloud"}]}},{message:{role:"assistant",model:"claude-opus-5-5",content:[{type:"tool_use",name:"SubagentHandback",input:{message:process.argv[2]}}]}},{type:"user",message:{role:"user",content:[{type:"tool_result",content:"Report delivered to your caller."}]}}].map(JSON.stringify).join("\n")+"\n")' "$TMP/handback.jsonl" "$V1"
-node -e 'process.stdout.write(JSON.stringify({session_id:"s",hook_event_name:"SubagentStop",agent_type:"gauntlet-skills",agent_transcript_path:process.argv[1],last_assistant_message:"",stop_hook_active:false}))' "$TMP/handback.jsonl" | bash .claude/hooks/skill-flags-record.sh
-GOT=$(tail -1 "$FLAGLOG" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const l=JSON.parse(d);process.stdout.write(l.model+'|'+l.reply)})" 2>&1)
-ok=0; [ "$GOT" = "claude-opus-5-5|$V1" ] && [ "$(wc -l < "$FLAGLOG")" -eq 2 ] && ok=1
-sf "a verdict handed back through SubagentHandback is read from the transcript" $ok "$GOT"
+hb_write() {  # hb_write <with handback 0|1> — the transcript before and after the handback lands
+  node -e 'const fs=require("fs");const lines=[{message:{role:"assistant",model:"claude-opus-5-5",content:[{type:"text",text:"thinking aloud"}]}}];
+    if(process.argv[2]==="1")lines.push({message:{role:"assistant",model:"claude-opus-5-5",content:[{type:"tool_use",name:"SubagentHandback",input:{message:process.argv[3]}}]}});
+    fs.writeFileSync(process.argv[1],lines.map(JSON.stringify).join("\n")+"\n")' "$TMP/handback.jsonl" "$1" "$V1"
+}
+hb_stop() {  # hb_stop <agent_type> — a stop whose last_assistant_message is empty
+  node -e 'process.stdout.write(JSON.stringify({session_id:"s",hook_event_name:"SubagentStop",agent_type:process.argv[2],agent_transcript_path:process.argv[1],last_assistant_message:"",stop_hook_active:false}))' "$TMP/handback.jsonl" "$1" | bash .claude/hooks/skill-flags-record.sh
+}
+hb_got() {  # hb_got — waits for the background record, then prints model|reply
+  for _ in $(seq 1 40); do [ "$(wc -l < "$FLAGLOG")" -ge 2 ] && break; sleep 0.25; done
+  tail -1 "$FLAGLOG" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const l=JSON.parse(d);process.stdout.write(l.model+'|'+l.reply)})" 2>&1
+}
+hb_write 0; hb_stop gauntlet-skills; sleep 0.5; hb_write 1
+GOT=$(hb_got); ok=0; [ "$GOT" = "claude-opus-5-5|$V1" ] && [ "$(wc -l < "$FLAGLOG")" -eq 2 ] && ok=1
+sf "a handback that lands after the hook fires is still read from the transcript" $ok "$GOT"
+sed -i '$d' "$FLAGLOG"
+printf '{"agentType":"gauntlet-skills","description":"Audit react"}\n' > "$TMP/handback.meta.json"
+hb_write 1; hb_stop audit-react
+GOT=$(hb_got); ok=0; [ "$GOT" = "claude-opus-5-5|$V1" ] && ok=1
+sf "a named audit agent is known by the type in its meta file" $ok "$GOT"
+rm -f "$TMP/handback.meta.json"
 sed -i '$d' "$FLAGLOG"
 
 stop gauntlet-skills '{"skill":"react","violations":[{"rule":"Never X"}],"checked":2}'
