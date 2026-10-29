@@ -112,7 +112,9 @@ node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y
 cat > bin/gh <<EOF
 #!/bin/sh
 printf '%s\n' "\$*" >> "$TMP/gh-args"
-case "\$*" in *"--head feat/z "*) echo '[{"number":151,"createdAt":"2999-01-02T03:04:05Z","state":"MERGED"}]' ;;
+case "\$*" in *"--head feat/merge-only "*) echo '[{"number":149,"createdAt":"2000-01-01T03:04:05Z","closedAt":"2999-01-01T03:04:05Z","state":"MERGED"}]' ;;
+  *"--head feat/reused "*) echo '[{"number":148,"createdAt":"2000-01-01T03:04:05Z","closedAt":"2000-01-02T03:04:05Z","state":"MERGED"}]' ;;
+  *"--head feat/z "*) echo '[{"number":151,"createdAt":"2999-01-02T03:04:05Z","state":"MERGED"}]' ;;
   *"--head feat/w "*) echo '[{"number":152,"createdAt":"2000-01-02T03:04:05Z","state":"OPEN"}]' ;;
   *"--head feat/v "*) echo '[{"number":150,"createdAt":"2000-01-02T03:04:05Z","state":"MERGED"}]' ;; *) echo '[]' ;; esac
 EOF
@@ -120,7 +122,16 @@ chmod +x bin/gh; rm -f "$TMP/gh-args"
 bash "$HERE/ship-mark.sh" begin
 sl_is "a log left open after its PR opened is closed by the next /ship" "$SLOGS/sg_log_2999-01-02_pr151.json" 'r.status === "pr-opened" && r.pr === 151 && r.finished === "2999-01-02T03:04:05Z"'
 sl_ok "and leaves open/" test ! -e "$SLOGS/open/sg_log__feat-z.json"
-sl_ok "gh is asked once, for the logged branch only" test "$(cat "$TMP/gh-args")" = "pr list --head feat/z --state all --json number,createdAt,state --limit 1"
+sl_ok "gh is asked once per open log" test "$(cat "$TMP/gh-args")" = "$(printf 'pr list --head %s --state all --json number,createdAt,closedAt,state --limit 1\n' feat/merge-only feat/z)"
+sl_ok "a log that only merged is removed once its PR is merged" test ! -e "$SLOGS/open/sg_log__feat-merge-only.json" -a -z "$(ls "$SLOGS"/sg_log_*_pr149.json 2>/dev/null)"
+git checkout -qb feat/reused; bash "$HERE/ship-mark.sh" begin; git checkout -q feat/y; bash "$HERE/ship-mark.sh" begin
+sl_ok "a live log on a branch whose old PR closed before it began is kept" test -f "$SLOGS/open/sg_log__feat-reused.json"
+mkdir -p "$SLOGS/open"; echo '{"v":1,"app":"sg_log","branch":"develop","started":"2000-01-01T00:00:00Z","gate":[],"findings":[],"steps":{}}' > "$SLOGS/open/sg_log__develop.json"
+for b in develop chore/release-v2; do
+  git checkout -qb "$b" 2>/dev/null || git checkout -q "$b"; bash "$HERE/ship-mark.sh" begin
+  sl_ok "a /ship on $b opens no log, and drops one an older version opened" test -z "$(ls "$SLOGS"/open/sg_log__*"${b##*/}"* 2>/dev/null)"
+done
+git checkout -q feat/y
 git checkout -qb feat/w; node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y
 bash "$HERE/ship-mark.sh" begin
 git checkout -qb feat/v; node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y

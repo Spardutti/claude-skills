@@ -77,7 +77,7 @@ out=$(CLAUDE_PROJECT_DIR="$PWD/src" bash "$SP" scope 2>&1); SUBDIFF=$(printf '%s
 sl_ok "from a project in a subfolder the diff still holds the files" test -n "$(grep -l 'b2' "$SUBDIFF" 2>/dev/null)"
 sl_is "the audit and review steps are started" "$HOME/.claude/ship-logs/open/prep-origin__feat-p.json" 'r.steps.audit.start && r.steps.review.start'
 git checkout -qb chore/release-v9; bash "$SP" start >/dev/null 2>&1; bash "$SP" scope >/dev/null 2>&1
-sl_is "a release branch starts no audit or review step it will skip" "$HOME/.claude/ship-logs/open/prep-origin__chore-release-v9.json" '!r.steps.audit && !r.steps.review'
+sl_ok "a release branch opens no log, so it starts no audit or review step" test ! -e "$HOME/.claude/ship-logs/open/prep-origin__chore-release-v9.json"
 git checkout -q feat/p
 git checkout -q --detach
 out=$(bash "$SP" start 2>&1); rc=$?
