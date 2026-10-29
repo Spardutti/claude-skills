@@ -29,7 +29,7 @@ Rules that always hold:
 - **Never re-do a satisfied stage** — already committed? start at pr.
 - **Never skip a required stage** — `/ship release` with uncommitted work runs commit → pr → merge → release first.
 - A merge into the **main** branch always asks for confirmation, even when a target is set.
-- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it. A release PR gets only the script, never the skills audit or the bug review: every commit in it already passed the full gate in its own PR.
+- The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it. A release gets no skills audit and no bug review: a `chore/release-*` PR gets only the script, and the dev → main PR gets no gate at all.
 
 ## Step 0 — Prechecks and Start Detection
 
@@ -82,11 +82,11 @@ the gate never runs; the moment a run continues to pr or merge, it runs first.
 Ask for it earlier with a bare `bash .claude/hooks/ship-gate.sh` when you want the
 findings before the PR.
 
-**Not in full before a release.** A release PR (dev → main) ships only commits that
-already passed this gate in their own PRs, and auditing them again started a skills agent
-over every file in the release. Before the release PR, run only the script. It compares
-against the dev branch, so it finds nothing to check and finishes in seconds, and it
-writes the receipt the PR needs. Skip the skills audit and the bug review.
+**Not in full before a release.** A release ships only commits that already passed this
+gate in their own PRs; auditing them again started a skills agent over every file in it.
+- **`chore/release-*` → dev** (the bump and changelog): run only the script, for the receipt
+  the PR needs. Skip the skills audit and the bug review.
+- **dev → main**: no gate at all, not even the script (release step 4).
 
 This is the one enforcement moment. It does not re-run the test suite: the `gauntlet.sh`
 Stop hook already ran types and tests on every turn. It checks the four things nothing
@@ -399,7 +399,7 @@ nothing. The gate logs each of its own runs; you add what only you know, as it h
 - NEVER merge a PR that is a draft, has conflicts, has failing CI, or is missing required reviews — stop and report.
 - NEVER squash the release PR into main — use a merge commit so the feature history survives for future changelog/version detection.
 - NEVER cut a `release/*` branch or back-merge main into dev — the version bump reaches main only through dev, so main never holds a commit dev lacks.
-- NEVER run the skills audit or the bug review before a release PR — its commits already passed them; run only `ship-gate.sh`.
+- NEVER run the skills audit or the bug review on a `chore/release-*` branch or a dev → main PR — their commits already passed them.
 - NEVER interpolate a branch name, tag, version, or title containing shell metacharacters (`` ` ``, `$(`, `;`, `&&`, `|`) into a command — pass interpolated values as single-quoted literals, pass PR/release bodies via `--body-file`/stdin, and abort if such a value contains metacharacters.
 - ALWAYS run the skills audit — one `gauntlet-skills` agent per applicable skill, all launched in one message. NEVER audit a skill yourself instead: the agent reads it fresh, with no memory of having decided it did not apply.
 - NEVER skip a skill because the diff "looks fine" — skip it only when no file in the ship scope matches it, and say which you skipped.

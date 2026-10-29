@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { git, parseReport, prSize } from "./ship-log-parse.mjs";
 import { printReport, tally } from "./ship-log-report.mjs";
 
 const HERE = dirname(resolve(process.argv[1]));
 const VERDICTS = ["confirmed", "refuted", "unconfirmed", "skipped"];
+// A release ships only work its feature PRs already logged.
+const RELEASE = /^(main|master|dev|develop|development|chore\/release-.*)$/;
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
 // gate-config.sh owns the config files and their order, so the gate and this agree on "on".
@@ -69,7 +71,7 @@ function finalize(dir, path, record, tag, status, reason, at) {
 }
 
 function prOf(branch) {
-  const r = spawnSync("gh", ["pr", "list", "--head", branch, "--state", "all", "--json", "number,createdAt,state", "--limit", "1"], { encoding: "utf8" });
+  const r = spawnSync("gh", ["pr", "list", "--head", branch, "--state", "all", "--json", "number,createdAt,closedAt,state", "--limit", "1"], { encoding: "utf8" });
   try { return r.status === 0 ? JSON.parse(r.stdout)[0] : undefined; } catch { return undefined; }
 }
 
@@ -80,8 +82,10 @@ function closeOpened(dir, app) {
   const open = join(dir, "open");
   for (const f of existsSync(open) ? readdirSync(open).filter((n) => n.startsWith(`${app}__`)) : []) {
     const path = join(open, f), record = JSON.parse(readFileSync(path, "utf8"));
-    if (!record.gate.length && !record.findings.length) continue;
-    const pr = prOf(record.branch);
+    const pr = prOf(record.branch), empty = !record.gate.length && !record.findings.length;
+    // A /ship that only merged fills nothing, so once its PR closes there is nothing to keep.
+    if (empty && pr?.closedAt >= record.started) { rmSync(path); continue; }
+    if (empty) continue;
     const opened = pr && pr.createdAt >= record.started;
     if (!pr || (!opened && pr.state !== "OPEN")) continue;
     finalize(dir, path, Object.assign(record, { pr: pr.number }), `pr${pr.number}`,
@@ -156,6 +160,11 @@ function run(mode, args) {
   if (mode === "on") return c.on ? 0 : 1;
   if (!c.on) return 0;
   const id = identity(c.root), path = openPath(c.dir, id), record = load(path, id);
+  if (mode === "start" && RELEASE.test(id.branch)) {
+    closeOpened(c.dir, id.app);
+    if (existsSync(path)) rmSync(path);
+    return 0;
+  }
   if (mode === "start") return restart(c.dir, path, record, id), 0;
   if (mode === "ready") {
     const todo = existsSync(path) ? missing(record, c) : [];
