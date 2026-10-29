@@ -16,6 +16,8 @@ const usesIn = (text, name) => {
   return uses(text, parts[0]) && new RegExp(`\\.${escape(parts.at(-1))}\\b`).test(text);
 };
 const fromCwd = (f) => relative(root, resolve(f));
+// `insert(events)` is code, not a word: it may follow a dot, never more letters.
+const calls = (text, code) => new RegExp(`${/^\w/.test(code) ? "\\b" : ""}${escape(code)}`).test(text);
 
 function list() {
   if (!entries.length) return console.log(`registry none — no *${REGISTRY_SUFFIX} in this project`);
@@ -56,6 +58,17 @@ function checkPlan(planPath, stubs) {
   if (!asks.length) console.log("registry ok");
 }
 
+function evaluate() {
+  if (!entries.length) return console.log(`registry none — no *${REGISTRY_SUFFIX} in this project`);
+  for (const e of entries) {
+    if (!e.does.length) { console.log(`registry eval ${e.name}: skipped, no does`); continue; }
+    const outside = files.filter((f) => !insideLocation(e, f) && !e.allowed.includes(f) && !f.endsWith(REGISTRY_SUFFIX));
+    const hits = outside.flatMap((f) => readFileSync(join(root, f), "utf8").split("\n").flatMap((line, i) =>
+      e.does.filter((code) => calls(line, code)).map((code) => `registry SUSPECT ${e.name} ${f}:${i + 1} ${code}`)));
+    console.log(hits.length ? hits.join("\n") : `registry eval ${e.name}: nothing outside ${e.location} does its job`);
+  }
+}
+
 function stale() {
   const problems = [];
   const seen = new Set();
@@ -65,6 +78,8 @@ function stale() {
       if (!e[key]) say(`no ${key}`);
       else if (/^[|>]/.test(e[key])) say(`${key} must sit on one line`);
     }
+    if (!e.triggers.length) say("no triggers");
+    for (const f of e.allowed) if (!existsSync(join(root, f))) say(`allowed ${f} not found`);
     if (e.name && !/^[\w.-]+$/.test(e.name)) say(`name ${e.name} may hold only letters, digits, dashes and dots`);
     if (/^\s+-\s/m.test(e.text)) say("write lists on one line, like triggers: [aim, target]");
     if (seen.has(e.name)) say(`name ${e.name} is used twice`);
@@ -82,6 +97,7 @@ function stale() {
       if (/^[a-z][a-z0-9]*$/.test(s)) say(`\`${s}\` is too common a word to prove use — name its owner, like \`Owner.${s}\``);
       else if (!s.split(".").every((part) => uses(code, part))) say(`${s} from extend_by is not found in ${e.location}`);
     }
+    for (const c of e.does) if (!calls(code, c)) say(`does ${c} is not found in ${e.location}`);
   }
   if (problems.length) fail(problems);
 }
@@ -95,7 +111,8 @@ const [mode, ...rest] = process.argv.slice(2);
 if (mode === undefined) list();
 else if (mode === "--plan" && rest[0]) checkPlan(resolve(rest[0]), rest.slice(1));
 else if (mode === "--stale") stale();
+else if (mode === "--eval") evaluate();
 else {
-  console.error("usage: registry.mjs [--plan PLAN.md <stub files…> | --stale]");
+  console.error("usage: registry.mjs [--plan PLAN.md <stub files…> | --stale | --eval]");
   process.exit(2);
 }

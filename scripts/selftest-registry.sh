@@ -69,7 +69,7 @@ git checkout -q -- src/skills/old.ts; rm -f src/skills/fire.ts PLAN.md
 rg "a current registry is silent" 0 "" -- --stale
 mkdir -p src/sim; printf 'class_name Aim\nenum Rule { NEAREST }\n' > src/sim/aim.gd
 printf 'name: aim-rules\nsummary: how a skill picks what to hit\ntriggers: [nearest, enemy]\nlocation: src/sim/aim.gd\nextend_by: add a `Rule` to `Aim`\n' > src/sim/aim.registry.yaml
-printf 'name: shapes\nsummary: what a skill looks like\nlocation: src/sim/\nextend_by: add a `Shape`\n' > src/sim/shapes.registry.yaml
+printf 'name: shapes\nsummary: what a skill looks like\ntriggers: [shape]\nlocation: src/sim/\nextend_by: add a `Shape`\n' > src/sim/shapes.registry.yaml
 printf 'class_name Shape\n' > src/sim/shape.gd
 rg "a location can be one file, beside another system in its folder" 0 "" -- --stale
 rg "two entries in one folder are both read" 0 "== src/sim/shapes.registry.yaml ==" --
@@ -83,7 +83,7 @@ printf 'func cast(enemies):\n\treturn Aim.first(enemies)\n' > src/sim/fire.gd
 rg "a call through the owner is use; only the skipped aiming entry still asks" 0 "registry ASK aiming-methods" -- --plan PLAN.md src/sim/fire.gd
 printf 'name: aim-rules\nsummary: s\nlocation: src/sim/aim.gd\nextend_by: call `first`\n' > src/sim/aim.registry.yaml
 rg "a bare common word is stale" 1 "`first` is too common a word to prove use" -- --stale
-printf 'name: aim-rules\nsummary: s\nlocation: src/sim/aim.gd\nextend_by: apply through `EnemyState.chill`\n' > src/sim/aim.registry.yaml
+printf 'name: aim-rules\nsummary: s\ntriggers: [chill]\nlocation: src/sim/aim.gd\nextend_by: apply through `EnemyState.chill`\n' > src/sim/aim.registry.yaml
 printf 'class_name EnemyState\nfunc chill(s): pass\n' >> src/sim/aim.gd
 rg "a type with its method passes the stale check" 0 "" -- --stale
 printf 'func cast(e: EnemyState):\n\treturn e.hp\n' > src/sim/fire.gd
@@ -103,7 +103,7 @@ rg "a missing example is stale" 1 "example Nope.ts not found" -- --stale
 rg "a name used twice is stale" 1 "name aiming-methods is used twice" -- --stale
 printf 'location: src/inventory/\n' > src/inventory/inventory.registry.yaml
 rg "missing fields are stale" 1 "no summary" -- --stale
-printf 'name: inventory\nsummary: C# slots for a target\nlocation: src/inventory/\nextend_by: add an `ItemSlot`\n' > src/inventory/inventory.registry.yaml
+printf 'name: inventory\nsummary: C# slots for a target\ntriggers: [item]\nlocation: src/inventory/\nextend_by: add an `ItemSlot`\n' > src/inventory/inventory.registry.yaml
 rg "a # inside a value is kept" 0 "summary: C# slots for a target" -- 
 printf 'name: inventory\nsummary: s\ntriggers:\n  - item\nlocation: src/inventory/\nextend_by: |\n  add an ItemSlot\n' > src/inventory/inventory.registry.yaml
 rg "a block list is stale, not a trigger that matches everything" 1 "write lists on one line" -- --stale
@@ -115,5 +115,30 @@ rm -f src/skills/fire.ts PLAN.md
 printf 'name: aim methods\nsummary: s\nlocation: src/inventory/\nextend_by: add an `ItemSlot`\n' > src/inventory/inventory.registry.yaml
 rg "a name a plan cannot mark is stale" 1 "name aim methods may hold only" -- --stale
 git checkout -q -- src/inventory/inventory.registry.yaml
+
+mkdir -p src/events src/mcp scripts
+ev() { printf 'name: events\nsummary: how a record is written\n%blocation: src/events/\nextend_by: call `createEvent`\ndoes: [%s]\nallowed: [%s]\n' "$1" "$2" "$3" > src/events/events.registry.yaml; }
+ev 'triggers: [event]\n' 'insert(events)' scripts/seed.ts
+printf 'export const createEvent = () => db.insert(events);\n' > src/events/save.ts
+printf 'import x from "y";\nexport const tool = () => db.insert(events).values(x);\n' > src/mcp/tools.ts
+printf 'export const ok = () => createEvent();\n' > src/mcp/ok.ts
+printf 'db.bulkInsert(events);\n' > src/mcp/bulk.ts
+printf 'db.insert(events);\n' > scripts/seed.ts
+N=$((N+1))
+out=$(node "$RG" --eval 2>&1); rc=$?
+want='registry eval aiming-methods: skipped, no does
+registry SUSPECT events src/mcp/tools.ts:2 insert(events)
+registry eval inventory: skipped, no does'
+if [ "$rc" = 0 ] && [ "$out" = "$want" ]; then PASS=$((PASS+1)); echo "  ok   eval names each file and line doing an entry's job outside its folder, and nothing else"
+else FAIL=$((FAIL+1)); printf '  FAIL eval names each file and line doing an entry'"'"'s job outside its folder — exit %s:\n%s\n' "$rc" "$out"; fi
+rm src/mcp/tools.ts
+rg "eval says when nothing skips an entry" 0 "registry eval events: nothing outside src/events/ does its job" -- --eval
+ev 'triggers: [event]\n' 'insert(users)' scripts/seed.ts
+rg "a does call missing from its folder is stale" 1 "does insert(users) is not found in src/events/" -- --stale
+ev 'triggers: [event]\n' 'insert(events)' scripts/gone.ts
+rg "an allowed file that is gone is stale" 1 "allowed scripts/gone.ts not found" -- --stale
+ev '' 'insert(events)' scripts/seed.ts
+rg "an entry with no triggers is stale" 1 "no triggers" -- --stale
+rm -rf src/events src/mcp scripts
 
 rg "an unknown argument is an error" 2 "usage" -- --nope
