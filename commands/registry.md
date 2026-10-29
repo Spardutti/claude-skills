@@ -1,9 +1,9 @@
 ---
 name: registry
-description: "Record the project's reusable systems — aiming methods, a state machine, an effect pipeline — as small <name>.registry.yaml files next to their code, so /plan-feature reads every one before it plans and must say reuse or skip for each. The user names the system, you draft the entry, and the user approves it. Nothing reads the registry outside planning"
+description: "Record the project's reusable systems — aiming methods, a state machine, an effect pipeline — as small <name>.registry.yaml files next to their code, so /plan-feature reads every one before it plans and must say reuse or skip for each. The user names the system, you draft the entry, and the user approves it. `/registry eval` finds existing code that does an entry's job outside its folder"
 category: Workflow
 allowed-tools: Bash(node .claude/hooks/registry.mjs*), Bash(node scripts/registry.mjs*), Read, Grep, Glob, Write, Edit
-argument-hint: "<a file, a folder or a word, e.g. sim/aim.gd or aiming>"
+argument-hint: "<a file, a folder or a word, e.g. sim/aim.gd or aiming> | eval"
 ---
 
 # Registry — The Systems a Plan Must Not Rebuild
@@ -14,10 +14,13 @@ beside its code, so one folder can hold several. `/plan-feature` reads all of th
 says "fires at the nearby enemy" still finds the aiming system, whatever words it uses.
 
 This is not a map of the repo. A project holds 2 to 50 entries, and the user
-decides which. Only `/plan-feature` reads them; no hook checks them while you edit.
+decides which. `/plan-feature` reads them and `/registry eval` checks the code against
+them; no hook checks them while you edit.
 
 `REG` below is `.claude/hooks/registry.mjs`, or `scripts/registry.mjs` in the
 claude-skills repo itself.
+
+`eval` as the argument → skip to **Eval**.
 
 ## Step 0 — No argument: ask
 
@@ -41,6 +44,8 @@ location: src/combat/aiming/
 extend_by: implement AimStrategy, register in AimRegistry
 example: NearestEnemyAim.ts
 never: write targeting logic inside a skill
+does: [AimRegistry.register(]
+allowed: [src/debug/aim-overlay.ts]
 ```
 
 - `name` — unique, lowercase, with dashes. Plans cite it.
@@ -54,6 +59,10 @@ never: write targeting logic inside a skill
 - `location` — the folder, or the one file when the system shares its folder (`sim/aim.gd`).
 - `example` — a file in `location` to copy from. Optional.
 - `never` — the mistake this entry exists to stop. Optional.
+- `does` — the calls that do this system's job, copied as they appear on one line in
+  `location` (`insert(events)`, `prisma.todo.create`). Only `location` should make them;
+  `eval` flags them anywhere else. Optional, but an entry without it is skipped by `eval`.
+- `allowed` — files outside `location` that make a `does` call on purpose (a seed script).
 
 Show the draft and wait for a yes before writing the file. Nothing is written
 without one.
@@ -66,6 +75,24 @@ node REG --stale
 
 It must print nothing about the new entry. A line means a symbol, the folder or the
 example is not where the entry says. Fix the entry, never the code.
+
+## Eval — find code that skips an entry
+
+```bash
+node REG --eval
+```
+
+Each `registry SUSPECT <entry> <file>:<line> <call>` is code outside the entry's folder
+making one of its `does` calls. Read the file around that line, and against the entry's
+`summary`, `extend_by` and `never` sort each one:
+
+- **Skips the registry** — it does the job its own way. Report it with the line and what
+  it should call instead, from `extend_by`.
+- **Fine** — on purpose, like a seed script. Offer to add it to `allowed`; on a yes, edit
+  the entry and run `--stale`.
+
+Name every `skipped, no does` entry and offer to draft its `does` from its folder. Report
+only: never change the code a suspect is in.
 
 ## BAD / GOOD
 
@@ -83,5 +110,6 @@ extend_by: implement AimStrategy, register in AimRegistry
 - Never write an entry the user has not approved.
 - Never add an entry the user did not ask for, and never hunt the repo for candidates.
 - Always name real symbols in `extend_by`, and run `--stale` before reporting.
+- Never fix a suspect `eval` found — report it; the user decides.
 - Always write `summary` in the words a feature request would use, not in class names.
 - Never put entries in `.claude/` or CLAUDE.md — the file lives next to the code it describes.
