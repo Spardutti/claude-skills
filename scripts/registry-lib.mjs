@@ -40,7 +40,7 @@ export function parseEntry(text) {
     const m = line.match(/^([a-z_]+):\s*(.*?)\s*(?:\s#.*)?$/);
     if (m) entry[m[1]] = value(m[2]);
   }
-  for (const key of ["triggers", "does", "allowed"]) entry[key] = [].concat(entry[key] ?? []).filter(Boolean);
+  for (const key of ["triggers", "does", "allowed", "rules"]) entry[key] = [].concat(entry[key] ?? []).filter(Boolean);
   return entry;
 }
 

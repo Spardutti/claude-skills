@@ -89,6 +89,8 @@ remove, make it a lesson.
 - `bad` and `good` are copied from the real examples in Step 1, trimmed.
 - `message` says what to do, in one sentence a tired person can act on.
 - `pattern` takes optional `flags` (`m`, `i`, `s`); `g` is always added.
+- A `*.registry.yaml` whose `never` is this mistake: end `message` with
+  `see <that file>`, and add the id to the entry's `rules: [...]`.
 
 ## Step 4 — Prove it (rules only)
 
@@ -122,4 +124,5 @@ GOOD: "pattern": "\\b(?:it|test)\\(\\s*[\"'`][^\"'`]*\\band\\b"   ← only insid
 - Never ship a rule whose `--selftest` fails.
 - Always run `--baseline <id>`, never a bare `--baseline`, so other rules' debt cannot be banked.
 - Always prefer a rule to a lesson; a lesson is the fallback, not the default.
+- Always link a rule to the registry entry it guards: the file in `message`, the id in `rules`.
 - Keep a lesson to one sentence, scoped by `files` to the code it is about.

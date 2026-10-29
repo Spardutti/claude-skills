@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import {
   REGISTRY_SUFFIX, addedText, escape, insideLocation, loadRegistry, projectFiles, projectRoot, symbolsOf, triggerHits,
 } from "./registry-lib.mjs";
+import { loadEditRules } from "./text-rules.mjs";
 
 const root = projectRoot();
 const files = projectFiles(root);
@@ -72,6 +73,7 @@ function evaluate() {
 function stale() {
   const problems = [];
   const seen = new Set();
+  const ruleIds = entries.some((e) => e.rules.length) ? Object.values(loadEditRules(root)).flat().map((r) => r.id) : [];
   for (const e of entries) {
     const say = (why) => problems.push(`registry stale ${e.file}: ${why}`);
     for (const key of ["name", "summary", "location", "extend_by"]) {
@@ -80,6 +82,7 @@ function stale() {
     }
     if (!e.triggers.length) say("no triggers");
     for (const f of e.allowed) if (!existsSync(join(root, f))) say(`allowed ${f} not found`);
+    for (const id of e.rules) if (!ruleIds.includes(id)) say(`rule ${id} not found in .edit-rules.json`);
     if (e.name && !/^[\w.-]+$/.test(e.name)) say(`name ${e.name} may hold only letters, digits, dashes and dots`);
     if (/^\s+-\s/m.test(e.text)) say("write lists on one line, like triggers: [aim, target]");
     if (seen.has(e.name)) say(`name ${e.name} is used twice`);
