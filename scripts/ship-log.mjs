@@ -2,7 +2,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { git, parseReport, prSize } from "./ship-log-parse.mjs";
+import { parseLine, readLines } from "./diary-lib.mjs";
+import { git, parseReport, planRegistry, prSize, ruleBlocks } from "./ship-log-parse.mjs";
 import { printReport, tally } from "./ship-log-report.mjs";
 
 const HERE = dirname(resolve(process.argv[1]));
@@ -58,13 +59,14 @@ function settleSurvivors(record) {
   }
 }
 
-function finalize(dir, path, record, tag, status, reason, at) {
+function finalize(c, path, record, tag, status, reason, at) {
   settleSurvivors(record);
   Object.assign(record, { status, reason: reason ?? null, finished: at ?? now() });
+  record.rules = ruleBlocks(c.diary, record.branch, record.started, record.finished);
   record.summary = summarize(record);
   const stem = `${record.app}_${record.finished.slice(0, 10)}_${tag}`;
-  let out = join(dir, `${stem}.json`);
-  for (let i = 2; existsSync(out); i++) out = join(dir, `${stem}-${i}.json`);
+  let out = join(c.dir, `${stem}.json`);
+  for (let i = 2; existsSync(out); i++) out = join(c.dir, `${stem}-${i}.json`);
   save(path, record);
   renameSync(path, out);
   console.log(`ship-log: saved ${out}`);
@@ -78,8 +80,8 @@ function prOf(branch) {
 // Agents skip the `pr` call, so a log whose branch has a PR by now is closed at that PR.
 // A PR older than the log was only updated by it, so that log ends at its own last event.
 // A long-lived branch like dev keeps its merged PRs, so an old one that is not open is not this log's.
-function closeOpened(dir, app) {
-  const open = join(dir, "open");
+function closeOpened(c, app) {
+  const open = join(c.dir, "open");
   for (const f of existsSync(open) ? readdirSync(open).filter((n) => n.startsWith(`${app}__`)) : []) {
     const path = join(open, f), record = JSON.parse(readFileSync(path, "utf8"));
     const pr = prOf(record.branch), empty = !record.gate.length && !record.findings.length;
@@ -88,16 +90,16 @@ function closeOpened(dir, app) {
     if (empty) continue;
     const opened = pr && pr.createdAt >= record.started;
     if (!pr || (!opened && pr.state !== "OPEN")) continue;
-    finalize(dir, path, Object.assign(record, { pr: pr.number }), `pr${pr.number}`,
+    finalize(c, path, Object.assign(record, { pr: pr.number }), `pr${pr.number}`,
       opened ? "pr-opened" : "pr-updated", null, opened ? pr.createdAt : lastEvent(record));
   }
 }
 
 // A ship that never reached pr or end was abandoned; keep it, but never fold it into the next one.
-function restart(dir, path, record, id) {
-  closeOpened(dir, id.app);
-  if (existsSync(path)) finalize(dir, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "abandoned");
-  save(path, load(path, id));
+function restart(c, path, record, id) {
+  closeOpened(c, id.app);
+  if (existsSync(path)) finalize(c, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "abandoned");
+  save(path, { ...load(path, id), registry: planRegistry(c.root) });
 }
 
 function addGateRun(record, [report, exit, seconds, base]) {
@@ -129,9 +131,7 @@ function addStep(record, [name, edge]) {
 
 // Worktrees share one diary, so only this branch's latest review since the ship started counts.
 function lastReview(diary, branch, since) {
-  const file = join(diary, "review-findings.jsonl");
-  const rows = existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean) : [];
-  const last = rows.map((l) => { try { return JSON.parse(l); } catch { return null; } })
+  const last = readLines(join(diary, "review-findings.jsonl")).map(parseLine)
     .filter((r) => r?.branch === branch && r.ts >= since && typeof r.reply === "string").at(-1);
   const json = last?.reply.match(/```json\s*([\s\S]*?)```/)?.[1];
   try {
@@ -161,11 +161,11 @@ function run(mode, args) {
   if (!c.on) return 0;
   const id = identity(c.root), path = openPath(c.dir, id), record = load(path, id);
   if (mode === "start" && RELEASE.test(id.branch)) {
-    closeOpened(c.dir, id.app);
+    closeOpened(c, id.app);
     if (existsSync(path)) rmSync(path);
     return 0;
   }
-  if (mode === "start") return restart(c.dir, path, record, id), 0;
+  if (mode === "start") return restart(c, path, record, id), 0;
   if (mode === "ready") {
     const todo = existsSync(path) ? missing(record, c) : [];
     if (todo.length) console.log(todo.map((t) => `  - ${t}`).join("\n"));
@@ -178,9 +178,9 @@ function run(mode, args) {
   else if (mode === "step") addStep(record, args);
   else if (mode === "pr" && /^\d+$/.test(args[0] ?? "")) {
     record.pr = Number(args[0]);
-    return finalize(c.dir, path, record, `pr${args[0]}`, "pr-opened"), 0;
+    return finalize(c, path, record, `pr${args[0]}`, "pr-opened"), 0;
   }
-  else if (mode === "end") return finalize(c.dir, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "stopped", args.join(" ") || null), 0;
+  else if (mode === "end") return finalize(c, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "stopped", args.join(" ") || null), 0;
   else throw new Error("usage: ship-log.mjs on | start | ready | gate <report> <exit> <seconds> <base> | step <name> start|end | finding '<json>' | pr <number> | end [reason] | report [dir]");
   save(path, record);
   return 0;
