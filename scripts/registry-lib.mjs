@@ -62,6 +62,15 @@ export function symbolsOf(extendBy = "") {
   return [...new Set([...ticked, ...shaped])];
 }
 
+export function planMarks(planPath) {
+  const text = existsSync(planPath) ? readFileSync(planPath, "utf8") : null;
+  if (text === null) return null;
+  const section = text.split(/^## /m).find((s) => /^Registry\s*$/m.test(s.split("\n")[0])) ?? "";
+  const marks = new Map();
+  for (const m of section.matchAll(/^[-*]\s*`?([\w.-]+)`?\s*:\s*(reuse|skip)\b/gim)) marks.set(m[1], m[2].toLowerCase());
+  return marks;
+}
+
 export const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export function triggerHits(entry, text) {

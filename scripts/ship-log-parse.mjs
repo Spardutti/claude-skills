@@ -1,5 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseLine, readLines } from "./diary-lib.mjs";
+import { planMarks } from "./registry-lib.mjs";
 
 const PROJECT = /^ {2}(\S.*?) (stryker|mutmut|config)(?: \((\d+)s\))? — (.*)$/;
 const SURVIVOR = /^ {6}\[(Survived|NoCoverage)\] (\S+)\s+(\S+)$/;
@@ -99,4 +102,16 @@ export function prSize(base, testRe, sourceExt) {
     bucket.files++; bucket.added += add; bucket.removed += rem;
   }
   return size;
+}
+
+export function planRegistry(root) {
+  const marks = planMarks(join(root, "PLAN.md"));
+  return marks && Object.fromEntries(marks);
+}
+
+// Worktrees share one diary, so only this branch's blocks during the ship count.
+export function ruleBlocks(diary, branch, since, until) {
+  return readLines(join(diary, "edit-blocks.jsonl")).map(parseLine)
+    .filter((r) => r?.branch === branch && r.ts >= since && r.ts <= until)
+    .map(({ ts, file, rules }) => ({ ts, file, rules: [].concat(rules) }));
 }

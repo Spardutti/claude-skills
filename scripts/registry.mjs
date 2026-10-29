@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
-  REGISTRY_SUFFIX, addedText, escape, insideLocation, loadRegistry, projectFiles, projectRoot, symbolsOf, triggerHits,
+  REGISTRY_SUFFIX, addedText, escape, insideLocation, loadRegistry, planMarks, projectFiles, projectRoot, symbolsOf, triggerHits,
 } from "./registry-lib.mjs";
 import { loadEditRules } from "./text-rules.mjs";
 
@@ -24,15 +24,6 @@ function list() {
   if (!entries.length) return console.log(`registry none — no *${REGISTRY_SUFFIX} in this project`);
   for (const e of entries) console.log(`== ${e.file} ==\n${e.text.trim()}\n`);
   stale();
-}
-
-function planMarks(planPath) {
-  const text = existsSync(planPath) ? readFileSync(planPath, "utf8") : null;
-  if (text === null) return null;
-  const section = text.split(/^## /m).find((s) => /^Registry\s*$/m.test(s.split("\n")[0])) ?? "";
-  const marks = new Map();
-  for (const m of section.matchAll(/^[-*]\s*`?([\w.-]+)`?\s*:\s*(reuse|skip)\b/gim)) marks.set(m[1], m[2].toLowerCase());
-  return marks;
 }
 
 function checkPlan(planPath, stubs) {

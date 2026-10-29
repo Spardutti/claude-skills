@@ -1,0 +1,7 @@
+name: gate-config
+summary: shared shell helpers for hook scripts — config loading, diary folder, JSON escaping
+triggers: [load_gauntlet_conf, json_string, diary_dir, json_field, skill_field]
+location: scripts/gate-config.sh
+extend_by: add the helper to gate-config.sh, source it, then call `load_gauntlet_conf`
+never: copy a helper like `json_string` into another script
+does: [json_string() {, load_gauntlet_conf() {, diary_dir() {]

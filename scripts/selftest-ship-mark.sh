@@ -37,7 +37,7 @@ N=$((N+1)); case "$out" in *'"deny"'*) FAIL=$((FAIL+1)); printf '  FAIL a PR fro
   *) PASS=$((PASS+1)); echo "  ok   a PR from a worktree session without --head is read from that worktree" ;; esac
 
 git checkout -q feat/m
-cp "$HERE"/ship-log*.mjs .claude/hooks/
+cp "$HERE"/ship-log*.mjs "$HERE/registry-lib.mjs" "$HERE/diary-lib.mjs" .claude/hooks/
 mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
 bash "$MARK" begin; echo "const m2=1" >> a.ts
 node -e 'process.stdout.write(JSON.stringify({ ts: new Date().toISOString().replace(/\.\d+Z$/, "Z"), branch: "feat/m", reply: "```json\n[{\"summary\":\"b\",\"failure_scenario\":\"x\"}]\n```" }) + "\n")' > .claude/review-findings.jsonl

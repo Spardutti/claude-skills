@@ -1,0 +1,6 @@
+name: diary-lib
+summary: reading the .jsonl diaries in .claude — review findings, skill audits, edit blocks
+triggers: [readLines, parseLine, parseVerdict, claudeDir, verdictOf]
+location: scripts/diary-lib.mjs
+extend_by: import `readLines` and `parseLine` from diary-lib.mjs, add a new reader there
+never: split and JSON.parse a .jsonl file by hand in another script

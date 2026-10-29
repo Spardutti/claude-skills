@@ -86,6 +86,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-base.sh"     # which branch the ship gate measures from
 . "$HERE/selftest-ship-log.sh"           # the /ship log: every gate run, findings, PR size
 . "$HERE/selftest-ship-log-settle.sh"    # survivors fixed but never logged
+. "$HERE/selftest-ship-log-plan.sh"      # registry marks and edit-rule blocks in the log
 . "$HERE/selftest-ship-prep.sh"         # ship-gate --scope and the one-call /ship setup
 . "$HERE/selftest-ship-prep-stages.sh"  # commit, merge and release facts in one call each
 . "$HERE/selftest-ship-mark.sh"          # a PR opens only after /ship starts on its branch
