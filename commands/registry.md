@@ -52,7 +52,9 @@ allowed: [src/debug/aim-overlay.ts]
 - `summary` — what the system is *for*, in the words a feature brief would use.
   The plan matches briefs to entries by this line.
 - `triggers` — words code of this kind uses. They catch a plan that skips the
-  entry while its stubs talk about targets.
+  entry while its stubs talk about targets. Pick names only this system uses
+  (`logActivity`, `AimRegistry`), not words the app uses for other things (`role`, `tool`).
+  Show each with how many code files outside `location` use it; one in over 1 of 10 is too broad.
 - `extend_by` — the steps, naming the real symbols (`AimStrategy`, or `` `Weapon` ``
   in backticks for a one-word name). A method goes with its owner, `` `Aim.first` ``, never
   a bare `` `first` ``: a plain word matches code that never touches the system.
@@ -107,6 +109,13 @@ summary: how skills and towers pick a target
 extend_by: implement AimStrategy, register in AimRegistry
 ```
 
+```yaml
+# BAD: matches chat roles, AI tools and every delete button, so plans ask about it all day
+triggers: [create, delete, role, tool]
+# GOOD: triggers match stub code, so name the code, not a phrase with spaces
+triggers: [saveEvent, logActivity, requireRole, buildEventTools]
+```
+
 ## Rules
 
 - Never write an entry the user has not approved.
@@ -114,4 +123,5 @@ extend_by: implement AimStrategy, register in AimRegistry
 - Always name real symbols in `extend_by`, and run `--stale` before reporting.
 - Never fix a suspect `eval` found — report it; the user decides.
 - Always write `summary` in the words a feature request would use, not in class names.
+- Never propose a trigger without its file count outside `location`.
 - Never put entries in `.claude/` or CLAUDE.md — the file lives next to the code it describes.
