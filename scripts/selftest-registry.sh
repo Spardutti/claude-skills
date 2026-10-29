@@ -137,6 +137,12 @@ ev 'triggers: [event]\n' 'insert(users)' scripts/seed.ts
 rg "a does call missing from its folder is stale" 1 "does insert(users) is not found in src/events/" -- --stale
 ev 'triggers: [event]\n' 'insert(events)' scripts/gone.ts
 rg "an allowed file that is gone is stale" 1 "allowed scripts/gone.ts not found" -- --stale
+ev 'triggers: [event]\n' 'insert(events)' scripts/seed.ts; echo 'rules: [no-raw-insert]' >> src/events/events.registry.yaml
+echo '{"lessons":[{"id":"no-raw-insert","files":"x","message":"m"}]}' > .edit-rules.json
+rg "a rule the entry names may be a lesson" 0 "" -- --stale
+echo '{"text":[]}' > .edit-rules.json
+rg "a rule the entry names that is gone is stale" 1 "rule no-raw-insert not found in .edit-rules.json" -- --stale
+rm .edit-rules.json
 ev '' 'insert(events)' scripts/seed.ts
 rg "an entry with no triggers is stale" 1 "no triggers" -- --stale
 rm -rf src/events src/mcp scripts

@@ -63,6 +63,8 @@ allowed: [src/debug/aim-overlay.ts]
   `location` (`insert(events)`, `prisma.todo.create`). Only `location` should make them;
   `eval` flags them anywhere else. Optional, but an entry without it is skipped by `eval`.
 - `allowed` — files outside `location` that make a `does` call on purpose (a seed script).
+- `rules` — ids in `.edit-rules.json` that catch this entry's `never` as it is written.
+  `--stale` flags an id that is gone. `/add-rule` adds them; never draft one here.
 
 Show the draft and wait for a yes before writing the file. Nothing is written
 without one.
