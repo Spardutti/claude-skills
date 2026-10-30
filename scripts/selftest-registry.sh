@@ -69,7 +69,7 @@ git checkout -q -- src/skills/old.ts; rm -f src/skills/fire.ts PLAN.md
 rg "a current registry is silent" 0 "" -- --stale
 mkdir -p src/sim; printf 'class_name Aim\nenum Rule { NEAREST }\n' > src/sim/aim.gd
 printf 'name: aim-rules\nsummary: how a skill picks what to hit\ntriggers: [nearest, enemy]\nlocation: src/sim/aim.gd\nextend_by: add a `Rule` to `Aim`\n' > src/sim/aim.registry.yaml
-printf 'name: shapes\nsummary: what a skill looks like\ntriggers: [shape]\nlocation: src/sim/\nextend_by: add a `Shape`\n' > src/sim/shapes.registry.yaml
+printf 'name: shapes\nsummary: what a skill looks like\ntriggers: [shape]\nlocation: src/sim/shape.gd\nextend_by: add a `Shape`\n' > src/sim/shapes.registry.yaml
 printf 'class_name Shape\n' > src/sim/shape.gd
 rg "a location can be one file, beside another system in its folder" 0 "" -- --stale
 rg "two entries in one folder are both read" 0 "== src/sim/shapes.registry.yaml ==" --
@@ -159,3 +159,27 @@ rg "an entry with no triggers is stale" 1 "no triggers" -- --stale
 rm -rf src/events src/mcp scripts
 
 rg "an unknown argument is an error" 2 "usage" -- --nope
+
+newrepo registry_locations
+mkdir -p sim view
+printf 'class_name CoreNode\nself.start_cost = 1\n' > sim/core_node.gd
+printf 'class_name CoreTree\n' > sim/core_tree.gd
+printf 'class_name Aim\n' > sim/aim.gd
+printf 'x.start_cost\n' > sim/stray.gd
+printf 'x.start_cost\n' > view/shop.gd
+core() { printf 'name: altar\nsummary: s\ntriggers: [altar]\nlocation: %s\nextend_by: add a `CoreNode` to `CoreTree`\ndoes: [.start_cost]\n' "$1" > sim/core.registry.yaml; }
+printf 'name: aim\nsummary: s\ntriggers: [aim]\nlocation: sim/aim.gd\nextend_by: add a `Aim`\n' > sim/aim.registry.yaml
+core '[sim/core_node.gd, sim/core_tree.gd]'
+rg "a list of locations finds names in any of its files" 0 "" -- --stale
+N=$((N+1))
+out=$(node "$RG" --eval 2>&1 | grep SUSPECT | sort)
+want='registry SUSPECT altar sim/stray.gd:1 .start_cost
+registry SUSPECT altar view/shop.gd:1 .start_cost'
+if [ "$out" = "$want" ]; then PASS=$((PASS+1)); echo "  ok   eval checks every file outside a list of locations, in the same folder too"
+else FAIL=$((FAIL+1)); printf '  FAIL eval with a list of locations:\n%s\n' "$out"; fi
+core '[sim/core_node.gd, sim/gone.gd]'
+rg "a listed location that is gone is stale" 1 "location sim/gone.gd not found" -- --stale
+core 'sim/'
+rg "a folder holding another entry's location is stale" 1 "location holds aim's sim/aim.gd" -- --stale
+printf 'name: aim\nsummary: s\ntriggers: [aim]\nlocation: sim\nextend_by: add a `Aim`\n' > sim/aim.registry.yaml
+rg "the same folder with and without a slash is not held" 0 "" -- --stale

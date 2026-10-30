@@ -77,10 +77,11 @@ export function triggerHits(entry, text) {
   return entry.triggers.filter((t) => new RegExp(`\\b${escape(t)}\\b`, "i").test(text));
 }
 
-// A location is a folder or one file, like sim/aim.gd beside unrelated systems in sim/.
+export const locationsOf = (entry) => [].concat(entry.location ?? []).map((l) => l.replace(/^\.\//, "")).filter(Boolean);
+
+// A location is a folder or files, like sim/aim.gd beside unrelated systems in sim/.
 export function insideLocation(entry, file) {
-  const loc = (entry.location ?? "").replace(/^\.\//, "");
-  return loc !== "" && (file === loc || file.startsWith(loc.replace(/\/?$/, "/")));
+  return locationsOf(entry).some((loc) => file === loc || file.startsWith(loc.replace(/\/?$/, "/")));
 }
 
 export const isAllowed = (entry, file) => entry.allowed.some((a) => (a.endsWith("/") ? file.startsWith(a) : file === a));
