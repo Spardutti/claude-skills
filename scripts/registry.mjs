@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
-  REGISTRY_SUFFIX, addedText, escape, insideLocation, loadRegistry, planMarks, projectFiles, projectRoot, symbolsOf, triggerHits,
+  REGISTRY_SUFFIX, addedText, escape, insideLocation, isAllowed, loadRegistry, planMarks, projectFiles, projectRoot, symbolsOf, triggerHits,
 } from "./registry-lib.mjs";
 import { loadEditRules } from "./text-rules.mjs";
 
@@ -50,11 +50,15 @@ function checkPlan(planPath, stubs) {
   if (!asks.length) console.log("registry ok");
 }
 
+function planMissing() {
+  if (entries.length && !planMarks(join(root, "PLAN.md"))?.size) console.log(`registry unplanned — ${entries.length} entries, no marks in PLAN.md`);
+}
+
 function evaluate() {
   if (!entries.length) return console.log(`registry none — no *${REGISTRY_SUFFIX} in this project`);
   for (const e of entries) {
     if (!e.does.length) { console.log(`registry eval ${e.name}: skipped, no does`); continue; }
-    const outside = files.filter((f) => !insideLocation(e, f) && !e.allowed.includes(f) && !f.endsWith(REGISTRY_SUFFIX));
+    const outside = files.filter((f) => !insideLocation(e, f) && !isAllowed(e, f) && !f.endsWith(REGISTRY_SUFFIX));
     const hits = outside.flatMap((f) => readFileSync(join(root, f), "utf8").split("\n").flatMap((line, i) =>
       e.does.filter((code) => calls(line, code)).map((code) => `registry SUSPECT ${e.name} ${f}:${i + 1} ${code}`)));
     console.log(hits.length ? hits.join("\n") : `registry eval ${e.name}: nothing outside ${e.location} does its job`);
@@ -78,22 +82,26 @@ function stale() {
     if (/^\s+-\s/m.test(e.text)) say("write lists on one line, like triggers: [aim, target]");
     if (seen.has(e.name)) say(`name ${e.name} is used twice`);
     seen.add(e.name);
-    const loc = join(root, e.location ?? "");
-    if (!e.location || !existsSync(loc)) { say(`location ${e.location} not found`); continue; }
-    const near = statSync(loc).isDirectory() ? loc : dirname(loc);
-    if (e.example && !existsSync(join(near, e.example)) && !existsSync(join(root, e.example))) say(`example ${e.example} not found`);
-    const syms = symbolsOf(e.extend_by);
-    if (!syms.length) say("extend_by names no symbol — write names like `AimStrategy`");
-    const code = files.filter((f) => insideLocation(e, f) && !f.endsWith(REGISTRY_SUFFIX))
-      .map((f) => readFileSync(join(root, f), "utf8")).join("\n");
-    for (const s of syms) {
-      // A plain word like `first` matches `var first = enemies[0]`; `Aim.first` only matches real use.
-      if (/^[a-z][a-z0-9]*$/.test(s)) say(`\`${s}\` is too common a word to prove use — name its owner, like \`Owner.${s}\``);
-      else if (!s.split(".").every((part) => uses(code, part))) say(`${s} from extend_by is not found in ${e.location}`);
-    }
-    for (const c of e.does) if (!calls(code, c)) say(`does ${c} is not found in ${e.location}`);
+    staleCode(e, say);
   }
   if (problems.length) fail(problems);
+}
+
+function staleCode(e, say) {
+  const loc = join(root, e.location ?? "");
+  if (!e.location || !existsSync(loc)) return say(`location ${e.location} not found`);
+  const near = statSync(loc).isDirectory() ? loc : dirname(loc);
+  if (e.example && !existsSync(join(near, e.example)) && !existsSync(join(root, e.example))) say(`example ${e.example} not found`);
+  const syms = symbolsOf(e.extend_by);
+  if (!syms.length) say("extend_by names no symbol — write names like `AimStrategy`");
+  const code = files.filter((f) => insideLocation(e, f) && !f.endsWith(REGISTRY_SUFFIX))
+    .map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+  for (const s of syms) {
+    // A plain word like `first` matches `var first = enemies[0]`; `Aim.first` only matches real use.
+    if (/^[a-z][a-z0-9]*$/.test(s)) say(`\`${s}\` is too common a word to prove use — name its owner, like \`Owner.${s}\``);
+    else if (!s.split(".").every((part) => uses(code, part))) say(`${s} from extend_by is not found in ${e.location}`);
+  }
+  for (const c of e.does) if (!calls(code, c)) say(`does ${c} is not found in ${e.location}`);
 }
 
 function fail(lines) {
@@ -104,9 +112,10 @@ function fail(lines) {
 const [mode, ...rest] = process.argv.slice(2);
 if (mode === undefined) list();
 else if (mode === "--plan" && rest[0]) checkPlan(resolve(rest[0]), rest.slice(1));
+else if (mode === "--plan-missing") planMissing();
 else if (mode === "--stale") stale();
 else if (mode === "--eval") evaluate();
 else {
-  console.error("usage: registry.mjs [--plan PLAN.md <stub files…> | --stale | --eval]");
+  console.error("usage: registry.mjs [--plan PLAN.md <stub files…> | --plan-missing | --stale | --eval]");
   process.exit(2);
 }

@@ -1,9 +1,9 @@
 ---
 name: registry
-description: "Record the project's reusable systems — aiming methods, a state machine, an effect pipeline — as small <name>.registry.yaml files next to their code, so /plan-feature reads every one before it plans and must say reuse or skip for each. The user names the system, you draft the entry, and the user approves it. `/registry eval` finds existing code that does an entry's job outside its folder"
+description: "Record the project's reusable systems — aiming methods, a state machine, an effect pipeline — as small <name>.registry.yaml files next to their code, so /plan-feature reads every one before it plans and must say reuse or skip for each. The user names the system, you draft the entry, and the user approves it. `/registry eval` finds existing code that does an entry's job outside its folder, and `/registry update` redrafts every entry against today's code"
 category: Workflow
 allowed-tools: Bash(node .claude/hooks/registry.mjs*), Bash(node scripts/registry.mjs*), Read, Grep, Glob, Write, Edit
-argument-hint: "<a file, a folder or a word, e.g. sim/aim.gd or aiming> | eval"
+argument-hint: "<a file, a folder or a word, e.g. sim/aim.gd or aiming> | eval | update"
 ---
 
 # Registry — The Systems a Plan Must Not Rebuild
@@ -20,7 +20,8 @@ them; no hook checks them while you edit.
 `REG` below is `.claude/hooks/registry.mjs`, or `scripts/registry.mjs` in the
 claude-skills repo itself.
 
-`eval` as the argument → skip to **Eval**.
+`eval` as the argument → skip to **Eval**. `update`, or any request to update the
+entries → skip to **Update**.
 
 ## Step 0 — No argument: ask
 
@@ -63,8 +64,11 @@ allowed: [src/debug/aim-overlay.ts]
 - `never` — the mistake this entry exists to stop. Optional.
 - `does` — the calls that do this system's job, copied as they appear on one line in
   `location` (`insert(events)`, `prisma.todo.create`). Only `location` should make them;
-  `eval` flags them anywhere else. Optional, but an entry without it is skipped by `eval`.
-- `allowed` — files outside `location` that make a `does` call on purpose (a seed script).
+  `eval` flags them anywhere else. Always draft one: an entry without it is skipped by `eval`.
+  If no call fits, leave it out and tell the user why in the draft.
+- `allowed` — files outside `location` that make a `does` call on purpose (a seed script), or
+  a folder ending in `/` (`checks/`). A test folder that sets up state directly belongs here;
+  never drop a good `does` because tests make the call.
 - `rules` — ids in `.edit-rules.json` that catch this entry's `never` as it is written.
   `--stale` flags an id that is gone. `/add-rule` adds them; never draft one here.
 
@@ -95,8 +99,21 @@ making one of its `does` calls. Read the file around that line, and against the 
 - **Fine** — on purpose, like a seed script. Offer to add it to `allowed`; on a yes, edit
   the entry and run `--stale`.
 
-Name every `skipped, no does` entry and offer to draft its `does` from its folder. Report
-only: never change the code a suspect is in.
+Name every `skipped, no does` entry and offer to draft its `does` from its folder. A skipped
+entry was not checked, so never call the run clean while one is left. Report only: never
+change the code a suspect is in.
+
+## Update — bring every entry up to today's code
+
+1. Run `node REG` to print every entry, and read each system as in Step 1.
+2. Draft every field of every entry, as in Step 2. `--stale` passing proves nothing here: it
+   only checks names that are already written, and never asks for a missing one.
+3. Try each new `does` on the code: search it outside `location` and show the hit count.
+4. Show one table: entry, each change, why. An entry with no `does` gets a row saying why.
+5. Wait for one yes for the whole table, write the changes, then run `node REG --stale`.
+6. Report the new `does` lines' suspects with `node REG --eval`, sorted as in **Eval**.
+
+An entry that needs no change still gets its row, so the user sees every entry was read.
 
 ## BAD / GOOD
 
@@ -122,6 +139,7 @@ triggers: [saveEvent, logActivity, requireRole, buildEventTools]
 - Never add an entry the user did not ask for, and never hunt the repo for candidates.
 - Always name real symbols in `extend_by`, and run `--stale` before reporting.
 - Never fix a suspect `eval` found — report it; the user decides.
+- Always draft a `does` for every entry you write or update, or say why none fits.
 - Always write `summary` in the words a feature request would use, not in class names.
 - Never propose a trigger without its file count outside `location`.
 - Never put entries in `.claude/` or CLAUDE.md — the file lives next to the code it describes.

@@ -107,6 +107,9 @@ It prints `base <sha>`, one line per changed source file with its new-side lines
 starts the audit and review steps in the ship log. Every check below uses exactly this scope;
 never rebuild it, never scan the whole repo.
 
+A `plan none` line means this branch adds files and skipped the registry. Ask the user once:
+continue, or stop and run `/plan-feature`. It never stops the ship by itself.
+
 Then run the checks **in this order, and no other** — run one after another,
 they cost a ship 5 to 8 minutes:
 

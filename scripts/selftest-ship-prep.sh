@@ -84,3 +84,24 @@ out=$(bash "$SP" start 2>&1); rc=$?
 sl_ok "a detached HEAD stops start with ship.md's message" test "$rc" = 1 -a -n "$(printf '%s' "$out" | grep 'Detached HEAD')"
 git checkout -q feat/p
 rm -rf bin/gh "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs"
+
+newrepo sg_prep_plan
+mkdir -p src; printf 'l1\n' > src/a.ts
+git add -A; git commit -qm base; git branch -q develop; git checkout -qb feat/plan
+PLAN_LINE="plan none: this branch adds files and no /plan-feature marked the registry"
+plan_is() {  # plan_is <label> <expected plan lines>
+  sl_ok "$1" test "$(bash "$SP" scope 2>&1 | grep '^plan ')" = "$2"
+}
+printf 'b\n' > src/b.ts
+plan_is "a new file in a project with no registry prints no warning" ""
+rm src/b.ts
+printf 'name: aim\nsummary: s\nlocation: src/\n' > src/aim.registry.yaml
+git add -A; git commit -qm entry; git branch -qf develop
+printf 'l2\n' >> src/a.ts
+plan_is "a changed file with no new file prints no warning" ""
+printf 'b\n' > src/b.ts
+plan_is "a new file with entries and no plan warns" "$PLAN_LINE"
+printf '# Plan\n\n## Build order\n' > PLAN.md
+plan_is "a plan with no registry marks still warns" "$PLAN_LINE"
+printf '## Registry\n- aim: skip — not aiming\n' > PLAN.md
+plan_is "a plan that marked the registry silences it" ""
