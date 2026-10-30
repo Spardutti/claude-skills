@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
-  REGISTRY_SUFFIX, addedText, escape, insideLocation, isAllowed, loadRegistry, planMarks, projectFiles, projectRoot, symbolsOf, triggerHits,
+  REGISTRY_SUFFIX, addedText, escape, insideLocation, isAllowed, loadRegistry, locationsOf, planMarks, projectFiles, projectRoot, symbolsOf, triggerHits,
 } from "./registry-lib.mjs";
 import { loadEditRules } from "./text-rules.mjs";
 
@@ -61,7 +61,7 @@ function evaluate() {
     const outside = files.filter((f) => !insideLocation(e, f) && !isAllowed(e, f) && !f.endsWith(REGISTRY_SUFFIX));
     const hits = outside.flatMap((f) => readFileSync(join(root, f), "utf8").split("\n").flatMap((line, i) =>
       e.does.filter((code) => calls(line, code)).map((code) => `registry SUSPECT ${e.name} ${f}:${i + 1} ${code}`)));
-    console.log(hits.length ? hits.join("\n") : `registry eval ${e.name}: nothing outside ${e.location} does its job`);
+    console.log(hits.length ? hits.join("\n") : `registry eval ${e.name}: nothing outside ${locationsOf(e).join(", ")} does its job`);
   }
 }
 
@@ -82,16 +82,30 @@ function stale() {
     if (/^\s+-\s/m.test(e.text)) say("write lists on one line, like triggers: [aim, target]");
     if (seen.has(e.name)) say(`name ${e.name} is used twice`);
     seen.add(e.name);
+    staleLocation(e, say);
     staleCode(e, say);
   }
   if (problems.length) fail(problems);
 }
 
+// A folder wide enough to hold another system hides that folder from eval.
+function staleLocation(e, say) {
+  const bare = (l) => l.replace(/\/$/, "");
+  const own = locationsOf(e).map(bare);
+  for (const other of entries) {
+    if (other === e) continue;
+    const held = locationsOf(other).map(bare).filter((l) => !own.includes(l) && insideLocation(e, l));
+    if (held.length) say(`location holds ${other.name}'s ${held.join(", ")} — list this system's own files`);
+  }
+}
+
 function staleCode(e, say) {
-  const loc = join(root, e.location ?? "");
-  if (!e.location || !existsSync(loc)) return say(`location ${e.location} not found`);
-  const near = statSync(loc).isDirectory() ? loc : dirname(loc);
-  if (e.example && !existsSync(join(near, e.example)) && !existsSync(join(root, e.example))) say(`example ${e.example} not found`);
+  const locs = locationsOf(e);
+  const where = locs.join(", ");
+  const gone = locs.filter((l) => !existsSync(join(root, l)));
+  if (!locs.length || gone.length) return say(`location ${gone.join(", ") || e.location} not found`);
+  const near = locs.map((l) => (statSync(join(root, l)).isDirectory() ? join(root, l) : dirname(join(root, l))));
+  if (e.example && !near.some((n) => existsSync(join(n, e.example))) && !existsSync(join(root, e.example))) say(`example ${e.example} not found`);
   const syms = symbolsOf(e.extend_by);
   if (!syms.length) say("extend_by names no symbol — write names like `AimStrategy`");
   const code = files.filter((f) => insideLocation(e, f) && !f.endsWith(REGISTRY_SUFFIX))
@@ -99,9 +113,9 @@ function staleCode(e, say) {
   for (const s of syms) {
     // A plain word like `first` matches `var first = enemies[0]`; `Aim.first` only matches real use.
     if (/^[a-z][a-z0-9]*$/.test(s)) say(`\`${s}\` is too common a word to prove use — name its owner, like \`Owner.${s}\``);
-    else if (!s.split(".").every((part) => uses(code, part))) say(`${s} from extend_by is not found in ${e.location}`);
+    else if (!s.split(".").every((part) => uses(code, part))) say(`${s} from extend_by is not found in ${where}`);
   }
-  for (const c of e.does) if (!calls(code, c)) say(`does ${c} is not found in ${e.location}`);
+  for (const c of e.does) if (!calls(code, c)) say(`does ${c} is not found in ${where}`);
 }
 
 function fail(lines) {

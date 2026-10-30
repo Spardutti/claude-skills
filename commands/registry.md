@@ -59,7 +59,9 @@ allowed: [src/debug/aim-overlay.ts]
 - `extend_by` — the steps, naming the real symbols (`AimStrategy`, or `` `Weapon` ``
   in backticks for a one-word name). A method goes with its owner, `` `Aim.first` ``, never
   a bare `` `first` ``: a plain word matches code that never touches the system.
-- `location` — the folder, or the one file when the system shares its folder (`sim/aim.gd`).
+- `location` — the folder, or the files when the system shares its folder
+  (`sim/aim.gd`, or `[sim/core.gd, sim/core_tree.gd]`). Never widen it to a shared folder to
+  make `--stale` pass: `eval` ignores everything inside it, and `--stale` flags one that holds another entry.
 - `example` — a file in `location` to copy from. Optional.
 - `never` — the mistake this entry exists to stop. Optional.
 - `does` — the calls that do this system's job, copied as they appear on one line in
