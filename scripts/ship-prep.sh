@@ -59,6 +59,9 @@ scope() {
   base=$(printf '%s\n' "$scope" | sed -n '1s/^base //p')
   while IFS=$'\t' read -r f _; do [ -n "$f" ] && files+=("$f"); done < <(printf '%s\n' "$scope" | sed '1d')
   skills_report "${files[@]}"
+  if printf '%s\n' "$scope" | grep -q '(new)$' && [ -n "$(node "$HERE/registry.mjs" --plan-missing 2>/dev/null)" ]; then
+    echo "plan none: this branch adds files and no /plan-feature marked the registry"
+  fi
   diff="/tmp/claude-ship-$(printf '%s %s' "$PWD" "$branch" | cksum | cut -d' ' -f1).diff"
   : > "$diff"
   if [ ${#files[@]} -gt 0 ]; then

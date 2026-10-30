@@ -83,6 +83,8 @@ export function insideLocation(entry, file) {
   return loc !== "" && (file === loc || file.startsWith(loc.replace(/\/?$/, "/")));
 }
 
+export const isAllowed = (entry, file) => entry.allowed.some((a) => (a.endsWith("/") ? file.startsWith(a) : file === a));
+
 // Only what the stub added: an extended file's old code would trip triggers it never wrote.
 export function addedText(root, file) {
   const tracked = spawnSync("git", ["-C", root, "ls-files", "--error-unmatch", file], { encoding: "utf8" });

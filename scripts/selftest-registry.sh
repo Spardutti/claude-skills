@@ -131,6 +131,17 @@ registry SUSPECT events src/mcp/tools.ts:2 insert(events)
 registry eval inventory: skipped, no does'
 if [ "$rc" = 0 ] && [ "$out" = "$want" ]; then PASS=$((PASS+1)); echo "  ok   eval names each file and line doing an entry's job outside its folder, and nothing else"
 else FAIL=$((FAIL+1)); printf '  FAIL eval names each file and line doing an entry'"'"'s job outside its folder — exit %s:\n%s\n' "$rc" "$out"; fi
+ev 'triggers: [event]\n' 'insert(events)' scripts/
+N=$((N+1))
+out=$(node "$RG" --eval 2>&1 | grep SUSPECT)
+if [ "$out" = "registry SUSPECT events src/mcp/tools.ts:2 insert(events)" ]; then PASS=$((PASS+1)); echo "  ok   an allowed folder covers its files and no others"
+else FAIL=$((FAIL+1)); printf '  FAIL an allowed folder covers its files and no others:\n%s\n' "$out"; fi
+ev 'triggers: [event]\n' 'insert(events)' scripts
+N=$((N+1))
+out=$(node "$RG" --eval 2>&1 | grep -c 'SUSPECT events scripts/seed.ts')
+if [ "$out" = 1 ]; then PASS=$((PASS+1)); echo "  ok   an allowed name with no slash is not a folder"
+else FAIL=$((FAIL+1)); printf '  FAIL an allowed name with no slash is not a folder: %s\n' "$out"; fi
+ev 'triggers: [event]\n' 'insert(events)' scripts/seed.ts
 rm src/mcp/tools.ts
 rg "eval says when nothing skips an entry" 0 "registry eval events: nothing outside src/events/ does its job" -- --eval
 ev 'triggers: [event]\n' 'insert(users)' scripts/seed.ts
