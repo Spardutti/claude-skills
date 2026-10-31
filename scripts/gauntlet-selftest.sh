@@ -100,6 +100,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-skill-flags.sh"        # logging skills-audit verdicts, and /skill-report
 . "$HERE/selftest-line-limit.sh"         # the 200-line ratchet
 . "$HERE/selftest-edit-check.sh"         # the 200-line ratchet on each edited file
+. "$HERE/selftest-bash-check.sh"         # the same checks on files a shell command changed
 . "$HERE/selftest-lint-ratchet.sh"       # the ESLint ratchet on each edited file
 . "$HERE/selftest-lint-ratchet-baseline.sh"  # baselines never bank growth, and edge cases
 . "$HERE/selftest-diary-check.sh"       # when /ship suggests /add-rule

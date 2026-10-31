@@ -31,6 +31,7 @@ import { homedir } from "node:os";
 //                             and finding, one file per ship, in one folder
 //   edit-check.sh             PostToolUse — line-limit.sh, lint-ratchet.mjs and
 //                             text-rules.mjs on each edited file
+//   bash-check.sh             PostToolUse on Bash — edit-check.sh on files a command changed
 //   registry.mjs              run by /plan-feature and /registry — the *.registry.yaml checks
 
 const GATE_FILENAME = "skill-gate.sh";
@@ -47,6 +48,7 @@ const VERSION_CHECK_FILENAME = "version-check.sh";
 const SKILL_FLAGS_FILENAME = "skill-flags-record.sh";
 const SKILL_REPORT_FILENAME = "skill-report.mjs";
 const EDIT_CHECK_FILENAME = "edit-check.sh";
+const BASH_CHECK_FILENAME = "bash-check.sh";
 const LINE_LIMIT_FILENAME = "line-limit.sh";
 const LINT_RATCHET_FILENAME = "lint-ratchet.mjs";
 const TEXT_RULES_FILENAME = "text-rules.mjs";
@@ -157,6 +159,7 @@ export async function setupHook(targetDir = process.cwd()) {
     SKILL_FLAGS_FILENAME,
     SKILL_REPORT_FILENAME,
     EDIT_CHECK_FILENAME,
+    BASH_CHECK_FILENAME,
     LINE_LIMIT_FILENAME,
     LINT_RATCHET_FILENAME,
     TEXT_RULES_FILENAME,

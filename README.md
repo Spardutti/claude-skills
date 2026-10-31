@@ -223,6 +223,7 @@ scripts/       validate-skills.mjs — checks skill length caps and reference in
                version-check.sh — SessionStart nudge when a newer catalog is published
                skill-flags-record.sh — logs each /ship skills audit and /code-review; skill-report.mjs tallies them
                edit-check.sh — PostToolUse check on each edited file: line-limit.sh, lint-ratchet.mjs, .edit-rules.json
+               bash-check.sh — PostToolUse check on files a shell command changed: runs edit-check.sh on each
                diary-check.mjs — run at the end of /ship; says when the diaries hold enough for /add-rule
                registry.mjs — the *.registry.yaml checks for /plan-feature and /registry
                line-limit.sh — the 200-line ratchet, shared by the edit check, the ship gate and preflight

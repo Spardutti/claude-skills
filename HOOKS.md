@@ -34,9 +34,10 @@ Two guard the **back** — nothing finishes or ships until the code passes:
   `gh pr merge`, and a `git push` from a protected branch without a receipt from
   `ship-gate.sh`. It also refuses a PR on a branch where `/ship` never started
 
-One checks each edit as it lands — see [The Edit Check](#the-edit-check):
+Two check each edit as it lands — see [The Edit Check](#the-edit-check):
 
 - `edit-check.sh` — a `PostToolUse` hook on `Write|Edit|MultiEdit`
+- `bash-check.sh` — a `PostToolUse` hook on `Bash`, for files a command changed
 
 One stays out of the way entirely:
 
@@ -316,6 +317,12 @@ rule before the install is recorded in `.line-limit-baseline` and `.lint-baselin
 (commit both): it never blocks, it may not grow, and editing it brings a "fix it if
 this change allows" note. Files the gate skips (`GAUNTLET_IGNORE_FILES`, e.g.
 `components/ui/`) and git-ignored files are skipped here too.
+
+A file changed by a shell command (`sed -i`, a Python patch) gets the same check from
+`bash-check.sh`. It runs `edit-check.sh` on each changed version once, so a failure
+it already reported does not block every later command. It reads the session's
+folder and any other git worktree the command names. A file written and committed in
+one command is not seen here; the ship gate still measures it.
 
 `--baseline` only banks: an entry may drop or go, never appear or grow. A rule
 switched on later (ESLint installed, a skill added) only notes until
