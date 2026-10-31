@@ -22,9 +22,9 @@ edit() {  # edit <file> — runs the installed hook as Claude Code would after a
   printf '{"tool_input":{"file_path":"%s/%s"}}' "$PWD" "$1" | CLAUDE_PROJECT_DIR="$PWD" bash .claude/hooks/edit-check.sh 2>&1
 }
 
-ok=1; for f in edit-check.sh line-limit.sh lint-ratchet.mjs text-rules.mjs ratchet-baseline.mjs diary-check.mjs diary-lib.mjs ship-log.mjs ship-log-parse.mjs ship-log-report.mjs ship-mark.sh ship-prep.sh registry.mjs registry-lib.mjs; do [ -x ".claude/hooks/$f" ] || ok=0; done
+ok=1; for f in edit-check.sh bash-check.sh line-limit.sh lint-ratchet.mjs text-rules.mjs ratchet-baseline.mjs diary-check.mjs diary-lib.mjs ship-log.mjs ship-log-parse.mjs ship-log-report.mjs ship-mark.sh ship-prep.sh registry.mjs registry-lib.mjs; do [ -x ".claude/hooks/$f" ] || ok=0; done
 ie "the edit-check files and the diary check are installed, executable" $ok "$(ls .claude/hooks)"
-WANT='[{"matcher":"Skill","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh"}]},{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/edit-check.sh"}]}]'
+WANT='[{"matcher":"Skill","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate-automark.sh"}]},{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/edit-check.sh"}]},{"matcher":"Bash","hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-check.sh"}]}]'
 ie "an upgrade adds the edit hook beside the old PostToolUse entry" "$([ "$(post)" = "$WANT" ] && echo 1)" "$(post)"
 ie "the first install records old code as baseline debt" "$(grep -qx '300 src/old.ts' .line-limit-baseline 2>/dev/null && echo 1)" "$(cat .line-limit-baseline 2>&1)"
 ie "an empty .lint-baseline is still written, so a reinstall never re-baselines" "$([ -f .lint-baseline ] && echo 1)" "$(ls -a)"

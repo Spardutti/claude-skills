@@ -13,6 +13,7 @@ const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
 const SKILL_FLAGS_FILENAME = "skill-flags-record.sh";
 const EDIT_CHECK_FILENAME = "edit-check.sh";
+const BASH_CHECK_FILENAME = "bash-check.sh";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -102,6 +103,12 @@ export async function registerHooks(settingsPath) {
     hooks: [{ type: "command", command: `$CLAUDE_PROJECT_DIR/.claude/hooks/${EDIT_CHECK_FILENAME}` }],
   };
   upsert(settings.hooks.PostToolUse, EDIT_CHECK_FILENAME, editCheckEntry);
+
+  const bashCheckEntry = {
+    matcher: "Bash",
+    hooks: [{ type: "command", command: `$CLAUDE_PROJECT_DIR/.claude/hooks/${BASH_CHECK_FILENAME}` }],
+  };
+  upsert(settings.hooks.PostToolUse, BASH_CHECK_FILENAME, bashCheckEntry);
 
   // Register SessionStart version check. No matcher: startup and resume both
   // want it, and the script's own daily stamp keeps a burst of resumes quiet.
