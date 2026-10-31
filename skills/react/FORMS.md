@@ -5,7 +5,7 @@ The default is **React Hook Form with `zodResolver`**, because shadcn's `<Form>`
 `FormField` wraps its `Controller`. Choosing anything else means not using the
 component library you already have.
 
-RHF 7.87 is current; 8.0 is in beta. `@hookform/resolvers` 6.0 handles Zod 3 and
+RHF 7.87 is current; 8.0 is in beta. `@hookform/resolvers` 7.0 handles Zod 3 and
 Zod 4 from the same import, detecting the schema at runtime — one resolver, either
 major, no separate package.
 
