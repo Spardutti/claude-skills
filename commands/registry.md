@@ -25,7 +25,7 @@ entries → skip to **Update**.
 
 ## Step 0 — No argument: ask
 
-Run `node REG` to print the entries that exist, then ask the user which system to record.
+Run `node REG --names` to print one line per entry that exists, then ask the user which system to record.
 Never search the repo for candidates; the user decides what is a system.
 
 ## Step 1 — With an argument: read the system

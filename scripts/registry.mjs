@@ -26,6 +26,11 @@ function list() {
   stale();
 }
 
+function names() {
+  if (!entries.length) return console.log(`registry none — no *${REGISTRY_SUFFIX} in this project`);
+  for (const e of entries) console.log(`${e.name} — ${e.summary} — ${e.file}`);
+}
+
 function checkPlan(planPath, stubs) {
   if (!entries.length) return console.log("registry ok — no entries");
   const marks = planMarks(planPath);
@@ -125,11 +130,12 @@ function fail(lines) {
 
 const [mode, ...rest] = process.argv.slice(2);
 if (mode === undefined) list();
+else if (mode === "--names") names();
 else if (mode === "--plan" && rest[0]) checkPlan(resolve(rest[0]), rest.slice(1));
 else if (mode === "--plan-missing") planMissing();
 else if (mode === "--stale") stale();
 else if (mode === "--eval") evaluate();
 else {
-  console.error("usage: registry.mjs [--plan PLAN.md <stub files…> | --plan-missing | --stale | --eval]");
+  console.error("usage: registry.mjs [--names | --plan PLAN.md <stub files…> | --plan-missing | --stale | --eval]");
   process.exit(2);
 }

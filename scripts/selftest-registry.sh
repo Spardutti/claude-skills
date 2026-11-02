@@ -37,6 +37,10 @@ git add -A; git commit -qm registry
 
 rg "every entry is printed in full" 0 "never: write targeting logic inside a skill" --
 rg "both entries are printed" 0 "== src/inventory/inventory.registry.yaml ==" --
+N=$((N+1)); out=$(node "$RG" --names 2>&1)
+want=$'aiming-methods — how skills pick a target — src/combat/aiming/aiming.registry.yaml\ninventory — what a unit carries — src/inventory/inventory.registry.yaml'
+if [ "$out" = "$want" ]; then PASS=$((PASS+1)); echo "  ok   --names prints one line per entry"
+else FAIL=$((FAIL+1)); printf '  FAIL --names:\n%s\n' "$out"; fi
 rg "a plan with no notes file fails" 1 "PLAN.md not found" -- --plan PLAN.md
 
 printf '# Plan notes\n\n## Registry\n- aiming-methods: reuse\n\n## Splits\n- inventory: skip\n' > PLAN.md
