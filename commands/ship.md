@@ -122,7 +122,8 @@ they cost a ship 5 to 8 minutes:
 4. **Run the gate script once more**, because those fixes changed files.
 
 **Log every finding the moment you settle it** — survivor, audit point or review finding:
-`node .claude/hooks/ship-log.mjs finding '<json>'` (shape in The ship log). With the log off
+`node .claude/hooks/ship-log.mjs finding '<json>'` (shape in The ship log; in a worktree:
+`CLAUDE_PROJECT_DIR=<worktree> node …`). With the log off
 these commands do nothing, so never skip them.
 
 The sections below say how to do each check. They are not an order.
@@ -307,7 +308,7 @@ gh pr create --base <base> --title '<conventional title, ≤70 chars>' --body-fi
 
 No other sections — no Review notes, Related, Decisions, Verification, Background. No tooling words a teammate would not know: say "a test gap the mutation tool found", not "a surviving mutant". A body that needs a sentence over 25 words is explaining, not describing — cut it.
 
-5. Run `node .claude/hooks/ship-log.mjs pr <number>`, then show the PR URL.
+5. Run `node .claude/hooks/ship-log.mjs pr <number>` (in a worktree: `CLAUDE_PROJECT_DIR=<worktree> node …`), then show the PR URL.
 
 ## Stage: merge
 
@@ -370,7 +371,8 @@ check; on a pick, run `/add-rule` with that mistake. Never write a rule here.
 
 The log is on when the user set `GAUNTLET_SHIP_LOG=1`; when it is off, every call below does
 nothing. The gate logs each of its own runs; you add what only you know, as it happens, with
-`node .claude/hooks/ship-log.mjs`:
+`node .claude/hooks/ship-log.mjs`. In a worktree, prefix every call with `CLAUDE_PROJECT_DIR=<worktree>`:
+run from the main folder, it logs to the main folder's branch and splits the ship in two.
 
 - `ship-prep.sh start` opens the log for you; never run `start` yourself. A ship left open
   by an interrupted run is saved as abandoned, so it never mixes into this one.
