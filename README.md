@@ -83,7 +83,7 @@ That last one is the difference. Your agent says the tests pass. This finds out.
 
 ## Skill Catalog
 
-**16 skills**, grouped the same way the installer presents them.
+**17 skills**, grouped the same way the installer presents them.
 
 > [!NOTE]
 > Skills marked **📦 Bundle** ship a concise always-loaded entry point plus reference files Claude reads only when a task needs them — comprehensive coverage at a low context cost.
@@ -95,6 +95,7 @@ That last one is the difference. Your agent says the tests pass. This finds out.
 | `react` 📦 | React 19.2 — `use`, Actions, `ref` as prop, Rules of Hooks, React Compiler v1.0, component splitting, `useEffect` avoidance, performance, loading/empty states, Zustand, Tailwind v4 tokens; bundle covers forms (React Hook Form + Zod) and shadcn/ui (Base UI vs Radix, `cva`, `cn()`) |
 | `tanstack-query` 📦 | TanStack Query v5 — queries, mutations (pessimistic & optimistic), `useInfiniteQuery`/`useSuspenseQuery`, query-key factories, v4→v5 migration |
 | `tanstack-router` | File-based routing, type-safe navigation, loaders & caching, search params, `beforeLoad` auth guards, pending UI that prevents frozen-feeling navigation |
+| `design-variants` 📦 | Three blind designer agents, one brief, nine working variants side by side on one artifact page — each built to a shared UX floor (all five states, WCAG 2.2 AA, clarity for strangers) and measured by a contrast-and-labels check; you pick a base and the parts to steal, a fresh designer merges them |
 
 ### Backend
 

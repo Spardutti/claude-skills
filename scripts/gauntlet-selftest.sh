@@ -91,6 +91,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-prep-stages.sh"  # commit, merge and release facts in one call each
 . "$HERE/selftest-ship-mark.sh"          # a PR opens only after /ship starts on its branch
 . "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
+. "$HERE/selftest-design-check.sh"      # design-variants check.mjs: contrast, labels, names
 . "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders
 . "$HERE/selftest-ship-gate-tooling.sh"  # .claude/ tooling and deleted files are never UNPROVEN
 . "$HERE/selftest-skill-gate.sh"         # deny messages, exemptions, auto mode
