@@ -146,6 +146,8 @@ node .claude/hooks/registry.mjs --plan PLAN.md <stub files…>
 
 **Print the notes, show the stub diff, and stop.** Diff only the files the stubs created or touched — the tree may hold other uncommitted work, so never show a bare `git diff --stat`. If a touched file already had uncommitted changes, show only the lines the stub added there. Keep that file list; the build checks against it. Build nothing until the user says go. The user may edit the stubs directly — re-run the type check on their edits before building. The plan is cheap to correct now and expensive to correct later.
 
+End the message with this question as its last line, after any summary: "Nothing is built yet. Build it this way, or change something?" A message that ends on a summary leaves the user unsure why you stopped.
+
 When the user says go, build the plan yourself, in this conversation. Do not spawn agents to write code: parallel code-writing workers each reloaded their skills and the plan, crossed messages, and re-reported, and one feature spent 51 minutes waiting on its slowest worker. One agent gives the user one diff to review.
 
 Build the side others depend on first (schema and API before the screens that call them). Fill the stubs in place and turn each pending test into a real one. Write the tests for what you write, and run each touched app's tests and type check before moving on.
@@ -162,6 +164,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and a
 - Always scan the repo yourself before asking the user anything — never spawn subagents to scan or to write code.
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.
 - Always print the plan and stop before Step 5 — never build until the user approves it.
+- Always end the stop message with the approval question as its last line — never end it on a summary.
 - Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/ship`.
 - Never produce a plan that proposes building something the scan found as reusable, unless the user explicitly rejected reuse.
 - Always run the registry first, mark every entry `reuse` or `skip` in `PLAN.md`, and stop only when `--plan` shows no FAIL — every ASK goes to the user.
