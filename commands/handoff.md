@@ -74,6 +74,9 @@ empty** — an empty heading costs the next agent a read for nothing.
 ## Mission
 One sentence. What we are trying to achieve, not what we did.
 
+## Where the user left off
+What the user was doing in the last few turns, with one quote in their words.
+
 ## State
 Landed: <commit subjects or "see git log -N">
 In flight: <what is half-done, and where it stops>
@@ -86,19 +89,42 @@ Uncommitted: <every dirty path in git status, and why it is dirty>
 - <approach> — <why it failed or was rejected>
 
 ## Open questions
-- <question> — <who or what answers it>
+- <question that blocks the next step> — <who or what answers it>
 
 ## Next step
-The single concrete action to take first.
+A question for the user, or one step that ends at one.
 
 ## Load first
 Skills: <names to call the Skill tool for>
 Commands: <slash commands this work uses>
-Files: <paths worth reading before touching anything>
+Files: <only the paths the next step touches>
 
 ## Pointers
-<spec / plan / PR / issue links and paths — never their contents>
+<the source doc that defines "done" first, then spec / plan / PR links — never their contents>
 ```
+
+**The next step stops at the user.** A fresh session acts on it at once, and
+the user may have moved on. Never write an order to ship, push, merge, deploy,
+or start new work.
+
+```markdown
+<!-- BAD — the new session ships before the user knows what it is -->
+## Next step
+Commit the `tools/pressure*` files and ship the branch with `/ship`.
+```
+
+```markdown
+<!-- GOOD — the user decides, with the facts in front of them -->
+## Next step
+Tell the user in plain words what `tools/pressure-table` does, then ask:
+"ship it now, or keep testing the balance scripts?"
+```
+
+**Cut what the next step won't use.** Side bugs, other people's tickets and
+"maybe later" go nowhere. Add a line only if the next step needs it.
+
+**Name a session, process, or port only with how to check it is still alive.**
+These go stale first.
 
 **Uncommitted work is the highest-value section.** A fresh agent opening a dirty
 tree has no idea whether it is half-finished work, an abandoned experiment, or
@@ -128,6 +154,9 @@ section toward it — cut decisions that no longer bear on that focus.
 - Always record rejected alternatives, not just the chosen one.
 - Always explain every uncommitted path in the tree.
 - Never write a chronological summary of the conversation.
-- Always end with exactly one concrete next step.
+- Always end with exactly one next step, and make it stop at a question for the user.
+- Never write a next step that ships, pushes, merges, deploys, or starts new work.
+- Always say where the user left off, in their own words.
+- Never list open questions, files, or pointers the next step won't use.
 - Always drop sections that would be empty.
 - Never include secrets, tokens, or personal data.
