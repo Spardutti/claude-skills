@@ -74,7 +74,19 @@ lines load at all.
 - One line per note, under ~150 characters. A longer line holds detail that
   belongs in the note file — propose moving it there.
 - Every line points to a file that exists. Every note file has a line.
-- Propose a fix for any broken `[[link]]` that names a note under another name.
+
+Then list every broken `[[link]]` — run this, don't eyeball it:
+
+```bash
+names=$(grep -h '^name:' "$MEM"/*.md | sed 's/^name: *//')
+grep -o '\[\[[^]]*\]\]' "$MEM"/*.md | tr -d '[]' | while IFS=: read -r file link; do
+  echo "$names" | grep -qx "$link" || echo "$(basename "$file") → [[$link]]"
+done
+```
+
+Every line it prints goes in the proposal, even if the link was broken before
+this pass. Point it at the note that now holds that fact, or drop the link.
+The script's output is the proof.
 
 ## Step 4 — Show the proposal
 
@@ -124,4 +136,5 @@ Backup: ~/.claude/projects/<slug>/memory-backup-20261107-1430
 - Always treat "no evidence" as keep, never as delete.
 - Always check names of files, flags, and scripts against the repo as it is now.
 - Always keep `MEMORY.md` one short line per note.
+- Always run the broken-link script and propose a fix for every line it prints.
 - Never write new notes about this pass itself.
