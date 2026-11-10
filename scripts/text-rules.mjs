@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 export function loadEditRules(root) {
@@ -25,7 +25,8 @@ export function textFindings(rules, root, rel) {
 export function projectFiles(root) {
   const args = ["ls-files", "--cached", "--others", "--exclude-standard"];
   const run = spawnSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
-  return run.status === 0 ? run.stdout.split("\n").filter(Boolean) : walk(root, "");
+  if (run.status !== 0) return walk(root, "");
+  return run.stdout.split("\n").filter((f) => f && statSync(resolve(root, f), { throwIfNoEntry: false })?.isFile());
 }
 
 function walk(root, dir) {

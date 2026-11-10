@@ -158,3 +158,12 @@ N=$((N+1))
 out=$(printf '{"tool_input":{"file_path":"%s/src/components/ui/btn.tsx"}}' "$LR" | CLAUDE_PROJECT_DIR="$LR" bash "$LR/scripts/edit-check.sh" 2>&1); rc=$?
 if [ "$rc" = 0 ] && [ -z "$out" ]; then PASS=$((PASS+1)); echo "  ok   a file the gate skips (shadcn ui) is skipped by every edit check"
 else FAIL=$((FAIL+1)); echo "  FAIL a file the gate skips (shadcn ui) is skipped by every edit check — exit $rc: $out"; fi
+
+GL="$TMP/gitlink"; rm -rf "$GL"; mkdir -p "$GL/src" "$GL/vendor.sh"
+cp "$LR/.edit-rules.json" "$GL/"; printf '# top\nx=1\n' > "$GL/src/old.sh"
+git -C "$GL" init -q; git -C "$GL" add -A; git -C "$GL" -c user.email=t@t -c user.name=t commit -qm init
+git -C "$GL" update-index --add --cacheinfo "160000,$(git -C "$GL" rev-parse HEAD),vendor.sh"
+env -C "$GL" node "$LR/scripts/lint-ratchet.mjs" --baseline no-file-header >/dev/null 2>&1
+N=$((N+1))
+if grep -qx '1 no-file-header src/old.sh' "$GL/.lint-baseline" 2>/dev/null; then PASS=$((PASS+1)); echo "  ok   --baseline skips a submodule"
+else FAIL=$((FAIL+1)); echo "  FAIL --baseline skips a submodule — $(cat "$GL/.lint-baseline" 2>&1)"; fi

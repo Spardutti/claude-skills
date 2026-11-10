@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -23,7 +23,7 @@ export function projectFiles(root) {
   const git = spawnSync("git", ["-C", root, "ls-files", "--cached", "--others", "--exclude-standard"],
     { encoding: "utf8", maxBuffer: 64 << 20 });
   if (git.status !== 0) return walk(root, root, []);
-  return git.stdout.split("\n").filter((f) => f && existsSync(join(root, f)));
+  return git.stdout.split("\n").filter((f) => f && statSync(join(root, f), { throwIfNoEntry: false })?.isFile());  // a submodule is listed as a folder
 }
 
 function value(raw) {

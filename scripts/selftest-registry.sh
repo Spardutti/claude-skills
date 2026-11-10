@@ -187,3 +187,9 @@ core 'sim/'
 rg "a folder holding another entry's location is stale" 1 "location holds aim's sim/aim.gd" -- --stale
 printf 'name: aim\nsummary: s\ntriggers: [aim]\nlocation: sim\nextend_by: add a `Aim`\n' > sim/aim.registry.yaml
 rg "the same folder with and without a slash is not held" 0 "" -- --stale
+mkdir -p vendor/lib; git add -A; git commit -qm locations
+git update-index --add --cacheinfo "160000,$(git rev-parse HEAD),vendor/lib"
+N=$((N+1)); out=$(node "$RG" --eval 2>&1)
+case "$out" in *EISDIR*|*Error*) FAIL=$((FAIL+1)); printf '  FAIL eval skips a submodule:\n%s\n' "$out" ;;
+  *"registry SUSPECT altar view/shop.gd:1"*) PASS=$((PASS+1)); echo "  ok   eval skips a submodule" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL eval skips a submodule:\n%s\n' "$out" ;; esac
