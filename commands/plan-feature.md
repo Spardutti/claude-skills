@@ -1,25 +1,25 @@
 ---
 name: plan-feature
-description: "Plan a feature so it integrates with existing code instead of duplicating it, then build it — you scan the repo yourself for reusable code, established patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go you fill them in"
+description: "Use when the user asks to build, add or change a feature, or to fix a bug. Plans the work so it integrates with existing code instead of duplicating it, then builds it — you scan the repo yourself for reusable code, established patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go you fill them in"
 category: Workflow
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 requires-commands: [registry]
-argument-hint: "<short feature description>"
+argument-hint: "<short feature or bug description>"
 ---
 
-# Plan Feature — Integration-First Planning
+# Plan Feature — Integration-First Planning for Features and Fixes
 
-You are a feature-integration planner. Before any code is written, your job is to make sure the new feature **plugs into what already exists** instead of growing in isolation: reuse existing components, follow established patterns, modify the right touch points.
+You are an integration planner for features and bug fixes. Before any code is written, your job is to make sure the change **plugs into what already exists** instead of growing in isolation: reuse existing components, follow established patterns, modify the right touch points.
 
 This is **not** a PRD. You are not scoping product value or success metrics. You are answering: *given this codebase, what should we reuse, what should we extend, what should we add, and what pattern should we follow?*
 
-## Step 1 — Restate the Feature
+## Step 1 — Restate the Change
 
 First, **check for a discovery log**. If `$ARGUMENTS` names a file, or a `DISCOVERY.md` exists at the repo root, read it — `/discover` produces one for exactly this. If found, treat its Mental model, Scope, Non-goals, Edge cases and Success criteria as **already resolved**: don't re-ask them later. Its Considered approaches are decided too — never revive a rejected framing.
 
 Its Open questions are the exception: those are genuinely unresolved, and one of them is worth asking if it changes the plan.
 
-Take `$ARGUMENTS` (the user's brief) plus the discovery log if present. In 1–2 sentences, restate what the feature is in your own words. If the brief is too vague to scan for (e.g. "improve the dashboard") and no discovery log clarifies it, ask **one** clarifying question first and stop. Otherwise continue.
+Take `$ARGUMENTS` (the user's brief) plus the discovery log if present. In 1–2 sentences, restate the change in your own words — for a bug, what breaks and what should happen instead. If the brief is too vague to scan for (e.g. "improve the dashboard") and no discovery log clarifies it, ask **one** clarifying question first and stop. Otherwise continue.
 
 ## Step 2 — Scout the Repo Yourself
 
@@ -46,7 +46,7 @@ longer matches its code: tell the user in Step 3, and never trust that entry's n
 3. Sort the hits: drop-in reusable, or a near miss that needs a small extension.
 
 **Pattern — how the closest feature is wired.**
-1. Classify the feature: list page, detail page, form, mutation, background job, API endpoint, UI element, other.
+1. Classify the change: list page, detail page, form, mutation, background job, API endpoint, UI element, other.
 2. Read the entry file of 2–3 existing features of that type, plus 1–2 supporting files each.
 3. Note file layout, routing, state and data, error handling, validation, styling, naming — each backed by a real file.
 
@@ -54,8 +54,8 @@ longer matches its code: tell the user in Step 3, and never trust that entry's n
 1. Infer the layers: UI, routing, state, API, DB, permissions, navigation, i18n, config.
 2. Find the registries and aggregators each layer needs: routers, DB schema, navigation, permissions,
    API roots and specs, i18n files, flags and config, type and event registries.
-3. Read each to confirm the feature must register there, and note its line count (`loc`).
-   Only files the feature must edit — never files it only reads, never every consumer.
+3. Read each to confirm the change must register there, and note its line count (`loc`).
+   Only files the change must edit — never files it only reads, never every consumer.
 
 Keep the findings short — symbol and `path:line` for reuse, exemplar files for the pattern, and
 `file`, `loc` and why for each touch point. Steps 3 and 4 build on them.
@@ -66,7 +66,7 @@ Now, and only now, ask the user clarifying questions — **batched in a single m
 
 - "There's already a `<Card variant="outlined">` in `src/ui/Card.tsx` — does the new card use this, or do you need a new variant?"
 - "Similar features (`OrderList`, `InvoiceList`) use `useInfiniteQuery` with cursor pagination — same approach here, or offset?"
-- "`src/api/router.ts` and `src/db/schema.ts` will both need entries — confirm this feature owns its own table, or extends `users`?"
+- "`src/api/router.ts` and `src/db/schema.ts` will both need entries — confirm this change owns its own table, or extends `users`?"
 
 Skip questions whose answer is obvious from the scans, **or already settled by a discovery log** — never re-ask something the log resolved. If everything is clear, skip this step entirely.
 
@@ -97,18 +97,18 @@ Python uses `raise NotImplementedError("stub")` and `@pytest.mark.skip(reason="s
 
 Run the type checker each touched app already uses (`tsc --noEmit`, `mypy`, `pyright`). Fix the sketch until it passes. If the app has no type checker, import every touched module instead (`python -c "import app.export"`) and say it proves less — names resolve, types go unchecked.
 
-If one PR's share of the sketch spans more than ~12 files, the feature is too big — tell the user to split it. A feature across repos counts each repo's PR on its own.
+If one PR's share of the sketch spans more than ~12 files, the change is too big — tell the user to split it. A change across repos counts each repo's PR on its own.
 
 ## Step 4b — Notes the Stubs Cannot Hold
 
 Print only what code cannot say. Never list reuse, extend or add targets here — the stub diff already shows them, and two copies drift.
 
 ```markdown
-# Plan notes — <feature name>
+# Plan notes — <feature or fix name>
 
 ## Registry
 - <entry name>: reuse
-- <entry name>: skip — <why this feature does not touch it>
+- <entry name>: skip — <why this change does not touch it>
 
 ## Pattern to follow
 <1–3 bullets pointing at an existing feature to mirror, with file paths>
@@ -154,9 +154,9 @@ Build the side others depend on first (schema and API before the screens that ca
 
 If a stub's signature turns out wrong, stop and tell the user why before changing it — never work around a stub with a hack inside the body. The design was approved as signatures, so a changed signature is a changed plan.
 
-Before reporting, grep the touched files for the `stub` marker. None may remain. Then compare every exported signature in the stub files against the approved stub. List each difference in the report as "Plan changed: <signature>, because <reason>" — a rule the build can forget, a check it cannot. When tests pass and no marker remains, report the diff.
+Before reporting, grep the touched files for the `stub` marker. None may remain. Then compare every exported signature in the stub files against the approved stub. List each difference in the report as "Plan changed: <signature>, because <reason>" — a rule the build can forget, a check it cannot. When tests pass and no marker remains, report the diff. End the report with: "Review it, then run `/ship` when it looks right."
 
-Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and asks for changes first, and any edit voids the gate's receipt, so an early run is always paid again. `/ship` runs it once, before the PR.
+Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the change and asks for changes first, and any edit voids the gate's receipt, so an early run is always paid again. `/ship` runs it once, before the PR.
 
 ## Rules
 
@@ -171,7 +171,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the feature and a
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If the scan finds nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
 - Always flag an extend target whose `loc` is near/over 200 lines and make the file split an explicit planned step — never let a "no new files" plan silently collide with the 200-line limit.
-- Cap the notes at ~40 lines. If it grows beyond that, the feature is too big — tell the user to split it.
+- Cap the notes at ~40 lines. If it grows beyond that, the change is too big — tell the user to split it.
 - Never write stubs on the default branch — branch each touched repo first.
 - Always write the stub sketch at the real paths and type-check it before stopping — never redeclare a symbol the plan says to reuse.
 - Never change an approved stub's signature during the build without telling the user why first.

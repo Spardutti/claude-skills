@@ -1,6 +1,6 @@
 ---
 name: ship
-description: "Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
+description: "Suggest it to the user once a feature or fix is built and reviewed; start it only when the user asks to ship. Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
 category: Workflow
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task, Skill
 requires-agents: [gauntlet-skills]
