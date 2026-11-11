@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { parseLine, readLines } from "./diary-lib.mjs";
-import { git, parseReport, planRegistry, prSize, ruleBlocks } from "./ship-log-parse.mjs";
+import { branchStart, git, parseReport, planRegistry, prSize, ruleBlocks } from "./ship-log-parse.mjs";
 import { printReport, tally } from "./ship-log-report.mjs";
 
 const HERE = dirname(resolve(process.argv[1]));
@@ -62,7 +62,7 @@ function settleSurvivors(record) {
 function finalize(c, path, record, tag, status, reason, at) {
   settleSurvivors(record);
   Object.assign(record, { status, reason: reason ?? null, finished: at ?? now() });
-  record.rules = ruleBlocks(c.diary, record.branch, record.started, record.finished);
+  record.rules = ruleBlocks(c.diary, record.branch, record.branchStarted ?? record.started, record.finished);
   record.summary = summarize(record);
   const stem = `${record.app}_${record.finished.slice(0, 10)}_${tag}`;
   let out = join(c.dir, `${stem}.json`);
@@ -99,7 +99,7 @@ function closeOpened(c, app) {
 function restart(c, path, record, id) {
   closeOpened(c, id.app);
   if (existsSync(path)) finalize(c, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "abandoned");
-  save(path, { ...load(path, id), registry: planRegistry(c.root) });
+  save(path, { ...load(path, id), registry: planRegistry(c.root), branchStarted: branchStart(id.branch) });
 }
 
 function addGateRun(record, [report, exit, seconds, base]) {

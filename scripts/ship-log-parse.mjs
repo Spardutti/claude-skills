@@ -106,10 +106,17 @@ export function prSize(base, testRe, sourceExt) {
 
 export function planRegistry(root) {
   const marks = planMarks(join(root, "PLAN.md"));
-  return marks && Object.fromEntries(marks);
+  return marks?.size ? Object.fromEntries(marks) : null;
 }
 
-// Worktrees share one diary, so only this branch's blocks during the ship count.
+// Most blocks come while the code is written, before /ship, so the count starts at the branch's birth.
+export function branchStart(branch) {
+  const first = git(["reflog", "show", "--date=unix", "--format=%gd", `refs/heads/${branch}`]).split("\n").filter(Boolean).at(-1);
+  const seconds = first?.match(/\{(\d+)\}/)?.[1];
+  return seconds ? new Date(seconds * 1000).toISOString().replace(/\.\d+Z$/, "Z") : null;
+}
+
+// Worktrees share one diary, so only this branch's blocks count.
 export function ruleBlocks(diary, branch, since, until) {
   return readLines(join(diary, "edit-blocks.jsonl")).map(parseLine)
     .filter((r) => r?.branch === branch && r.ts >= since && r.ts <= until)
