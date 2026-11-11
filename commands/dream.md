@@ -1,9 +1,10 @@
 ---
 name: dream
-description: "Clean up this project's auto memory against what really happened — checks each memory note against the session transcripts and the repo, proposes fixes, deletes and merges with a quoted proof for each, and changes nothing until you approve each one. Keeps MEMORY.md a short index"
+description: "Clean up this project's auto memory against what really happened — checks each memory note against the session transcripts and the repo, finds corrections no note covers yet, proposes adds, fixes, deletes and merges with a quoted proof for each, and changes nothing until you approve each one. Keeps MEMORY.md a short index"
 category: Workflow
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write
 argument-hint: "[topic to focus on, or empty for all memories]"
+requires-commands: [add-rule]
 ---
 
 # Dream — Check Memory Against What Happened
@@ -66,6 +67,32 @@ Sort each note into one bucket:
    "moved everything under apps/api, server/ is gone".
 ```
 
+## Step 2b — Find corrections no note covers
+
+`SCAN` is `.claude/hooks/correction-scan.mjs`, or `scripts/correction-scan.mjs` in the
+claude-skills repo. It lists every message of the user's that might be a correction,
+newest first, since the last pass:
+
+```bash
+node SCAN --scan "$MEM/.."
+```
+
+No `SCAN` (the file was copied in by hand) → grep the transcripts for
+`"type":"user"` lines with "don't", "stop", "I said", "wrong", newest first.
+
+Each line has `said` (the user's words) and `after` (the end of the reply before it).
+Most hits are not corrections. Keep one only when the user told Claude it did, or was
+about to do, the wrong thing, and the lesson holds beyond that one task.
+
+Drop it if a memory note, `CLAUDE.md`, or `.edit-rules.json` already says it. Then sort:
+
+- **Add** — about how Claude works: when to ask, push, release, how to write.
+  Propose a new `feedback` note quoting the user's words.
+- **Rule** — about code in certain files. Do not write it. Propose `/add-rule <the mistake>`.
+  No `.claude/commands/add-rule.md` → make it an **Add** that names the files it is about.
+
+Never propose adding any of it to `CLAUDE.md`.
+
 ## Step 3 — Check the index
 
 `MEMORY.md` loads into every session, so it stays short. Only the first 200
@@ -102,6 +129,10 @@ Dream — 125 notes checked
 2. Merge   project_save_format.md + project_save_v2.md → project_save_format.md
    Proof: both describe the same JSON save file; v2 has the newer field list.
 3. Fix     MEMORY.md line 41 — 310 characters; move the detail into its note.
+4. Add     feedback_no_push_before_go.md — push only after the user says go.
+   Proof: session 2026-11-02: "no, dont push yet, I want to read it first".
+5. Rule    run `/add-rule route tests mock the data layer`
+   Proof: session 2026-11-05: "why did you spin up a database in the route test".
 
 Keep: 122 notes.
 
@@ -118,7 +149,8 @@ Back up first, every time:
 cp -r "$MEM" "$MEM-backup-$(date +%Y%m%d-%H%M)"
 ```
 
-Then apply only the approved numbers. After a delete or merge, update
+Then apply only the approved numbers. After applying, even "none", record the pass
+so the same corrections are not offered again: `node SCAN --mark`. After a delete or merge, update
 `MEMORY.md` and every `[[link]]` that pointed at the removed name.
 
 Print what changed and the backup path, so the user can undo it:
@@ -138,3 +170,5 @@ Backup: ~/.claude/projects/<slug>/memory-backup-20261107-1430
 - Always keep `MEMORY.md` one short line per note.
 - Always run the broken-link script and propose a fix for every line it prints.
 - Never write new notes about this pass itself.
+- Never put a correction in `CLAUDE.md`; behaviour goes to a memory note, code goes to `/add-rule`.
+- Always quote the user's own words for every Add or Rule.

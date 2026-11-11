@@ -27,6 +27,7 @@ import { homedir } from "node:os";
 //   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
 //   skill-report.mjs          read by /skill-report — tallies that log
 //   diary-check.mjs           run by /ship — says when /add-rule has repeats to look at
+//   correction-scan.mjs       run by /dream — finds corrections in the chats
 //   ship-log.mjs              the /ship log, when GAUNTLET_SHIP_LOG=1 — every gate run
 //                             and finding, one file per ship, in one folder
 //   edit-check.sh             PostToolUse — line-limit.sh, lint-ratchet.mjs and
@@ -53,8 +54,7 @@ const LINE_LIMIT_FILENAME = "line-limit.sh";
 const LINT_RATCHET_FILENAME = "lint-ratchet.mjs";
 const TEXT_RULES_FILENAME = "text-rules.mjs";
 const RATCHET_BASELINE_FILENAME = "ratchet-baseline.mjs";
-const DIARY_CHECK_FILENAME = "diary-check.mjs";
-const DIARY_LIB_FILENAME = "diary-lib.mjs";
+const DIARY_FILENAMES = ["diary-check.mjs", "diary-lib.mjs", "correction-scan.mjs"];
 const SHIP_LOG_FILENAME = "ship-log.mjs";
 const SHIP_LOG_PARSE_FILENAME = "ship-log-parse.mjs";
 const SHIP_LOG_REPORT_FILENAME = "ship-log-report.mjs";
@@ -164,8 +164,7 @@ export async function setupHook(targetDir = process.cwd()) {
     LINT_RATCHET_FILENAME,
     TEXT_RULES_FILENAME,
     RATCHET_BASELINE_FILENAME,
-    DIARY_CHECK_FILENAME,
-    DIARY_LIB_FILENAME,
+    ...DIARY_FILENAMES,
     SHIP_LOG_FILENAME,
     SHIP_LOG_PARSE_FILENAME,
     SHIP_LOG_REPORT_FILENAME,

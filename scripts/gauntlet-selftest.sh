@@ -105,6 +105,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-lint-ratchet.sh"       # the ESLint ratchet on each edited file
 . "$HERE/selftest-lint-ratchet-baseline.sh"  # baselines never bank growth, and edge cases
 . "$HERE/selftest-diary-check.sh"       # when /ship suggests /add-rule
+. "$HERE/selftest-correction-scan.sh"   # corrections /dream finds in the chats
 . "$HERE/selftest-edit-blocks.sh"       # edit-hook blocks, logged and tallied
 . "$HERE/selftest-registry.sh"          # *.registry.yaml: the listing, the plan check and stale entries
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
