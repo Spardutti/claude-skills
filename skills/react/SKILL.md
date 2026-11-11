@@ -325,6 +325,7 @@ A test sits next to the file it tests and carries its name; in a project that al
 12. **Prefer** granular per-section error boundaries; never rely on data-fetching Effects.
 13. **Always** handle the loading / error / empty trio in data-driven components — see LOADING-STATES.md.
 14. **Always** put a feature file in its kind folder (`components/ hooks/ api/ queries/ schemas/ types/ utils/`); never at the feature root, never in a top-level `src/components/`.
+15. **Prefer** native browser features (dialog, popover, anchor positioning, view transitions) over JS libraries; check the `modern-web-guidance` skill if installed (`npx modern-web-guidance@latest install`).
 
 ## Reference Files
 
