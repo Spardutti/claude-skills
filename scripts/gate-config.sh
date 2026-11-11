@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 GAUNTLET_MAX_LINES=200
+GAUNTLET_KIND_FOLDERS="components|hooks|api|queries|schemas|types|utils|stores|test"
 GAUNTLET_MUTATE=""
 GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
 GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|jsonc?|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"

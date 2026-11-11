@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-STRUCTURE_JS_KINDS="components|hooks|api|queries|schemas|types|utils|stores|test"
 STRUCTURE_KIND_FILE='(^|[._])(router|routes|controller|service|schema|model)s?\.[cm]?[jt]s$|(Router|Routes|Controller|Service|Schema|Model)s?\.[cm]?[jt]s$'
 
 # --no-renames: a move must show up as an add, or renaming a misplaced file would slip through.
@@ -23,8 +22,8 @@ has_subject() {  # has_subject <test path>: a file the test is named for, beside
 feature_misplaced() {  # feature_misplaced <path below features/<name>/>
   case "$1" in
     index.*) ;;
-    */*) printf '%s' "${1%%/*}" | grep -qxE "$STRUCTURE_JS_KINDS" \
-           || echo "${1%%/*}/ is not a kind folder ($STRUCTURE_JS_KINDS)" ;;
+    */*) printf '%s' "${1%%/*}" | grep -qxE "$GAUNTLET_KIND_FOLDERS" \
+           || echo "${1%%/*}/ is not a kind folder ($GAUNTLET_KIND_FOLDERS)" ;;
     *) echo "loose at the feature root, where only index.* belongs" ;;
   esac
 }

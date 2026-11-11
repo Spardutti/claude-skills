@@ -20,7 +20,7 @@ A unit should have **one reason to change** — it serves one actor or stakehold
 
 | Metric | Max | Action |
 |--------|-----|--------|
-| File length | 200 lines | Split into smaller modules |
+| File length | 200 lines, or `GAUNTLET_MAX_LINES` in `.claude/gauntlet.conf` | Split into smaller modules |
 | Function/method body | 30 lines | Extract helpers |
 | Function parameters | 3 | Use an options/config object |
 | Nesting depth | 3 levels | Extract early returns or helpers |
@@ -257,7 +257,7 @@ Don't over-apply SRP. Keep together when:
 - Always describe a unit in one sentence without "and" — if you can't, split it.
 - Always separate computation (pure logic) from side effects (I/O, logging, notifications).
 - Always separate query functions from command functions (CQS).
-- Never exceed 200 lines per file — split before you hit the limit.
+- Never exceed the line limit (200, or `GAUNTLET_MAX_LINES` in `.claude/gauntlet.conf`) — split before you hit it.
 - Never exceed 30 lines per function body — extract helpers.
 - Never nest deeper than 3 levels — use early returns.
 - Never mix levels of abstraction in the same function.
@@ -269,7 +269,7 @@ Don't over-apply SRP. Keep together when:
 
 | Excuse | Rebuttal |
 |--------|----------|
-| "It's only 250 lines, that's fine" | The rule is 200. The next change makes it 280. Split now while the seams are obvious. |
+| "It's only 250 lines, that's fine" | The limit is 200, or the project's `GAUNTLET_MAX_LINES`. The next change makes it 280. Split now while the seams are obvious. |
 | "Splitting would just create indirection" | If the parts have different reasons to change, the indirection is the point. |
 | "These two things always change together" | Then keep them — but verify with `git log`, not vibes. "Always" usually means "twice so far". |
 | "I'll refactor this later, after the feature ships" | Post-ship refactors don't get prioritized. Split as part of this PR or it stays forever. |

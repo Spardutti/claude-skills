@@ -81,7 +81,7 @@ touch it.
 schema: "./src/db/schema/*.ts",   // in drizzle.config.ts
 ```
 
-Keep each schema file under 200 lines. Better Auth generates its own tables, and
+Keep each schema file under the line limit (200, or `GAUNTLET_MAX_LINES`). Better Auth generates its own tables, and
 their `user.id` is `text`; a foreign key to it is `text()`, not `integer()`.
 
 ## Schema — Type Inference
@@ -247,7 +247,7 @@ MIGRATIONS.md. Safe DDL on a live table is in the sql skill.
 2. **Always set `casing: "snake_case"`** in both `drizzle()` and `drizzle.config.ts`; never name columns by hand.
 3. **Always use `timestamp({ withTimezone: true })`.**
 4. **Always index a foreign key column** — Postgres does not.
-5. **Always keep schema files under 200 lines**, one per domain.
+5. **Always keep schema files under the line limit**, one per domain.
 6. **Always infer types** with `$inferInsert` / `$inferSelect`.
 7. **Always give a junction table its own `relations()`**, and one `relations()` per table.
 8. **Always name `columns`** in relational queries that feed a list or an API.

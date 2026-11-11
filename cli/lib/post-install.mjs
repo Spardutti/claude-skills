@@ -3,13 +3,27 @@
 // project does not have. Lifted out of a 270-line main() — these two are a
 // phase of their own, they run only when something was installed, and neither
 // decides what gets installed.
-import { confirm, input } from "@inquirer/prompts";
+import { confirm } from "@inquirer/prompts";
 import chalk from "chalk";
-import { setupHook, detectStack, writeGauntletConf } from "./setup-hook.mjs";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { setupHook, detectStack } from "./setup-hook.mjs";
+import { askGauntletConf, readDefaults, writeGauntletConf } from "./gauntlet-conf.mjs";
 import { autoModeRuleStatus, writeAutoModeRule } from "./auto-mode.mjs";
 import { reportToolNeeds } from "./tool-needs.mjs";
 import { scaffoldStryker } from "./scaffold-stryker.mjs";
 import { setupClaudeMd } from "./setup-claude-md.mjs";
+
+async function offerGauntletConf(CWD, needsTest) {
+  if (existsSync(join(CWD, ".claude", "gauntlet.conf"))) {
+    console.log(`  ${chalk.dim("Kept yours: .claude/gauntlet.conf")}`);
+    return;
+  }
+  console.log();
+  const defaults = readDefaults(join(CWD, ".claude", "hooks"));
+  const written = await writeGauntletConf(CWD, defaults, await askGauntletConf(defaults, needsTest));
+  console.log(`  Config written: ${written.replace(CWD + "/", "")} ${chalk.dim("— every other setting is listed there")}`);
+}
 
 export async function runPostInstall({ CWD, selectedSkills, selectedCommands }) {
   // --- Hook setup ---
@@ -68,19 +82,8 @@ export async function runPostInstall({ CWD, selectedSkills, selectedCommands }) 
         }
       } else {
         console.log(`  ${chalk.yellow("!")} ${chalk.dim("Gauntlet found no test runner here — it will stay asleep.")}`);
-        console.log();
-        const wantConf = await confirm({
-          message: "Point it at your test command now?",
-          default: false,
-        });
-        if (wantConf) {
-          const cmd = (await input({ message: "Test command:" })).trim();
-          if (cmd) {
-            const written = await writeGauntletConf(CWD, cmd);
-            console.log(`  Config written: ${written.replace(CWD + "/", "")}`);
-          }
-        }
       }
+      await offerGauntletConf(CWD, !gates);
     }
   }
 

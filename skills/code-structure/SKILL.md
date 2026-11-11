@@ -28,7 +28,7 @@ Concrete, enforceable thresholds. Crossing one is a signal to split — not an a
 
 | Metric | Max | Action |
 |--------|-----|--------|
-| File length | 200 lines | Split into smaller modules |
+| File length | 200 lines, or `GAUNTLET_MAX_LINES` in `.claude/gauntlet.conf` | Split into smaller modules |
 | Function/method body | 30 lines | Extract helpers |
 | Function parameters | 3 | Use an options/config object |
 | Nesting depth | 3 levels | Early returns or extracted helpers |
@@ -81,7 +81,7 @@ The two forces meet here. Keep code together when:
 
 1. **Describe a unit in one sentence without "and"** — if you can't, it has two jobs; split it.
 2. **Separate computation from side effects**, and queries from commands (CQS).
-3. **Never exceed 200 lines/file or 30 lines/function** — split before crossing, not after.
+3. **Never exceed the line limit (200, or `GAUNTLET_MAX_LINES` in `.claude/gauntlet.conf`) or 30 lines/function** — split before crossing, not after.
 4. **Never nest deeper than 3 levels** — use early returns.
 5. **Never mix levels of abstraction** in one function.
 6. **Never extract on the second duplication** — wait for the third, and only if intent (not just shape) matches.

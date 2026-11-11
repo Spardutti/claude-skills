@@ -147,3 +147,13 @@ structure "a Stimulus controller nested under controllers/ is in its kind folder
 echo "export default class {}" > app/javascript/lib/chart_controller.js
 structure "a *_controller.js outside controllers/ is still named" \
 "  app/javascript/lib/chart_controller.js — the kind is in the filename; it belongs in a kind folder" 1
+
+echo "ship-gate structure: kind folders from gauntlet.conf"
+structrepo sg_struct_kinds package.json '{}'
+echo "GAUNTLET_KIND_FOLDERS='components|services'" >> .claude/gauntlet.conf
+git add -A; git commit -qm manifest; git branch develop
+mkdir -p src/features/pay/services src/features/pay/utils
+echo "export const x = 1" > src/features/pay/services/charge.ts
+echo "export const x = 1" > src/features/pay/utils/money.ts
+structure "a project's own kind folders replace the default list" \
+"  src/features/pay/utils/money.ts — utils/ is not a kind folder (components|services)" 1

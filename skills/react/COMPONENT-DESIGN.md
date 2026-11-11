@@ -29,7 +29,7 @@ separation of concerns, the Rule of Three — see the `code-structure` skill.
 
 | Metric | Max | Action |
 |--------|-----|--------|
-| File length | 200 lines | Split into smaller modules |
+| File length | 200 lines, or `GAUNTLET_MAX_LINES` in `.claude/gauntlet.conf` | Split into smaller modules |
 | Function/hook body | 30 lines | Extract helpers or sub-hooks |
 | Component JSX return | 50 lines | Extract child components |
 | Function parameters | 3 | Use an options object |
@@ -72,7 +72,7 @@ Extract a new component when:
 - A block is conditionally rendered with its own logic.
 - A UI pattern repeats 2+ times.
 - A section could be described independently ("the filter bar", "the card header").
-- The JSX return passes 50 lines, or the file passes 200.
+- The JSX return passes 50 lines, or the file passes the line limit.
 
 ## Don't Over-Split
 
@@ -363,7 +363,7 @@ Your code is too complex if:
 ## Refactoring Checklist
 
 1. Can I describe this file/function in one sentence without "and"?
-2. Is the file under 200 lines, every function under 30?
+2. Is the file under the line limit, every function under 30?
 3. Are there 3 or fewer levels of nesting?
 4. Does each hook handle exactly one concern?
 5. Is state minimal — no derived state stored?
@@ -371,7 +371,7 @@ Your code is too complex if:
 
 ## Rules
 
-1. **Never exceed 200 lines per file** — split before you cross it.
+1. **Never exceed the line limit** (200, or `GAUNTLET_MAX_LINES` in `.claude/gauntlet.conf`) — split before you cross it.
 2. **One job per component, one concern per hook** — "and" in the description means split.
 3. **Functions ≤30 lines, JSX return ≤50 lines, ≤3 nesting levels.**
 4. **Cap props at 5-6** — beyond that, compose with `children` or split.

@@ -111,6 +111,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-structure.sh"          # what a file declares vs what exists
 . "$HERE/selftest-fetch.sh"              # the CLI talking to GitHub
 . "$HERE/selftest-install.sh"            # installing over an existing install
+. "$HERE/selftest-gauntlet-conf.sh"      # the settings file the installer writes
 . "$HERE/selftest-install-edit-check.sh"  # the edit check, installed and upgraded
 . "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end

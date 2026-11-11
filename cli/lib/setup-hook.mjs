@@ -109,22 +109,6 @@ export async function detectStack(targetDir = process.cwd()) {
   });
 }
 
-// Written only when detection finds nothing — otherwise the hook auto-detects and
-// no config file is needed.
-export async function writeGauntletConf(targetDir, testCommand) {
-  const confPath = join(resolve(targetDir), ".claude", "gauntlet.conf");
-  await mkdir(dirname(confPath), { recursive: true });
-  await writeFile(confPath, [
-    "# Gauntlet config. Read after ~/.claude/gauntlet.conf, and wins over it.",
-    "# GAUNTLET_OFF=1 disables the hook in this project.",
-    "",
-    "GAUNTLET_TYPECHECK=''",
-    `GAUNTLET_TEST='${testCommand.replace(/'/g, "'\\''")}'`,
-    "",
-  ].join("\n"), { mode: 0o644 });
-  return confPath;
-}
-
 // Before the edit hook is registered, so code that predates it never blocks an edit.
 // Only rules never baselined are recorded: re-recording a known one would bank growth.
 function writeBaselines(dir, hooksDir) {
