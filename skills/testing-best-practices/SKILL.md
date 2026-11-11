@@ -184,7 +184,7 @@ Minimal defaults, override only what matters.
 class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
-    username = factory.Sequence(lambda n: f"user-{n}")
+    username = factory.LazyFunction(lambda: f"user-{uuid4().hex[:12]}")
     email = factory.LazyAttribute(lambda o: f"{o.username}@example.com")
     is_active = True
     class Params:
@@ -199,7 +199,7 @@ inactive = UserFactory(is_active=False)
 // GOOD: fishery
 const userFactory = Factory.define<User>(({ sequence, params }) => ({
   id: sequence,
-  email: `user-${sequence}@example.com`,
+  email: `user-${crypto.randomUUID()}@example.com`,
   role: params.admin ? "admin" : "member",
   isActive: true,
 }));
@@ -207,6 +207,8 @@ const userFactory = Factory.define<User>(({ sequence, params }) => ({
 const user = userFactory.build();
 const admin = userFactory.build({ admin: true });
 ```
+
+A sequence restarts in every worker process, so parallel workers repeat it. Give unique columns a random value.
 
 Use **fixtures** for infrastructure (DB, client), **factories** for data (models, DTOs).
 

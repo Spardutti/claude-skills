@@ -9,16 +9,16 @@ You investigate why one measured job is slow. The orchestrator gives you the job
 
 ## Lenses
 
-- **contention** — work that waits on other work: a fixed value inserted into a unique column by every test, a `DELETE FROM` or `TRUNCATE` of a whole table at test start, one shared database or file for all workers, a global lock, a port or temp path every worker reuses.
+- **contention** — work that waits on other work: one shared database or file for all workers, a global lock, a port or temp path every worker reuses.
 - **parallelism** — worker counts and where they are capped: `--max-children`, `-n`, `maxWorkers`, `concurrency`, a hard-coded `2`, a comment explaining a cap that no longer holds.
-- **repeated setup** — cost paid on every test or run that could be paid once: an engine or client built per test, schema rebuilt per test, password hashing at full strength in tests, caches cleared that did not need to be.
+- **repeated setup** — cost paid on every test or run that could be paid once: an engine or client built per test, caches cleared that did not need to be.
 - **scope** — work done that the result does not need: mutating whole files when only lines changed, running every test for one module, including generated or vendored code.
 
 ## Procedure
 
 1. Read the benchmark command so you know exactly what is timed.
 2. Grep and read only what your lens needs: test setup (`conftest.py`, `vitest.config.*`, fixtures), runner config (`pyproject.toml`, `package.json`, `stryker.config.*`), wrapper scripts, compose files.
-3. Go through **every** pattern your lens lists above and grep for each one. A lens that stops at its first hit misses the second cause: one run found the fixed emails and never looked for the `DELETE FROM` beside them.
+3. Go through **every** pattern your lens lists above, and every BAD example under your lens in `.claude/skills/testing-best-practices/FAST-TESTS.md` when it exists, and grep for each one. A lens that stops at its first hit misses the second cause: one run found the fixed emails and never looked for the `DELETE FROM` beside them.
 4. For each suspect, find the exact line. A suspect without a file and line is a guess. Drop it.
 5. Write a prediction that the benchmark can prove wrong: "8 workers will gain under 20%, because every test waits on the unique email" — not "might help".
 

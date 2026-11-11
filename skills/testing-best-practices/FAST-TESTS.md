@@ -277,5 +277,6 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 - Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image, WhiteNoise's static scan.
 - Always set `jit=off` on a Postgres test database.
 - Always run test and mutation workers on half the cores at `nice -n 19`, inside the container when tests run in Docker.
+- Never hard-code a worker count in a runner script or config; the gate passes one.
 - Always measure — wait events, CPU, a profile — before changing a test fixture for speed.
 - Never make tests faster by running fewer of them or asserting less.

@@ -4,6 +4,7 @@ description: "Make one measured thing faster: fix a benchmark and a result that 
 category: Workflow
 allowed-tools: Task, Bash, Read, Edit, Write, Grep, Glob
 requires-agents: [optimize-suspect]
+requires-commands: [test-review]
 argument-hint: "<what is slow> [target, e.g. 'under 190s' or '2x']"
 ---
 
@@ -14,6 +15,10 @@ You make one measured job faster without changing what it proves. The method: fi
 `$ARGUMENTS` names the slow job and, ideally, a target. With no target, use **2× faster** and say so.
 
 Work in this project only. Never read into, check or change another project.
+
+## Step 0 — The known causes
+
+When the slow job runs tests, follow `.claude/commands/test-review.md` with `speed` before anything is timed. If it reports a break, stop and hand the breaks over: a rule the skill already states needs fixing, not measuring. The user runs `/optimize` again once they are fixed.
 
 ## Step 1 — The benchmark
 
@@ -130,6 +135,7 @@ If the cause is a **pattern**, not a one-off, write it as one rule the way a ski
 - NEVER write a prediction whose range includes no change.
 - NEVER profile beside a benchmark run.
 - NEVER read into or change another project.
+- ALWAYS run `/test-review speed` first when the job runs tests, and stop on a break.
 - ALWAYS run a round through `bench.sh <round>`, never the job by hand.
 - ALWAYS profile after a wrong prediction, before the next round.
 - ALWAYS rerun once before judging an invariant that moved by one or two items.
