@@ -7,6 +7,7 @@ A slow suite is rarely slow tests. It is setup every test inherits: fixtures tha
 - [A Rolled-Back Test Still Holds Its Locks](#a-rolled-back-test-still-holds-its-locks)
 - [Unique Values In Unique Columns](#unique-values-in-unique-columns)
 - [Never Delete Or Truncate A Whole Table At Test Start](#never-delete-or-truncate-a-whole-table-at-test-start)
+- [Empty A Private Test Table With DELETE](#empty-a-private-test-table-with-delete)
 - [Hash Test Passwords With The Cheapest Settings](#hash-test-passwords-with-the-cheapest-settings)
 - [Stop Cloud Clients Probing The Network](#stop-cloud-clients-probing-the-network)
 - [Cut What Every Test Process Pays To Start](#cut-what-every-test-process-pays-to-start)
@@ -85,6 +86,31 @@ parsed.pathname = parsed.pathname.replace(/_test$/, `_w${process.env.STRYKER_MUT
 ```
 
 Rename every scratch database a test creates for itself the same way. On one API this alone took a Stryker run from 326s to 90s.
+
+## Empty A Private Test Table With DELETE
+
+Once each worker owns its database, tests that commit still need empty tables between them. `TRUNCATE` swaps in new files on disk for every table it names, which costs the same however few rows there are. `DELETE` on a few rows costs almost nothing.
+
+```ts
+// BAD — ~240 ms before every test
+await pool.query(`TRUNCATE ${tables.join(", ")}`);
+
+// GOOD — ~2 ms when no table has a foreign key; with keys, list child tables first
+await pool.query(tables.map((t) => `DELETE FROM "${t}"`).join("; "));
+```
+
+Migrate that database once per process, not once per test file. A setup file runs before every file, and a module-level flag is reset with each file's modules; `process.env` is not.
+
+```ts
+// BAD — setupFiles runs this before every test file
+await migrate(pool);
+
+// GOOD — once per worker process
+if (!process.env.TEST_DB_MIGRATED) {
+  await migrate(pool);
+  process.env.TEST_DB_MIGRATED = "1";
+}
+```
 
 ## Hash Test Passwords With The Cheapest Settings
 
@@ -243,7 +269,8 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 ## Rules
 
 - Always insert a fresh value into every unique column in a fixture, including a test builder's default arguments.
-- Never `DELETE FROM` or `TRUNCATE` a whole table to reset a test; give the suite an empty database.
+- Never `DELETE FROM` or `TRUNCATE` a whole shared table to reset a test; give the suite an empty database.
+- Always empty a worker's own test tables with `DELETE`, never `TRUNCATE`, and migrate its database once per process, not once per file.
 - Always give each parallel worker its own database when test setup drops it, scratch databases included; never pin concurrency to 1 instead.
 - Always hash test passwords with the algorithm's cheapest settings, in test setup only; when the library hardcodes its cost, swap its hash and verify functions.
 - Always switch off cloud SDK credential probes in test setup.
