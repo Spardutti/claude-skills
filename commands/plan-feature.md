@@ -97,7 +97,7 @@ Python uses `raise NotImplementedError("stub")` and `@pytest.mark.skip(reason="s
 
 Run the type checker each touched app already uses (`tsc --noEmit`, `mypy`, `pyright`). Fix the sketch until it passes. If the app has no type checker, import every touched module instead (`python -c "import app.export"`) and say it proves less — names resolve, types go unchecked.
 
-If one PR's share of the sketch spans more than ~12 files, the change is too big — tell the user to split it. A change across repos counts each repo's PR on its own.
+If one PR's share of the sketch spans more than ~12 non-test files, warn the user it may be too big to review, suggest a split, and keep going. A change across repos counts each repo's PR on its own.
 
 ## Step 4b — Notes the Stubs Cannot Hold
 
