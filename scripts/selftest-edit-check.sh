@@ -25,6 +25,7 @@ ec "a new file over 200 lines is blocked"        new.sh 2 "new.sh — 210 lines 
 mkl new.sh 150
 ec "a new file under the limit passes"           new.sh 0 ""
 ec "recorded debt passes, with a note to split it" old.sh 0 '"additionalContext":"LINE LIMIT — old.sh is 300 lines'
+ec "the debt note asks Claude to tell the user"  old.sh 0 "Tell the user once per task, and offer to split"
 mkl old.sh 310
 ec "recorded debt that grew is blocked"          old.sh 2 "old.sh — 310 lines, was 300"
 mkl other.sh 250

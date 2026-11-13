@@ -81,7 +81,7 @@ while read -r n f; do
     SHRANK="$SHRANK  $f — $n lines, was $was
 "
   elif [ -n "$ONE" ]; then
-    echo "LINE LIMIT — $f is $n lines, over $LIMIT (old debt). Split it if this change allows."
+    echo "LINE LIMIT — $f is $n lines, over $LIMIT (old debt). Tell the user once per task, and offer to split one small piece out first."
   fi
 done <<EOF
 $NOW
