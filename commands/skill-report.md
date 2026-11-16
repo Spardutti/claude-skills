@@ -2,7 +2,7 @@
 name: skill-report
 description: "Show how often each installed skill was flagged by /ship's skills audit in this repo — which rules keep breaking and should become a script check, and which skills never catch anything and may be dead weight"
 category: Workflow
-allowed-tools: Bash(node .claude/hooks/skill-report.mjs*)
+allowed-tools: Bash(node .claude/hooks/skill-report.mjs*), Bash(node .claude/hooks/ship-log.mjs gaps*)
 ---
 
 # Skill Report — Which Skills Earn Their Place
@@ -25,6 +25,9 @@ edit hook blocks to `.claude/edit-blocks.jsonl`. This command reads both.
    most three rules that blocked on **three or more branches**. Each one is a rule Claude
    keeps writing wrong first: suggest where its skill should state it earlier — a BAD/GOOD
    pair near the top, or a line in Rules — so the first draft gets it right.
+6. Run `node .claude/hooks/ship-log.mjs gaps` and show its table verbatim. It counts the test
+   gaps mutation testing found on each branch's first run, per week, across every logged repo.
+   A change to the testing skill works only if "gaps per branch" drops in the weeks after it.
 
 ## BAD / GOOD
 

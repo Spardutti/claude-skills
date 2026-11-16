@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { basename, dirname, join, resolve } from "node:path";
 import { parseLine, readLines } from "./diary-lib.mjs";
 import { branchStart, git, parseReport, planRegistry, prSize, ruleBlocks } from "./ship-log-parse.mjs";
-import { printReport, tally } from "./ship-log-report.mjs";
+import { printGaps, printReport, tally } from "./ship-log-report.mjs";
 
 const HERE = dirname(resolve(process.argv[1]));
 const VERDICTS = ["confirmed", "refuted", "unconfirmed", "skipped"];
@@ -157,6 +157,7 @@ function missing(record, c) {
 function run(mode, args) {
   const c = conf();
   if (mode === "report") return printReport(args[0] ?? c.dir);
+  if (mode === "gaps") return printGaps(args[0] ?? c.dir);
   if (mode === "on") return c.on ? 0 : 1;
   if (!c.on) return 0;
   const id = identity(c.root), path = openPath(c.dir, id), record = load(path, id);
@@ -181,7 +182,7 @@ function run(mode, args) {
     return finalize(c, path, record, `pr${args[0]}`, "pr-opened"), 0;
   }
   else if (mode === "end") return finalize(c, path, record, id.branch.replace(/[^\w.-]+/g, "-"), "stopped", args.join(" ") || null), 0;
-  else throw new Error("usage: ship-log.mjs on | start | ready | gate <report> <exit> <seconds> <base> | step <name> start|end | finding '<json>' | pr <number> | end [reason] | report [dir]");
+  else throw new Error("usage: ship-log.mjs on | start | ready | gate <report> <exit> <seconds> <base> | step <name> start|end | finding '<json>' | pr <number> | end [reason] | report [dir] | gaps [dir]");
   save(path, record);
   return 0;
 }

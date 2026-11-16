@@ -33,8 +33,9 @@ function row(r) {
   return [r.app, (r.finished ?? r.started).slice(0, 10), r.pr ? `#${r.pr}` : r.branch, r.status, s.minutes ?? "-", s.gateRuns, `${s.gateSeconds}s`, size, findingCell(s.findings)];
 }
 
-function table(rows) {
-  const head = ["app", "date", "pr", "status", "min", "gate runs", "gate time", "files +/-", "findings found/confirmed/fixed"];
+const SHIPS = ["app", "date", "pr", "status", "min", "gate runs", "gate time", "files +/-", "findings found/confirmed/fixed"];
+
+function table(rows, head = SHIPS) {
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => String(r[i]).length)));
   for (const r of [head, ...rows]) console.log(r.map((c, i) => String(c).padEnd(widths[i])).join("  ").trimEnd());
 }
@@ -46,5 +47,35 @@ export function printReport(dir) {
     return 0;
   }
   table(all.map(row));
+  return 0;
+}
+
+const MUTATION = /^(stryker|mutmut)$/;
+const ran = (p) => MUTATION.test(p.tool) && (p.result === "ok" || p.result === "survivors");
+
+// Gaps on a branch's first mutation run: how many tests Claude missed before the gate pointed at them.
+function firstRunGaps(record) {
+  const run = record.gate.find((g) => g.projects?.some(ran));
+  return run ? run.projects.filter(ran).reduce((n, p) => n + (p.survivors?.length ?? 0), 0) : null;
+}
+
+function weekOf(iso) {
+  const d = new Date(iso.slice(0, 10));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+export function printGaps(dir) {
+  const weeks = new Map();
+  for (const r of records(dir)) {
+    const gaps = firstRunGaps(r);
+    if (gaps === null) continue;
+    const w = weeks.get(weekOf(r.started)) ?? { branches: 0, withGaps: 0, gaps: 0 };
+    w.branches++; w.gaps += gaps; if (gaps) w.withGaps++;
+    weeks.set(weekOf(r.started), w);
+  }
+  if (weeks.size === 0) return console.log("ship-log: no mutation runs logged yet."), 0;
+  const rows = [...weeks].sort().map(([wk, w]) => [wk, w.branches, w.withGaps, (w.gaps / w.branches).toFixed(1)]);
+  table(rows, ["week of", "branches", "first run had gaps", "gaps per branch"]);
   return 0;
 }
