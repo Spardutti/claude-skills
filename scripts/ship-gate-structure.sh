@@ -43,10 +43,10 @@ js_misplaced() {  # js_misplaced <path> <owner>
     echo "sorted by kind first; it belongs in <domain>/<kind>/ or shared/<kind>/"
   elif printf '%s' "$b" | grep -qE '^use[A-Z].*\.[jt]sx?$' && ! printf '%s' "/$f" | grep -qE '/(hooks|queries)/'; then
     echo "a hook belongs in hooks/ or queries/"
-  # Stimulus loads *_controller.js from any depth under controllers/, so controllers/components/ is its kind folder.
+  # Stimulus loads *_controller.js under controllers/ at any depth; Drizzle's default schema is db/schema.ts.
   elif printf '%s' "$b" | grep -qE "$STRUCTURE_KIND_FILE" \
        && ! printf '%s' "$parent" | grep -qxE 'routes|controllers|services|schemas|models|api|queries|types' \
-       && ! printf '%s' "/$f" | grep -qE '/controllers/(.+/)?[^/]+_controller\.[jt]s$'; then
+       && ! printf '%s' "/$f" | grep -qE '/controllers/(.+/)?[^/]+_controller\.[jt]s$|/db/schema\.[jt]s$'; then
     echo "the kind is in the filename; it belongs in a kind folder"
   fi
 }
@@ -66,13 +66,46 @@ py_misplaced() {  # py_misplaced <path>
   fi
 }
 
+LAYOUT_CODE='\.([cm]?[jt]sx?|astro|py)$'
+
+# A file's place is the first folder below its project, two under src/, so a new feature folder is no new place.
+layout_place() {  # stdin: paths; $LAYOUT_MANIFESTS: every project manifest, one per line
+  awk 'BEGIN { n = split(ENVIRON["LAYOUT_MANIFESTS"], m, "\n"); for (j = 1; j <= n; j++) { sub(/\/?[^\/]*$/, "", m[j]); o[m[j]] = 1 } }
+  { n = split($0, p, "/"); own = 0; pre = ""
+    for (i = 1; i < n; i++) { pre = pre (i > 1 ? "/" : "") p[i]; if (pre in o) own = i }
+    depth = own + 1 + (p[own + 1] == "src")
+    k = ""; for (i = 1; i <= depth && i < n; i++) k = k (i > 1 ? "/" : "") p[i]
+    print (k == "" ? "." : k) }'
+}
+
+# The trunk is the baseline: code may go where the trunk already has code, or where GAUNTLET_LAYOUT allows.
+layout_known() {
+  git rev-parse -q --verify "$BASE^{commit}" >/dev/null || { echo "*"; return; }
+  git ls-tree -r --name-only "$BASE" | grep -E "$LAYOUT_CODE" | layout_place | sort -u
+}
+
+stray() {  # stray <path>: why a new code file sits where no code was, or nothing
+  printf '%s' "$1" | grep -qE "$LAYOUT_CODE" || return 0
+  [ "$KNOWN" = "*" ] && return 0
+  matches_any "$1" "$GAUNTLET_LAYOUT" && return 0
+  place=$(printf '%s\n' "$1" | layout_place)
+  printf '%s\n' "$KNOWN" | grep -qxF "$place" && return 0
+  echo "a new place for code ($place/); move it, or add it to GAUNTLET_LAYOUT in .claude/gauntlet.conf"
+}
+
 # Only ADDED files are judged, so a repo laid out the old way cannot get worse and need not move.
 structure_check() {
   bad=""; count=0
+  LAYOUT_MANIFESTS=$({ git ls-files; added_files; } | grep -E '(^|/)(package\.json|pyproject\.toml|pytest\.ini|setup\.cfg)$')
+  export LAYOUT_MANIFESTS
+  KNOWN=$(layout_known)
   while IFS= read -r f; do
     [ -f "$f" ] && ! is_ignored "$f" || continue
     printf '%s' "/$f" | grep -qE '/(node_modules|\.stryker-tmp|mutants)/' && continue
     o=$(owner_of "$f")
+    why=$(stray "$f")
+    if [ -n "$why" ]; then count=$((count+1)); bad="$bad  $f — $why
+"; continue; fi
     case "$f" in
       *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.astro) why=$(js_misplaced "$f" "$o") ;;
       *.py) grep -qis fastapi "$o/pyproject.toml" || continue; why=$(py_misplaced "$f") ;;

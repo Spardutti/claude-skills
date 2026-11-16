@@ -77,13 +77,13 @@ cd "$PROJECT_DIR" 2>/dev/null || quit "skipped: project dir unreadable"
 
 git rev-parse --git-dir >/dev/null 2>&1 || quit "skipped: not a git repo"
 
+. "$(dirname "$0")/gate-config.sh"
 GAUNTLET_OFF=""
 GAUNTLET_TYPECHECK="__auto__"
 GAUNTLET_TEST="__auto__"
 GAUNTLET_CODE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|sql"
 # Global defaults first, then the project's on top — project wins, key by key.
-if [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ]; then . "$HOME/.claude/gauntlet.conf"; fi
-if [ -f "$PROJECT_DIR/.claude/gauntlet.conf" ]; then . "$PROJECT_DIR/.claude/gauntlet.conf"; fi
+load_gauntlet_conf "$PROJECT_DIR/.claude/gauntlet.conf" ""
 if [ -n "$GAUNTLET_OFF" ]; then quit "skipped: GAUNTLET_OFF is set"; fi
 
 # ---------------------------------------------------------------- skip rule 1

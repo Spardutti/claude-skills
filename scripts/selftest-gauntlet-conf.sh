@@ -23,7 +23,7 @@ gc_write "{ GAUNTLET_MAX_LINES: '300', GAUNTLET_KIND_FOLDERS: 'components|servic
 gc_check "the answers come back through the hook's own loader, quotes and all" \
   "300;components|services;pnpm test -- --run 'it''s';" "$(gc_read)"
 gc_check "only the answers are set; every other setting is listed, commented out" \
-  "GAUNTLET_KIND_FOLDERS GAUNTLET_MAX_LINES GAUNTLET_TEST GAUNTLET_TYPECHECK|11" \
+  "GAUNTLET_KIND_FOLDERS GAUNTLET_MAX_LINES GAUNTLET_TEST GAUNTLET_TYPECHECK|12" \
   "$(grep -oE '^GAUNTLET_[A-Z_]+' "$GC/.claude/gauntlet.conf" | sort | tr '\n' ' ' | sed 's/ $//')|$(grep -cE '^#? ?GAUNTLET_' "$GC/.claude/gauntlet.conf")"
 
 before=$(cat "$GC/.claude/gauntlet.conf")

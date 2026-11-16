@@ -7,7 +7,8 @@ import { input } from "@inquirer/prompts";
 // The third column is an example, for settings the hook leaves unset by default.
 const SETTINGS = [
   ["GAUNTLET_MAX_LINES", "max lines per file; 0 turns the check off"],
-  ["GAUNTLET_KIND_FOLDERS", "the folders a feature may hold, split by |"],
+  ["GAUNTLET_KIND_FOLDERS", "the folders a feature may hold"],
+  ["GAUNTLET_LAYOUT", "globs where new code may go beyond where the trunk has code; '*' turns the check off", "src/pages/* src/middleware.ts"],
   ["GAUNTLET_TEST", "the test command; set, it replaces detection", "npm test"],
   ["GAUNTLET_TYPECHECK", "the typecheck command; '' turns it off", "npx tsc --noEmit"],
   ["GAUNTLET_BASE", "the trunk branch, tried before develop, dev and main", "staging"],
@@ -30,7 +31,7 @@ export function readDefaults(hooksDir) {
 const quote = (v) => `'${String(v).replace(/'/g, "'\\''")}'`;
 
 export function buildConf(defaults, chosen) {
-  const lines = ["# Gauntlet config. Read after ~/.claude/gauntlet.conf, and wins over it.", ""];
+  const lines = ["# Gauntlet config. Read after ~/.claude/gauntlet.conf, and wins over it.", "# A list takes spaces, commas, | or new lines between items.", ""];
   for (const [name, what, example] of SETTINGS) {
     lines.push(`# ${what}`);
     const value = chosen[name];

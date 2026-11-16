@@ -14,6 +14,10 @@ echo "const a=1" > a.ts
 check "no gates detected"       "no gates detected"
 printf "GAUNTLET_TYPECHECK=''\nGAUNTLET_TEST='echo ok'\n" > .claude/gauntlet.conf
 check "green"                   "green: gates passed"
+echo "<template/>" > a.vue
+printf "GAUNTLET_TYPECHECK=''\nGAUNTLET_TEST='echo ok'\nGAUNTLET_CODE_EXT='ts, vue'\n" > .claude/gauntlet.conf
+check "a comma list of code extensions still counts a .vue as code" "green: gates passed"
+rm a.vue
 echo "// touch" >> a.ts
 printf "GAUNTLET_TYPECHECK=''\nGAUNTLET_TEST='echo \"No test files found\"'\n" > .claude/gauntlet.conf
 check "runner matched 0 tests"  "matched 0 test files"

@@ -3,6 +3,7 @@
 GAUNTLET_MAX_LINES=200
 GAUNTLET_KIND_FOLDERS="components|hooks|api|queries|schemas|types|utils|stores|test"
 GAUNTLET_MUTATE=""
+GAUNTLET_LAYOUT="${GAUNTLET_LAYOUT:-}"
 GAUNTLET_SOURCE_EXT="ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|rb|php|c|h|cpp|hpp|cs|swift|gd"
 GAUNTLET_IGNORE_EXT="md|mdx|txt|rst|adoc|jsonc?|ya?ml|toml|lock|cfg|ini|env|csv|tsv|sql|html|css|scss|svg|png|jpg|jpeg|gif|webp|ico|pdf|woff2?|ttf|otf|mp3|mp4|wav|zip|gz|tres|tscn|import|godot"
 GAUNTLET_IGNORE_FILES="*.gen.ts *.gen.tsx *.generated.* */migrations/*.py */alembic/versions/*.py */components/ui/*.tsx */hooks/use-mobile.ts */*.config.*"
@@ -17,6 +18,19 @@ load_gauntlet_conf() {  # load_gauntlet_conf <project conf> <fallback conf>
   [ -n "${HOME:-}" ] && [ -f "$HOME/.claude/gauntlet.conf" ] && . "$HOME/.claude/gauntlet.conf"
   local conf="$1"; [ -f "$conf" ] || conf="$2"
   if [ -f "$conf" ]; then . "$conf"; fi
+  normalize_lists
+}
+
+# A list setting takes spaces, commas, | or new lines; regex lists are joined with |, glob lists with spaces.
+normalize_lists() {
+  local n
+  for n in GAUNTLET_KIND_FOLDERS GAUNTLET_SOURCE_EXT GAUNTLET_IGNORE_EXT GAUNTLET_CODE_EXT; do
+    [ -n "${!n:-}" ] && printf -v "$n" '%s' "$(printf '%s' "${!n}" | tr ', \n\t' '||||' | tr -s '|' | sed 's/^|//; s/|$//')"
+  done
+  for n in GAUNTLET_IGNORE_FILES GAUNTLET_LAYOUT; do
+    [ -n "${!n:-}" ] && printf -v "$n" '%s' "$(printf '%s' "${!n}" | tr ',|\n\t' '    ')"
+  done
+  return 0
 }
 
 skill_field() {  # skill_field <SKILL.md> <key pattern> — its first value, quotes stripped
@@ -45,14 +59,16 @@ json_field() {  # json_field <json> <key> — a flat string value; \" is unescap
 
 # set -f: unquoted, the list is glob-expanded before it is split, and */components/ui/*.tsx
 # expanded into the very path it should match.
-is_ignored() {
+matches_any() {  # matches_any <path> <globs>
   set -f
-  for pat in $GAUNTLET_IGNORE_FILES; do
-    case "/$1" in $pat) set +f; return 0 ;; esac
+  for pat in $2; do
+    case "$1" in $pat) set +f; return 0 ;; esac
   done
   set +f
   return 1
 }
+
+is_ignored() { matches_any "/$1" "$GAUNTLET_IGNORE_FILES"; }
 
 # Every diary sits in the .claude that holds the hooks writing it, so a worktree or a
 # subfolder session still shares one set. Outside .claude/hooks (this repo's scripts/), the project.

@@ -19,6 +19,7 @@ TMP=$(mktemp -d)
 SELFTEST_SANDBOX="$TMP"
 cd "$TMP" || exit 1
 export HOME="$TMP/home"; mkdir -p "$HOME"
+export GAUNTLET_LAYOUT="*"  # tests opt in to the stray check, so their throwaway repos need no baseline
 RUN="$$-$(date +%s 2>/dev/null || echo 0)"
 LOG="$TMP/ran.log"
 N=0
@@ -78,6 +79,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-ship-gate-stryker-run.sh"  # Stryker run elsewhere, through .stryker-run
 . "$HERE/selftest-ship-gate-setup.sh"    # a change to Stryker's own setup gets a trial run
 . "$HERE/selftest-ship-gate-structure.sh"  # where a new file may live
+. "$HERE/selftest-ship-gate-layout.sh"   # no new code where the trunk has none
 . "$HERE/selftest-ship-gate-fail-fast.sh"  # no mutation run after a cheap check fails
 . "$HERE/selftest-ship-gate-length.sh"  # the length check honours .line-limit-baseline
 . "$HERE/selftest-ship-gate-report.sh"    # the last line names the saved output

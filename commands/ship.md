@@ -146,7 +146,8 @@ So: run that command. Show its output verbatim. Obey its exit code.
 - **0** — clean, continue.
 - **1** — findings. A file over the limit stops you: splitting a file is a design
   decision, not something to do silently mid-ship. A new file outside its kind folder
-  (`components/`, `hooks/`, `routers/` …) stops you too: move it. Surviving mutants are a gap in the
+  (`components/`, `hooks/`, `routers/` …), or in a place the trunk has no code, stops you too:
+  move it, or ask the user whether to add that place to `GAUNTLET_LAYOUT`. Surviving mutants are a gap in the
   tests, not in the code — write the test that closes each one (see below), then re-run
   the script.
 - **2** — it ran but could not prove the tests, almost always because no mutation tool
