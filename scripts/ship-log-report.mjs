@@ -53,10 +53,10 @@ export function printReport(dir) {
 const MUTATION = /^(stryker|mutmut)$/;
 const ran = (p) => MUTATION.test(p.tool) && (p.result === "ok" || p.result === "survivors");
 
-// Gaps on a branch's first mutation run: how many tests Claude missed before the gate pointed at them.
+// Gaps on a branch's first mutation run: the tests Claude missed before the gate pointed at them.
 function firstRunGaps(record) {
   const run = record.gate.find((g) => g.projects?.some(ran));
-  return run ? run.projects.filter(ran).reduce((n, p) => n + (p.survivors?.length ?? 0), 0) : null;
+  return run ? run.projects.filter(ran).flatMap((p) => p.survivors ?? []) : null;
 }
 
 function weekOf(iso) {
@@ -65,17 +65,25 @@ function weekOf(iso) {
   return d.toISOString().slice(0, 10);
 }
 
+// The kinds name the next checklist pattern to add in test-checks.mjs.
+function topKinds(gaps) {
+  const by = new Map();
+  for (const g of gaps) by.set(g.mutator ?? "unnamed (mutmut)", (by.get(g.mutator ?? "unnamed (mutmut)") ?? 0) + 1);
+  return [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(", ");
+}
+
 export function printGaps(dir) {
   const weeks = new Map();
   for (const r of records(dir)) {
     const gaps = firstRunGaps(r);
     if (gaps === null) continue;
-    const w = weeks.get(weekOf(r.started)) ?? { branches: 0, withGaps: 0, gaps: 0 };
-    w.branches++; w.gaps += gaps; if (gaps) w.withGaps++;
+    const w = weeks.get(weekOf(r.started)) ?? { branches: 0, withGaps: 0, gaps: [] };
+    w.branches++; w.gaps.push(...gaps); if (gaps.length) w.withGaps++;
     weeks.set(weekOf(r.started), w);
   }
   if (weeks.size === 0) return console.log("ship-log: no mutation runs logged yet."), 0;
-  const rows = [...weeks].sort().map(([wk, w]) => [wk, w.branches, w.withGaps, (w.gaps / w.branches).toFixed(1)]);
-  table(rows, ["week of", "branches", "first run had gaps", "gaps per branch"]);
+  const sorted = [...weeks].sort();
+  table(sorted.map(([wk, w]) => [wk, w.branches, w.withGaps, (w.gaps.length / w.branches).toFixed(1)]), ["week of", "branches", "first run had gaps", "gaps per branch"]);
+  console.log(`\ngap kinds, last 4 weeks: ${topKinds(sorted.slice(-4).flatMap(([, w]) => w.gaps)) || "none"}`);
   return 0;
 }

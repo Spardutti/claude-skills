@@ -5,6 +5,7 @@ import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brokenRules, loadEditRules, projectFiles, textFindings } from "./text-rules.mjs";
 import { mergeBaseline, readBaseline, writeBaseline } from "./ratchet-baseline.mjs";
+import { WEAK_ASSERTS, checklist } from "./test-checks.mjs";
 
 const ROOT = realpathSync(process.cwd());
 const BASELINE = resolve(ROOT, ".lint-baseline");
@@ -134,6 +135,7 @@ function checkFile(path) {
     }
   }
   for (const lesson of LESSONS.filter((l) => l.applies(rel))) console.log(`LESSON — ${lesson.message}`);
+  if (hasSkill("testing-best-practices")) for (const line of checklist(ROOT, rel, projectFiles(ROOT))) console.log(line);
   return failed;
 }
 
@@ -146,6 +148,7 @@ function selftest() {
 
 function main(mode, arg) {
   ({ text: TEXT, lessons: LESSONS } = loadEditRules(ROOT));
+  if (hasSkill("testing-best-practices")) TEXT = [...WEAK_ASSERTS, ...TEXT];
   if (mode === "--baseline") return baseline(arg, false);
   if (mode === "--baseline-new") return baseline(undefined, true);
   if (mode === "--file") return checkFile(arg ?? "");

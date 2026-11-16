@@ -5,7 +5,7 @@ echo "the check after shell commands"
 newrepo bash_check
 mkdir -p src .claude/hooks
 cp "$HERE/bash-check.sh" "$HERE/edit-check.sh" "$HERE/line-limit.sh" "$HERE/gate-config.sh" \
-   "$HERE/lint-ratchet.mjs" "$HERE/text-rules.mjs" "$HERE/ratchet-baseline.mjs" .claude/hooks/
+   "$HERE/lint-ratchet.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" .claude/hooks/
 printf '.claude/\n' > .gitignore
 git add -A; git commit -qm hooks
 BC_ROOT="$PWD"
