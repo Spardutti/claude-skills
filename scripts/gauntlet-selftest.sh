@@ -65,6 +65,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 # helpers above and the $N/$PASS/$FAIL counters rather than keeping its own.
 # Adding a case means editing the file that owns the subject, not this one.
 . "$HERE/selftest-gauntlet-hook.sh"      # the Stop hook: skips, detection, runners
+. "$HERE/selftest-gauntlet-delta.sh"     # the Stop hook re-tests only code changed since green
 . "$HERE/selftest-ship-gate-stryker.sh"  # the JS half of the ship gate
 . "$HERE/selftest-ship-gate-glob.sh"     # a [id] route is judged on its changed lines only
 . "$HERE/selftest-ship-gate-stryker-zero.sh"  # survivors from a run that tested nothing

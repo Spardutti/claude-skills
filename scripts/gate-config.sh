@@ -85,3 +85,17 @@ json_string() {
     print
   }'
 }
+
+# Prints the changed code files whose content differs from the last green run, and stages
+# this run's hashes in <marker>.next. A file reverted since then counts as changed too.
+since_green() {  # since_green <marker> <project dir> <changed code files>
+  local old="" f
+  [ "$(head -1 "$1" 2>/dev/null)" = "$2" ] && old=$(tail -n +2 "$1")
+  { printf '%s\n' "$2"
+    { printf '%s\n' "$3"; printf '%s\n' "$old" | cut -f2 | while IFS= read -r f; do [ -e "$f" ] && printf '%s\n' "$f"; done; } \
+      | sort -u | while IFS= read -r f; do
+        [ -n "$f" ] && printf '%s\t%s\n' "$(git hash-object -- "$f" 2>/dev/null || echo gone)" "$f"
+      done; } > "$1.next"
+  awk -F'\t' 'NR == FNR { old[$2] = $1; next } FNR > 1 && old[$2] != $1 { print $2 }' \
+    <(printf '%s\n' "$old") "$1.next" | grep .
+}

@@ -16,7 +16,7 @@
 # Skip ladder, cheapest first — quits at the first "no":
 #   1. no changed files
 #   2. no changed *code* files (docs/config only)
-#   3. this exact diff already passed
+#   3. no code changed since this session's last green run
 #   4. no gates detected for this repo
 #
 # Config, both optional and both KEY=value files that get sourced in this order:
@@ -101,13 +101,10 @@ if [ -z "$FILES_NL" ] && [ -z "${GAUNTLET_DRYRUN:-}" ]; then
 fi
 
 # ---------------------------------------------------------------- skip rule 3
-# The repo path is part of the hash: one session can touch several repos, and two
-# of them can legitimately hold an identical diff.
-DIFF_HASH=$( { printf '%s\n' "$PROJECT_DIR"; git diff HEAD 2>/dev/null; printf '%s\n' "$CHANGED"; } \
-             | git hash-object --stdin 2>/dev/null )
-if [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "$DIFF_HASH" ] \
-   && [ -z "${GAUNTLET_DRYRUN:-}" ]; then
-  quit "skipped: this diff already passed"
+# Only code changed since the last green run is tested again: an uncommitted shared
+# file otherwise re-ran most of the suite on every stop.
+if [ -z "${GAUNTLET_DRYRUN:-}" ]; then
+  FILES_NL=$(since_green "$MARKER" "$PROJECT_DIR" "$FILES_NL") || quit "skipped: no code changed since the last green run"
 fi
 
 # ---------------------------------------------------------------- skip rule 4
@@ -289,7 +286,7 @@ Write a test that covers the change, or unset GAUNTLET_REQUIRE_TESTS."
 fi
 
 if [ -z "$FAILED" ]; then
-  printf '%s' "$DIFF_HASH" > "$MARKER"
+  mv -f "$MARKER.next" "$MARKER" 2>/dev/null
   if [ -z "$RAN" ]; then
     if [ -n "$SKIP_NOTE" ]; then quit "skipped: $SKIP_NOTE"; fi
     quit "skipped: no gate applied to the changed files"
