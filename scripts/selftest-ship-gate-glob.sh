@@ -13,3 +13,8 @@ sg "a bracket path's changed line is still judged" "route.ts:30:7" 1
 out=$(bash "$SG" 2>&1); N=$((N+1))
 if printf '%s' "$out" | grep -q 'route.ts:30:9' && ! printf '%s' "$out" | grep -q 'route.ts:5:3'; then PASS=$((PASS+1)); echo "  ok   and only its changed lines: an old line's survivor is not this diff's"
 else FAIL=$((FAIL+1)); printf '  FAIL and only its changed lines: an old line'"'"'s survivor is not this diff'"'"'s\n%s\n' "$out"; fi
+sg "a Stryker survivor says how to mark an equivalent one, instead of --force" "// Stryker disable next-line <Mutator>: <why> — then run this again." 1
+N=$((N+1))
+if node --input-type=module -e "import { parseReport } from '$HERE/ship-log-parse.mjs'; process.exit(parseReport(process.argv[1]).projects[0].survivors.length === 2 ? 0 : 1)" "$out"; then
+  PASS=$((PASS+1)); echo "  ok   the ship log never reads that hint as a survivor"
+else FAIL=$((FAIL+1)); echo "  FAIL the ship log never reads that hint as a survivor"; fi

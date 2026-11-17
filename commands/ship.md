@@ -166,6 +166,9 @@ the receipt itself — do not run the gate again after it. **Never run `--baseli
 make a finding go away.** It accepts a survivor as permanent debt, so it is for a mutant
 that genuinely cannot be killed — an equivalent mutant, where the change alters nothing
 observable. Say which mutant and why, in the commit, or write the test instead.
+Stryker has no baseline file, because it mutates only the changed lines. An equivalent
+Stryker mutant gets `// Stryker disable next-line <Mutator>: <why>` above its line, then
+the gate runs again. **Never `--force` for one** — that skips every check, not just it.
 A survivor in code that only runs at import — app setup, router registration — is
 neither: mutmut forks after import, so that mutant never runs. Call the function from a
 test, or mark it `# pragma: no mutate block, <reason>`; never baseline it as harmless.

@@ -77,6 +77,11 @@ mutmut_unchecked() {  # mutmut_unchecked <label> <base> <count> <run log>
 # every mutant. One agent baselined 39 of those as harmless.
 survivor_list() {  # survivor_list <survivors> <tool>
   printf '%s\n' "$1" | sed 's/^/      /'
+  if [ "$2" = stryker ]; then
+    echo "      Equivalent, so no test can tell? Put the reason above that line, never --force:"
+    echo "      // Stryker disable next-line <Mutator>: <why> — then run this again."
+    return 0
+  fi
   [ "$2" = mutmut ] || return 0
   echo "      Only runs at import (app setup, router registration)? Then it is unreachable,"
   echo "      not equivalent — see testing-best-practices/MUTATION-TESTING.md."
