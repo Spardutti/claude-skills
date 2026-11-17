@@ -52,6 +52,7 @@ const EDIT_CHECK_FILENAME = "edit-check.sh";
 const BASH_CHECK_FILENAME = "bash-check.sh";
 const LINE_LIMIT_FILENAME = "line-limit.sh";
 const LINT_RATCHET_FILENAME = "lint-ratchet.mjs";
+const LINT_RUNNERS_FILENAME = "lint-runners.mjs";
 const TEXT_RULES_FILENAME = "text-rules.mjs";
 const TEST_CHECKS_FILENAME = "test-checks.mjs";
 const RATCHET_BASELINE_FILENAME = "ratchet-baseline.mjs";
@@ -147,6 +148,7 @@ export async function setupHook(targetDir = process.cwd()) {
     BASH_CHECK_FILENAME,
     LINE_LIMIT_FILENAME,
     LINT_RATCHET_FILENAME,
+    LINT_RUNNERS_FILENAME,
     TEXT_RULES_FILENAME,
     TEST_CHECKS_FILENAME,
     RATCHET_BASELINE_FILENAME,

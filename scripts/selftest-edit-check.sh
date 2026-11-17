@@ -3,7 +3,7 @@
 
 echo "the edit-time check"
 EC="$TMP/ec"; rm -rf "$EC"; mkdir -p "$EC/scripts" "$EC/skills/x"
-cp "$HERE/line-limit.sh" "$HERE/edit-check.sh" "$HERE/lint-ratchet.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" "$HERE/gate-config.sh" "$EC/scripts/"
+cp "$HERE/line-limit.sh" "$HERE/edit-check.sh" "$HERE/lint-ratchet.mjs" "$HERE/lint-runners.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" "$HERE/gate-config.sh" "$EC/scripts/"
 mkl() { awk -v n="$2" 'BEGIN { for (i=0;i<n;i++) print ": pad" }' > "$EC/$1"; }
 
 mkl old.sh 300

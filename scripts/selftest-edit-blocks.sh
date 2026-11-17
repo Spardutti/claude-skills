@@ -3,7 +3,7 @@
 
 echo "edit-hook blocks are logged and tallied"
 EB="$TMP/eb"; rm -rf "$EB"; mkdir -p "$EB/.claude/hooks" "$EB/src"
-cp "$HERE/edit-check.sh" "$HERE/line-limit.sh" "$HERE/gate-config.sh" "$HERE/lint-ratchet.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" \
+cp "$HERE/edit-check.sh" "$HERE/line-limit.sh" "$HERE/gate-config.sh" "$HERE/lint-ratchet.mjs" "$HERE/lint-runners.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" \
    "$HERE/ratchet-baseline.mjs" "$HERE/skill-report.mjs" "$HERE/diary-lib.mjs" "$EB/.claude/hooks/"
 git -C "$EB" init -q -b feat/x
 printf '{"text":[{"id":"no-todo","files":"\\\\.ts$","pattern":"TODO","message":"m","bad":"// TODO","good":"x"}]}' > "$EB/.edit-rules.json"

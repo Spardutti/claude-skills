@@ -473,6 +473,7 @@ biggest source of wasted wall-clock, and it is why teams abandon this after a we
 - Never count a mutant that fails to parse as killed.
 - Always spread `configDefaults.exclude` when adding `.stryker-tmp`, and gitignore it.
 - Always install the tool the way the project manages dependencies (uv, poetry, npm workspace).
+- Always set `"tsconfigFile": "no-tsconfig-rewrite-typescript-7-has-no-compiler-api.json"` when `typescript` resolves to 7 — Stryker 10 crashes on its missing API (stryker-js #6111).
 - Always match `[Survived]` for Stryker findings — the summary header contains the word `survived` on a clean run.
 - Always read mutmut's verdict from `mutmut results`; `mutmut run` exits 0 either way and prints no word to grep.
 - Never baseline a survivor in import-time code as equivalent — call the function from a test, or mark it `# pragma: no mutate block, <reason>`.

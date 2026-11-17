@@ -5,7 +5,7 @@ echo "the lint ratchet"
 LR="$TMP/lr"; rm -rf "$LR"; mkdir -p "$LR/scripts" "$LR/node_modules/.bin" "$LR/src"
 for k in code-structure typescript-best-practices; do mkdir -p "$LR/.claude/skills/$k"; echo x > "$LR/.claude/skills/$k/SKILL.md"; done
 printf '# rules: max-lines-per-function @typescript-eslint/explicit-module-boundary-types\n' > "$LR/.lint-baseline"
-cp "$HERE/lint-ratchet.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" "$HERE/edit-check.sh" "$HERE/gate-config.sh" "$LR/scripts/"
+cp "$HERE/lint-ratchet.mjs" "$HERE/lint-runners.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" "$HERE/edit-check.sh" "$HERE/gate-config.sh" "$LR/scripts/"
 printf '#!/bin/sh\nfor a in "$@"; do printf "arg[%%s]\\n" "$a"; done > "%s/args.log"\ncat "%s/eslint.json"\n' \
   "$LR" "$LR" > "$LR/node_modules/.bin/eslint"
 chmod +x "$LR/node_modules/.bin/eslint"

@@ -3,7 +3,7 @@
 
 echo "test files: a checklist from the code under test, and weak assertions blocked"
 TC="$TMP/tc"; rm -rf "$TC"; mkdir -p "$TC/scripts" "$TC/skills/testing-best-practices" "$TC/src" "$TC/app/clientes" "$TC/tests/clientes"
-cp "$HERE/edit-check.sh" "$HERE/lint-ratchet.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" "$HERE/gate-config.sh" "$TC/scripts/"
+cp "$HERE/edit-check.sh" "$HERE/lint-ratchet.mjs" "$HERE/lint-runners.mjs" "$HERE/text-rules.mjs" "$HERE/test-checks.mjs" "$HERE/ratchet-baseline.mjs" "$HERE/gate-config.sh" "$TC/scripts/"
 echo x > "$TC/skills/testing-best-practices/SKILL.md"
 git -C "$TC" init -q
 printf 'export function search(rows, q) {\n  return rows\n    .filter((r) => r.name.includes(q))\n    .sort((a, b) => a.name.localeCompare(b.name))\n    .slice(0, 5);\n}\n' > "$TC/src/search.ts"

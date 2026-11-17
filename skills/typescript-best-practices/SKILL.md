@@ -282,7 +282,9 @@ async function fetchUser(id: string): Promise<Result<User, AppError>> {
 }
 ```
 
-Under **TypeScript 7.0** (current stable, GA July 8 2026), `tsc` is the **native Go compiler** — a plain `npm i -D typescript` installs it and type-checks ~10× faster; the old `tsgo` / `@typescript/native-preview` preview package is now just `tsc`. `strict`, `module: "esnext"`, and a modern `target` are defaults — the block above keeps them explicit for clarity and older toolchains. `moduleResolution` values `node` / `node10` / `classic` and `baseUrl` remain deprecated; `paths` works without `baseUrl`. Caveat: 7.0 ships no stable programmatic compiler API yet (lands in 7.1, ~Oct 2026), so editor tooling that depends on it — Vue / Svelte / Astro / Angular template type-checking — may need to stay on 6.x until then.
+Under **TypeScript 7.0** (current stable, GA July 8 2026), `tsc` is the **native Go compiler** — a plain `npm i -D typescript` installs it and type-checks 4–5× faster; the old `tsgo` / `@typescript/native-preview` preview package is now just `tsc`. `strict`, `module: "esnext"`, and a modern `target` are defaults — the block above keeps them explicit for clarity and older toolchains. `baseUrl` is **removed** (an error, not a warning), and `types` defaults to `[]`. 7.0 ships no stable compiler API (7.1 is in beta), so `typescript-eslint`, `astro check` and Stryker break on it.
+
+**Upgrading an existing project to 7 → read TS7-UPGRADE.md first.** It covers which tools force a side-by-side install, the tsconfig lines 7 rejects, and the Stryker workaround.
 
 ## Rules
 
@@ -298,4 +300,5 @@ Under **TypeScript 7.0** (current stable, GA July 8 2026), `tsc` is the **native
 10. **Prefer** `as const` for literal arrays and config objects; `as const satisfies T` when you also need a shape check
 11. **Prefer** `const` type parameters over caller-side `as const` for literal-preserving generics
 12. **Use** `using` / `await using` for resources that need deterministic cleanup
+13. **Always** read TS7-UPGRADE.md before bumping `typescript` to 7 — `typescript-eslint`, `astro check` and Stryker break on it
 13. **Mark type-only imports** with `import type` — required under `verbatimModuleSyntax`

@@ -4,12 +4,13 @@ import { appendFileSync, existsSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brokenRules, loadEditRules, projectFiles, textFindings } from "./text-rules.mjs";
-import { mergeBaseline, readBaseline, writeBaseline } from "./ratchet-baseline.mjs";
+import { forget, mergeBaseline, readBaseline, writeBaseline } from "./ratchet-baseline.mjs";
+import { pickLinter } from "./lint-runners.mjs";
 import { WEAK_ASSERTS, checklist } from "./test-checks.mjs";
 
 const ROOT = realpathSync(process.cwd());
 const BASELINE = resolve(ROOT, ".lint-baseline");
-const ESLINT = resolve(ROOT, "node_modules/.bin/eslint");
+const LINTER = pickLinter(ROOT);
 const SELF = relative(ROOT, fileURLToPath(import.meta.url));
 let TEXT = [];
 let LESSONS = [];
@@ -38,37 +39,12 @@ const hasSkill = (name) =>
   existsSync(resolve(ROOT, ".claude/skills", name, "SKILL.md")) || existsSync(resolve(ROOT, "skills", name, "SKILL.md"));
 const LINT = RULES.filter((r) => hasSkill(r.skill));
 
-// A plugin rule the project's config cannot load makes ESLint crash, so retry without it.
-function eslint(rules, target) {
-  const results = eslintOnce(rules, target);
-  const core = rules.filter((r) => !r.id.includes("/"));
-  if (results || core.length === rules.length) return { results, ran: rules };
-  return { results: core.length ? eslintOnce(core, target) : [], ran: core };
+function lintFindings(found) {
+  return found.filter((f) => RULES.find((r) => r.id === f.rule)?.applies(f.rel));
 }
 
-function eslintOnce(rules, target) {
-  const args = ["-f", "json"];
-  for (const r of rules) args.push("--rule", JSON.stringify({ [r.id]: r.config }));
-  args.push(target);
-  const run = spawnSync(ESLINT, args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
-  try {
-    return JSON.parse(run.stdout);
-  } catch {
-    return null;
-  }
-}
-
-function eslintFindings(results) {
-  const out = [];
-  for (const file of results) {
-    const rel = relative(ROOT, file.filePath);
-    for (const m of file.messages) {
-      const rule = RULES.find((r) => r.id === m.ruleId);
-      if (rule && rule.applies(rel)) out.push({ rel, rule: m.ruleId, line: m.line, message: m.message });
-    }
-  }
-  return out;
-}
+// Two linters count a rule differently, so debt counted by the other one is not judged.
+const recount = (was) => (LINTER && was.linter !== LINTER.name ? forget(was, LINT.map((r) => r.id)) : was);
 
 function countBy(list) {
   const counts = new Map();
@@ -80,34 +56,39 @@ function countBy(list) {
 }
 
 function baseline(only, newOnly) {
-  const was = readBaseline(BASELINE);
-  const pick = (r) => (only ? r.id === only : !newOnly || !was.rules.has(r.id));
-  const lint = existsSync(ESLINT) ? LINT.filter(pick) : [];
+  const read = readBaseline(BASELINE);
+  const switched = read.exists && recount(read) !== read && (!only || LINT.some((r) => r.id === only));
+  const was = switched ? recount(read) : read;
+  const pick = (r) => (switched && LINT.includes(r)) || (only ? r.id === only : !newOnly || !was.rules.has(r.id));
+  const lint = LINTER ? LINT.filter(pick) : [];
   const text = TEXT.filter(pick);
   if (newOnly && was.exists && lint.length + text.length === 0) return 0;
   if (newOnly && lint.length + text.length) console.log(`  Recording old code as baseline debt for: ${[...lint, ...text].map((r) => r.id).join(" ")}`);
-  const { results, ran } = lint.length ? eslint(lint, ".") : { results: [], ran: [] };
-  if (!results) {
-    console.error("lint-ratchet: eslint gave no JSON; baseline not written.");
+  const { found: lintFound, ran } = lint.length ? LINTER.run(lint, ".") : { found: [], ran: [] };
+  if (!lintFound) {
+    console.error(`lint-ratchet: ${LINTER.name} gave no JSON; baseline not written.`);
     return 1;
   }
+  if (switched) console.log(`  Re-counting lint debt with ${LINTER.name}; ${read.linter} counted it before.`);
   const cannot = lint.filter((r) => !ran.includes(r)).map((r) => r.id);
   if (cannot.length) console.log(`lint-ratchet: ESLint could not run ${cannot.join(" ")}; its plugin is not in the ESLint config.`);
   if (newOnly && was.exists && ran.length + text.length === 0) return 0;
-  const found = [...eslintFindings(results), ...projectFiles(ROOT).flatMap((rel) => textFindings(text, ROOT, rel))];
+  const found = [...lintFindings(lintFound), ...projectFiles(ROOT).flatMap((rel) => textFindings(text, ROOT, rel))];
   const judged = new Set([...ran, ...text].map((r) => r.id));
-  const n = writeBaseline(BASELINE, mergeBaseline(was, countBy(found), judged), new Set([...was.rules, ...judged]));
+  const linter = ran.length ? LINTER.name : LINTER && read.linter;
+  const n = writeBaseline(BASELINE, mergeBaseline(was, countBy(found), judged), new Set([...was.rules, ...judged]), linter);
   console.log(`lint-ratchet: baseline written — ${n} rule/file pair(s) accepted as debt.`);
   return 0;
 }
 
 function scan(rel) {
-  const lint = existsSync(ESLINT) ? LINT.filter((r) => r.applies(rel)) : [];
-  const { results, ran } = lint.length ? eslint(lint, rel) : { results: null, ran: [] };
+  const lint = LINTER ? LINT.filter((r) => r.applies(rel)) : [];
+  const { found, ran } = lint.length ? LINTER.run(lint, rel) : { found: [], ran: [] };
+  if (!found) console.log(`NOTE — ${LINTER.name} crashed or printed no JSON, so ${lint.map((r) => r.id).join(" ")} did not run on ${rel}. Run it on that file to see why.`);
   const text = TEXT.filter((r) => r.applies(rel));
   return {
-    rules: [...(results ? ran : []), ...text],
-    found: [...(results ? eslintFindings(results) : []), ...textFindings(text, ROOT, rel)],
+    rules: [...(found ? ran : []), ...text],
+    found: [...lintFindings(found ?? []), ...textFindings(text, ROOT, rel)],
   };
 }
 
@@ -116,7 +97,7 @@ function checkFile(path) {
   const rel = relative(ROOT, existsSync(abs) ? realpathSync(abs) : abs);
   if (rel.startsWith("..") || spawnSync("git", ["check-ignore", "-q", "--", rel], { cwd: ROOT }).status === 0) return 0;
   const { rules, found } = scan(rel);
-  const was = readBaseline(BASELINE);
+  const was = recount(readBaseline(BASELINE));
   let failed = 0;
   for (const rule of rules) {
     const hits = found.filter((f) => f.rule === rule.id);
