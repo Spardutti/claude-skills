@@ -115,3 +115,21 @@ stop general-purpose "$R1"
 ok=0; [ ! -e "$HOME/.claude/ship-logs/open/sg_flags__feat-no-ship.json" ] && ok=1
 sf "a review outside /ship opens no log" $ok "$(ls "$HOME/.claude/ship-logs/open" 2>&1)"
 rm -rf "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs"
+
+SESSIONS="$HOME/.claude/projects/$(printf '%s' "$PWD" | sed 's/[^a-zA-Z0-9]/-/g')"; mkdir -p "$SESSIONS"
+call() {  # call <message id> <tool_use json or ""> <usage json>
+  node -e 'const [id,use,usage]=process.argv.slice(1);console.log(JSON.stringify({type:"assistant",message:{id,content:use?[JSON.parse(use)]:[],usage:usage?JSON.parse(usage):undefined}}))' "$@"
+}
+U1='{"input_tokens":10,"cache_read_input_tokens":1000,"cache_creation_input_tokens":0,"output_tokens":50}'
+U2='{"input_tokens":10,"cache_read_input_tokens":1050,"cache_creation_input_tokens":400,"output_tokens":5}'
+{ call m1 '{"type":"tool_use","name":"Skill","input":{"skill":"react"}}' "$U1"; call m2 "" "$U2"
+  call m3 '{"type":"tool_use","name":"Skill","input":{"skill":"astro"}}' "$U1"; call m3 '{"type":"tool_use","name":"Skill","input":{"skill":"react"}}' "$U1"; call m4 "" "$U2"
+  call m5 '{"type":"tool_use","name":"Skill","input":{"skill":"vue"}}' "$U1"; call m6 "" ""; } > "$SESSIONS/s1.jsonl"
+REPORT=$(node .claude/hooks/skill-report.mjs 2>&1 | sed -n '/skill load cost/,$p')
+WANT='skill load cost  loads  measured  median tokens
+react                2         1            400
+astro                1         0              -
+vue                  1         0              -'
+ok=0; [ "$REPORT" = "$WANT" ] && ok=1
+sf "a skill load costs its context growth; a shared or unreadable load gets no number" $ok "$REPORT"
+rm -rf "$SESSIONS"

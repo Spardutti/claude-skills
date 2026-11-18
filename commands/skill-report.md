@@ -25,7 +25,10 @@ edit hook blocks to `.claude/edit-blocks.jsonl`. This command reads both.
    most three rules that blocked on **three or more branches**. Each one is a rule Claude
    keeps writing wrong first: suggest where its skill should state it earlier — a BAD/GOOD
    pair near the top, or a line in Rules — so the first draft gets it right.
-6. Run `node .claude/hooks/ship-log.mjs gaps` and show its table verbatim. It counts the test
+6. If a `skill load cost` table is printed, it shows how much each skill adds to the context when it loads, read
+   from this project's session files. A `-` means no load could be measured on its own: say so, never guess a number.
+   A skill that costs the most and is in **Try without it** is the strongest case to drop.
+7. Run `node .claude/hooks/ship-log.mjs gaps` and show its table verbatim. It counts the test
    gaps mutation testing found on each branch's first run, per week, across every logged repo.
    A change to the testing skill works only if "gaps per branch" drops in the weeks after it.
 
