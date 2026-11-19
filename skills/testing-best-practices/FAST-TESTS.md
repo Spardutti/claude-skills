@@ -11,6 +11,7 @@ A slow suite is rarely slow tests. It is setup every test inherits: fixtures tha
 - [Hash Test Passwords With The Cheapest Settings](#hash-test-passwords-with-the-cheapest-settings)
 - [Stop Cloud Clients Probing The Network](#stop-cloud-clients-probing-the-network)
 - [Cut What Every Test Process Pays To Start](#cut-what-every-test-process-pays-to-start)
+- [A Test Helper Must Not Import The Whole App](#a-test-helper-must-not-import-the-whole-app)
 - [Turn Off Postgres JIT In Tests](#turn-off-postgres-jit-in-tests)
 - [Half The Cores, Lowest Priority](#half-the-cores-lowest-priority)
 - [Measure Before Fixing](#measure-before-fixing)
@@ -211,6 +212,27 @@ def pytest_configure():
     settings.WHITENOISE_AUTOREFRESH = True
 ```
 
+## A Test Helper Must Not Import The Whole App
+
+`vitest related`, `jest --findRelatedTests` and the Stop hook pick tests by import graph. A shared helper that imports the route tree makes every test depend on every page, so a one-line edit reruns the suite. One app: 51 of 182 test files, 31s, for any `.tsx` change.
+
+```tsx
+// BAD — src/test/harness.tsx; every test using it now "imports" every page
+import { routeTree } from '@/routeTree.gen';
+export const renderApp = (url: string) =>
+  render(<RouterProvider router={createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [url] }) })} />);
+
+// GOOD — the test hands over the one screen it needs
+export function renderRoute(component: () => JSX.Element, path = '/') {
+  const root = createRootRoute();
+  const route = createRoute({ getParentRoute: () => root, path, component });
+  const router = createRouter({ routeTree: root.addChildren([route]), history: createMemoryHistory({ initialEntries: [path] }) });
+  return render(<RouterProvider router={router} />);
+}
+```
+
+Keep full-tree navigation in a few end-to-end tests. Check the graph: `npx vitest related --run src/some/leaf.tsx` should list only that file's own tests.
+
 ## Turn Off Postgres JIT In Tests
 
 Postgres compiles a query it costs as expensive, and it costs one by its plan, not by the rows. A complex query on near-empty test tables spends longer compiling than running.
@@ -275,6 +297,7 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 - Always hash test passwords with the algorithm's cheapest settings, in test setup only; when the library hardcodes its cost, swap its hash and verify functions.
 - Always switch off cloud SDK credential probes in test setup.
 - Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image, WhiteNoise's static scan.
+- Never import the route tree, the app root or a barrel of every feature from a shared test helper; `related` then reruns the whole suite.
 - Always set `jit=off` on a Postgres test database.
 - Always run test and mutation workers on half the cores at `nice -n 19`, inside the container when tests run in Docker.
 - Never hard-code a worker count in a runner script or config; the gate passes one.
