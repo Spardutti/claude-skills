@@ -86,7 +86,7 @@ The two forces meet here. Keep code together when:
 5. **Never mix levels of abstraction** in one function.
 6. **Never extract on the second duplication** — wait for the third, and only if intent (not just shape) matches.
 7. **Never add a boolean/mode parameter** to make a shared helper fit a new caller — split into purpose-named functions.
-8. **Never extract a helper used in exactly one place.**
+8. **Never extract a helper used in exactly one place** — unless it keeps a function under the 30-line limit; then name it for its one job.
 9. **Split on responsibility, never on line count or visual similarity alone.**
 10. **Inline a wrong abstraction** before trying to "fix" it with more parameters.
 11. **Don't over-split** — only split when there is a real second responsibility.

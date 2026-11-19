@@ -138,7 +138,7 @@ func RenderHeader(u User) string {
 }
 ```
 
-Extract when the helper earns its name by being *called from multiple places* or by *hiding real complexity*. Not before.
+Extract when the helper earns its name by being *called from multiple places* or by *hiding real complexity*, or when it keeps a function under the 30-line limit. Not before.
 
 ### 5. "Generic" utility that needs the caller to configure it
 
@@ -210,7 +210,7 @@ You have a wrong abstraction if:
 
 - Never extract on the second duplication — wait for the third, and only if the shape is clear.
 - Never add a boolean parameter to make a shared helper fit a new caller — split it instead.
-- Never extract a helper that's used in exactly one place.
+- Never extract a helper that's used in exactly one place, unless it keeps a function under the 30-line limit.
 - Always prefer two purpose-named functions over one generic function with a `mode` argument.
 - Always inline a wrong abstraction before trying to "fix" it with more parameters.
 - Always ask "would both callers change for the same business reason?" before extracting.
