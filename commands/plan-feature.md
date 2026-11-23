@@ -70,6 +70,8 @@ Now, and only now, ask the user clarifying questions — **batched in a single m
 
 Skip questions whose answer is obvious from the scans, **or already settled by a discovery log** — never re-ask something the log resolved. If everything is clear, skip this step entirely.
 
+**Count the choices you will make for the user.** A choice is anything the brief, the code, the discovery log and the user's answers leave open, where a wrong pick means rework. Naming and styling are not choices. If more than 5 remain, write no stubs: ask the 5 that cost the most rework, or suggest `/discover` if the brief is too vague.
+
 ## Step 4 — Write the Plan as Stubs
 
 The plan is code, not prose. Markdown can name a reuse target that does not exist; a stub cannot — the type checker refuses it. Write the plan's shapes at the **real paths**, so the build later fills bodies in place and `git diff` is the plan.
@@ -148,6 +150,17 @@ node .claude/hooks/registry.mjs --plan PLAN.md <stub files…>
 
 End the message with this question as its last line, after any summary: "Nothing is built yet. Build it this way, or change something?" A message that ends on a summary leaves the user unsure why you stopped.
 
+Just above that question, list every choice you made for the user, in chat only — nobody reads `PLAN.md`:
+
+```
+Confidence: medium (2 choices I made for you)
+
+1. Export uses the current filters, not all invoices. OK?
+2. No row cap. The largest account has about 4k invoices. OK?
+```
+
+Confidence is high for 0–1 choices and medium for 2–5. With 0 choices, print only the `Confidence: high` line.
+
 When the user says go, build the plan yourself, in this conversation. Do not spawn agents to write code: parallel code-writing workers each reloaded their skills and the plan, crossed messages, and re-reported, and one feature spent 51 minutes waiting on its slowest worker. One agent gives the user one diff to review.
 
 Build the side others depend on first (schema and API before the screens that call them). Fill the stubs in place and turn each pending test into a real one. Write the tests for what you write, and run each touched app's tests and type check before moving on.
@@ -165,6 +178,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the change and as
 - Always ground clarifying questions in actual scan findings — never ask generic product questions.
 - Always print the plan and stop before Step 5 — never build until the user approves it.
 - Always end the stop message with the approval question as its last line — never end it on a summary.
+- Always list every choice you made for the user just above that question, with the confidence line — never write stubs while more than 5 remain.
 - Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/ship`.
 - Never produce a plan that proposes building something the scan found as reusable, unless the user explicitly rejected reuse.
 - Always run the registry first, mark every entry `reuse` or `skip` in `PLAN.md`, and stop only when `--plan` shows no FAIL — every ASK goes to the user.
