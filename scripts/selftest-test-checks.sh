@@ -65,6 +65,8 @@ printf 'import type { Api } from "@/lib/api"\nimport { a } from "@/lib/api/a"\ni
 tc_is "a type import, a direct file, drizzle's schema and a small feature index pass" 0 "$(edit src/new.ts)"
 echo 'import { b } from "./index"' > "$TC/lib/api/a.ts"
 tc_is "a file inside the barrel's own folder passes" 0 "$(edit lib/api/a.ts)"
+tc_is "--debt lists the old findings of exactly the files asked for, for /plan-feature" "src/old.ts: 1 × barrel-import" \
+  "$(cd "$TC" && node scripts/lint-ratchet.mjs --debt src/old.ts src/new.ts old.ts "$TC/src/old.ts" | sort -u)"
 
 rm -rf "$TC/skills/testing-best-practices"
 tc_is "without the testing skill there is no checklist" "" "$(tests_lines tests/clientes/test_search.py)"

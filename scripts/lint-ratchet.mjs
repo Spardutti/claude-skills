@@ -127,14 +127,27 @@ function selftest() {
   return broken.length ? 1 : 0;
 }
 
+function debt(paths) {
+  const { counts } = readBaseline(BASELINE);
+  for (const path of paths) {
+    const rel = relative(ROOT, resolve(ROOT, path));
+    for (const [key, n] of counts) {
+      const [rule, file] = [key.slice(0, key.indexOf(" ")), key.slice(key.indexOf(" ") + 1)];
+      if (file === rel) console.log(`${rel}: ${n} × ${rule}`);
+    }
+  }
+  return 0;
+}
+
 function main(mode, arg) {
+  if (mode === "--debt") return debt(process.argv.slice(3));
   ({ text: TEXT, lessons: LESSONS } = loadEditRules(ROOT));
   if (hasSkill("testing-best-practices")) TEXT = [...WEAK_ASSERTS, BARREL_IMPORT, ...TEXT];
   if (mode === "--baseline") return baseline(arg, false);
   if (mode === "--baseline-new") return baseline(undefined, true);
   if (mode === "--file") return checkFile(arg ?? "");
   if (mode === "--selftest") return selftest();
-  console.error("usage: lint-ratchet.mjs --baseline [rule-id] | --baseline-new | --file <path> | --selftest");
+  console.error("usage: lint-ratchet.mjs --baseline [rule-id] | --baseline-new | --file <path> | --debt <path...> | --selftest");
   return 1;
 }
 

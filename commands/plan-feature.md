@@ -54,8 +54,10 @@ longer matches its code: tell the user in Step 3, and never trust that entry's n
 1. Infer the layers: UI, routing, state, API, DB, permissions, navigation, i18n, config.
 2. Find the registries and aggregators each layer needs: routers, DB schema, navigation, permissions,
    API roots and specs, i18n files, flags and config, type and event registries.
-3. Read each to confirm the change must register there, and note its line count (`loc`).
+3. Read each to confirm the change must register there, and note its line count (`loc`)
    Only files the change must edit — never files it only reads, never every consumer.
+4. List the old findings the edit hook lets stand in those files:
+   `node .claude/hooks/lint-ratchet.mjs --debt <touch point files…>` (prints nothing when none).
 
 Keep the findings short — symbol and `path:line` for reuse, exemplar files for the pattern, and
 `file`, `loc` and why for each touch point. Steps 3 and 4 build on them.
@@ -118,6 +120,9 @@ Print only what code cannot say. Never list reuse, extend or add targets here �
 ## Splits
 - `<file>` (<loc> LOC) — split <part> into `<new file>` before adding to it
 
+## Debt
+- `<file>` — <count> × <rule>: <the fix, in one line>; one line per rule
+
 ## Wiring (added at build)
 - `<file>` — <the registration line a throwing stub cannot carry yet>
 
@@ -126,6 +131,8 @@ Print only what code cannot say. Never list reuse, extend or add targets here �
 ```
 
 **Size check.** Each touch point you noted carries a `loc`. If extending a file pushes it near or over 200 lines, or it is already over, list the split under Splits so it is approved up front, not found mid-build.
+
+**Debt check.** For each line `--debt` printed, propose its fix under Debt — the file is open anyway, so the fix is cheapest now. Leave the section out when none has debt.
 
 **No type checker?** Then the stubs prove nothing, so also add `## Reuse`, `## Extend` and `## Add` lists (`<symbol>` at `path:line`, `<file>` — what changes) to the notes.
 
@@ -161,6 +168,15 @@ Confidence: medium (2 choices I made for you)
 
 Confidence is high for 0–1 choices and medium for 2–5. With 0 choices, print only the `Confidence: high` line.
 
+Below the choices, add one short recommendation for the whole Debt section: the fixes worth doing now, in plain words, and one yes or no. Pick the small ones that pay off. If a touched file is far over 200 lines or carries a large pile of debt, name the biggest one in one more sentence as its own task, not part of this change. It is not a choice and never counts toward the 5:
+
+```
+These files have old debt. I'd fix the 5 barrel imports while there; it's small. Yes?
+Too big for now: chat.tsx is 1,040 lines. Worth its own /plan-feature to split it.
+```
+
+Build only the fixes the user says yes to. Once one is fixed, run the `--baseline <rule>` command the edit hook prints, so the paid-down debt is banked.
+
 When the user says go, build the plan yourself, in this conversation. Do not spawn agents to write code: parallel code-writing workers each reloaded their skills and the plan, crossed messages, and re-reported, and one feature spent 51 minutes waiting on its slowest worker. One agent gives the user one diff to review.
 
 Build the side others depend on first (schema and API before the screens that call them). Fill the stubs in place and turn each pending test into a real one. Write the tests for what you write, and run each touched app's tests and type check before moving on.
@@ -184,6 +200,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the change and as
 - Always run the registry first, mark every entry `reuse` or `skip` in `PLAN.md`, and stop only when `--plan` shows no FAIL — every ASK goes to the user.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.
 - If the scan finds nothing useful, say so in the plan ("no existing pattern found — this is a greenfield area") rather than padding.
+- Always propose a fix for every line `--debt` prints for the files the plan edits, under Debt, then ask one short yes or no for the fixes worth doing — never fix debt the user did not approve.
 - Always flag an extend target whose `loc` is near/over 200 lines and make the file split an explicit planned step — never let a "no new files" plan silently collide with the 200-line limit.
 - Cap the notes at ~40 lines. If it grows beyond that, the change is too big — tell the user to split it.
 - Never write stubs on the default branch — branch each touched repo first.
