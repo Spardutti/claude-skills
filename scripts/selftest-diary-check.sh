@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
-echo "the diary check /ship runs at the end"
+echo "the diary check /deliver runs at the end"
 DC="$TMP/dc"; rm -rf "$DC"; mkdir -p "$DC/.claude/hooks"
 cp "$HERE/diary-check.mjs" "$HERE/diary-lib.mjs" "$HERE/gate-config.sh" "$DC/.claude/hooks/"
 dc() {  # dc <label> <expected exit> <expected substring, empty for silence> [args]

@@ -51,7 +51,7 @@ prep_has "and every uncommitted file" "$out" "uncommitted 3"
 prep_has "and whether gh is logged in" "$out" "gh logged in"
 prep_has "and this branch's PR" "$out" "pr OPEN #12 https://x/pull/12"
 sl_ok "start exits 0" test "$rc" = 0
-sl_ok "start sets the /ship mark" bash "$HERE/ship-mark.sh" check
+sl_ok "start sets the /deliver mark" bash "$HERE/ship-mark.sh" check
 sl_ok "and opens the ship log" test -f "$HOME/.claude/ship-logs/open/prep-origin__feat-p.json"
 sl_ok "gh is asked exactly these, in order" test "$(cat "$TMP/prep-gh-args")" = "$(printf 'auth status\npr view --json state,number,url -q .state+" #"+(.number|tostring)+" "+.url')"
 out=$(PREP_GH_AUTH=1 bash "$SP" start 2>&1)
@@ -81,7 +81,7 @@ sl_ok "a release branch opens no log, so it starts no audit or review step" test
 git checkout -q feat/p
 git checkout -q --detach
 out=$(bash "$SP" start 2>&1); rc=$?
-sl_ok "a detached HEAD stops start with ship.md's message" test "$rc" = 1 -a -n "$(printf '%s' "$out" | grep 'Detached HEAD')"
+sl_ok "a detached HEAD stops start with deliver.md's message" test "$rc" = 1 -a -n "$(printf '%s' "$out" | grep 'Detached HEAD')"
 git checkout -q feat/p
 rm -rf bin/gh "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs"
 

@@ -87,13 +87,13 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-timing.sh"             # how long the Stop hook and the ship gate took
 . "$HERE/selftest-ship-gate-config.sh"   # what a repo's own mutation command is handed
 . "$HERE/selftest-ship-gate-base.sh"     # which branch the ship gate measures from
-. "$HERE/selftest-ship-log.sh"           # the /ship log: every gate run, findings, PR size
+. "$HERE/selftest-ship-log.sh"           # the /deliver log: every gate run, findings, PR size
 . "$HERE/selftest-ship-log-settle.sh"    # survivors fixed but never logged
 . "$HERE/selftest-ship-log-plan.sh"      # registry marks and edit-rule blocks in the log
 . "$HERE/selftest-ship-log-gaps.sh"      # the test-gap score per week
-. "$HERE/selftest-ship-prep.sh"         # ship-gate --scope and the one-call /ship setup
+. "$HERE/selftest-ship-prep.sh"         # ship-gate --scope and the one-call /deliver setup
 . "$HERE/selftest-ship-prep-stages.sh"  # commit, merge and release facts in one call each
-. "$HERE/selftest-ship-mark.sh"          # a PR opens only after /ship starts on its branch
+. "$HERE/selftest-ship-mark.sh"          # a PR opens only after /deliver starts on its branch
 . "$HERE/selftest-optimize-bench.sh"     # /optimize's benchmark refuses a round with no prediction
 . "$HERE/selftest-design-check.sh"      # design-variants check.mjs: contrast, labels, names
 . "$HERE/selftest-survey.sh"             # the real-repo survey finds repos inside group folders
@@ -110,7 +110,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-lint-ratchet.sh"       # the ESLint ratchet on each edited file
 . "$HERE/selftest-lint-ratchet-baseline.sh"  # baselines never bank growth, and edge cases
 . "$HERE/selftest-lint-ratchet-oxlint.sh"  # the same ratchet run by oxlint, and switching linters
-. "$HERE/selftest-diary-check.sh"       # when /ship suggests /add-rule
+. "$HERE/selftest-diary-check.sh"       # when /deliver suggests /add-rule
 . "$HERE/selftest-correction-scan.sh"   # corrections /dream finds in the chats
 . "$HERE/selftest-edit-blocks.sh"       # edit-hook blocks, logged and tallied
 . "$HERE/selftest-registry.sh"          # *.registry.yaml: the listing, the plan check and stale entries
@@ -122,6 +122,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-claude-md.sh"           # the blocks written into CLAUDE.md
 . "$HERE/selftest-cli.sh"                # the installer binary end to end
 . "$HERE/selftest-cli-requires.sh"       # commands that need another, and new catalog items
+. "$HERE/selftest-cli-rename.sh"         # /ship renamed to /deliver: old installs carry over
 . "$HERE/selftest-stryker.sh"            # scaffolding Stryker into a project
 . "$HERE/selftest-standalone.sh"         # no test file runs on its own, in a real repo
 

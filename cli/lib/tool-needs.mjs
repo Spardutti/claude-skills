@@ -61,7 +61,7 @@ async function pythonAdvice(dir, rel, entries) {
 // What the installed commands need that this project does not have yet.
 // ship-gate.sh's own detection drives a single-package repo; a monorepo whose
 // tools need a workspace prefix or a container sets GAUNTLET_MUTATE instead. Only
-// /ship needs anything: a mutation tool, per project, since a monorepo can hold
+// /deliver needs anything: a mutation tool, per project, since a monorepo can hold
 // several and they do not share one.
 export async function reportToolNeeds(projectDir) {
   const needs = [];

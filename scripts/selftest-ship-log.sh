@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
-echo "the /ship log"
+echo "the /deliver log"
 SL="$HERE/ship-log.mjs"; SLOGS="$HOME/.claude/ship-logs"; SLOUT="$TMP/ship-log-stryker.out"; DAY=$(date -u +%F)
 SLOPEN="$SLOGS/open/sg_log__feat-x.json"
 
@@ -38,13 +38,13 @@ sl_ok "with the log off, the gate writes nothing" test ! -e "$SLOGS"
 
 mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
 bash "$SG" >/dev/null 2>&1
-sl_ok "a gate run outside /ship writes no log" test ! -e "$SLOPEN"
+sl_ok "a gate run outside /deliver writes no log" test ! -e "$SLOPEN"
 git checkout -qb feat/rel; bash "$HERE/ship-mark.sh" begin --no-log
 sl_ok "a release's mark is set" bash "$HERE/ship-mark.sh" check
 git checkout -q feat/x
 sl_ok "a release's mark opens no log" test ! -e "$SLOGS/open/sg_log__feat-rel.json"
 bash "$HERE/ship-mark.sh" begin
-sl_ok "the /ship mark opens the log, so it never hangs on the agent" test -f "$SLOPEN"
+sl_ok "the /deliver mark opens the log, so it never hangs on the agent" test -f "$SLOPEN"
 bash "$SG" >/dev/null 2>&1; rc=$?
 sl_ok "a FAIL keeps its exit code with the log on" test "$rc" = 1
 sl_is "the run is logged under the app and branch" "$SLOPEN" 'r.app === "sg_log" && r.branch === "feat/x" && r.gate.length === 1 && r.gate[0].verdict === "FAIL" && r.gate[0].exit === 1'
@@ -120,7 +120,7 @@ case "\$*" in *"--head feat/merge-only "*) echo '[{"number":149,"createdAt":"200
 EOF
 chmod +x bin/gh; rm -f "$TMP/gh-args"
 bash "$HERE/ship-mark.sh" begin
-sl_is "a log left open after its PR opened is closed by the next /ship" "$SLOGS/sg_log_2999-01-02_pr151.json" 'r.status === "pr-opened" && r.pr === 151 && r.finished === "2999-01-02T03:04:05Z"'
+sl_is "a log left open after its PR opened is closed by the next /deliver" "$SLOGS/sg_log_2999-01-02_pr151.json" 'r.status === "pr-opened" && r.pr === 151 && r.finished === "2999-01-02T03:04:05Z"'
 sl_ok "and leaves open/" test ! -e "$SLOGS/open/sg_log__feat-z.json"
 sl_ok "gh is asked once per open log" test "$(cat "$TMP/gh-args")" = "$(printf 'pr list --head %s --state all --json number,createdAt,closedAt,state --limit 1\n' feat/merge-only feat/z)"
 sl_ok "a log that only merged is removed once its PR is merged" test ! -e "$SLOGS/open/sg_log__feat-merge-only.json" -a -z "$(ls "$SLOGS"/sg_log_*_pr149.json 2>/dev/null)"
@@ -129,7 +129,7 @@ sl_ok "a live log on a branch whose old PR closed before it began is kept" test 
 mkdir -p "$SLOGS/open"; echo '{"v":1,"app":"sg_log","branch":"develop","started":"2000-01-01T00:00:00Z","gate":[],"findings":[],"steps":{}}' > "$SLOGS/open/sg_log__develop.json"
 for b in develop chore/release-v2; do
   git checkout -qb "$b" 2>/dev/null || git checkout -q "$b"; bash "$HERE/ship-mark.sh" begin
-  sl_ok "a /ship on $b opens no log, and drops one an older version opened" test -z "$(ls "$SLOGS"/open/sg_log__*"${b##*/}"* 2>/dev/null)"
+  sl_ok "a /deliver on $b opens no log, and drops one an older version opened" test -z "$(ls "$SLOGS"/open/sg_log__*"${b##*/}"* 2>/dev/null)"
 done
 git checkout -q feat/y
 git checkout -qb feat/w; node "$SL" start; bash "$SG" --force >/dev/null 2>&1; git checkout -q feat/y

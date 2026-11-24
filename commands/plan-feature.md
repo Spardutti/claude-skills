@@ -131,7 +131,7 @@ Print only what code cannot say. Never list reuse, extend or add targets here �
 
 **Registry.** List every entry the registry printed, each marked `reuse` or `skip` with a reason. Leave the section out only when it printed `registry none`.
 
-Always save the notes to `PLAN.md` at the repo root, then print them. The registry check reads that file, and `/ship` deletes it before the commit. If git already tracks a `PLAN.md`, it belongs to the project: ask the user before overwriting it.
+Always save the notes to `PLAN.md` at the repo root, then print them. The registry check reads that file, and `/deliver` deletes it before the commit. If git already tracks a `PLAN.md`, it belongs to the project: ask the user before overwriting it.
 
 **Registry check.** Run it with the plan file and every file the stubs created or touched:
 
@@ -167,9 +167,9 @@ Build the side others depend on first (schema and API before the screens that ca
 
 If a stub's signature turns out wrong, stop and tell the user why before changing it — never work around a stub with a hack inside the body. The design was approved as signatures, so a changed signature is a changed plan.
 
-Before reporting, grep the touched files for the `stub` marker. None may remain. Then compare every exported signature in the stub files against the approved stub. List each difference in the report as "Plan changed: <signature>, because <reason>" — a rule the build can forget, a check it cannot. When tests pass and no marker remains, report the diff. End the report with: "Review it, then run `/ship` when it looks right."
+Before reporting, grep the touched files for the `stub` marker. None may remain. Then compare every exported signature in the stub files against the approved stub. List each difference in the report as "Plan changed: <signature>, because <reason>" — a rule the build can forget, a check it cannot. When tests pass and no marker remains, report the diff. End the report with: "Review it, then run `/deliver` when it looks right."
 
-Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the change and asks for changes first, and any edit voids the gate's receipt, so an early run is always paid again. `/ship` runs it once, before the PR.
+Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the change and asks for changes first, and any edit voids the gate's receipt, so an early run is always paid again. `/deliver` runs it once, before the PR.
 
 ## Rules
 
@@ -179,7 +179,7 @@ Do not run `ship-gate.sh`, Stryker or mutmut. The user reviews the change and as
 - Always print the plan and stop before Step 5 — never build until the user approves it.
 - Always end the stop message with the approval question as its last line — never end it on a summary.
 - Always list every choice you made for the user just above that question, with the confidence line — never write stubs while more than 5 remain.
-- Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/ship`.
+- Never run `ship-gate.sh`, Stryker or mutmut — the gate runs once, at `/deliver`.
 - Never produce a plan that proposes building something the scan found as reusable, unless the user explicitly rejected reuse.
 - Always run the registry first, mark every entry `reuse` or `skip` in `PLAN.md`, and stop only when `--plan` shows no FAIL — every ASK goes to the user.
 - Never include effort estimates, timelines, success metrics, or stakeholder sections — this is integration planning, not a PRD.

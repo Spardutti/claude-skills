@@ -130,15 +130,15 @@ esac
 KEY=$(CLAUDE_PROJECT_DIR="$TARGET" bash "$GATE" --key 2>/dev/null)
 [ -z "$KEY" ] && exit 0
 
-# A gate run by hand skips /ship's audit and review, so the PR waits for /ship itself.
+# A gate run by hand skips /deliver's audit and review, so the PR waits for /deliver itself.
 # A merge whose branch gh cannot name is left to the receipt alone.
 MARKER="$PROJECT_DIR/.claude/hooks/ship-mark.sh"
 case "$CMD" in *"gh pr create"*) MARK_BRANCH=${BRANCH:-$(git -C "$TARGET" branch --show-current)} ;; *) MARK_BRANCH=$BRANCH ;; esac
 if [ -f "$MARKER" ] && [ -n "$MARK_BRANCH" ] && ! CLAUDE_PROJECT_DIR="$TARGET" bash "$MARKER" check "$MARK_BRANCH"; then
-  deny "BLOCKED: /ship has not run on branch $MARK_BRANCH.
+  deny "BLOCKED: /deliver has not run on branch $MARK_BRANCH.
 
-Load the /ship command with the Skill tool and follow it from the start. A gate run
-by hand is not enough: /ship also runs the skills audit and the code review.
+Load the /deliver command with the Skill tool and follow it from the start. A gate run
+by hand is not enough: /deliver also runs the skills audit and the code review.
 The gate's earlier pass is reused, so only those two steps cost time."
 fi
 
@@ -146,10 +146,10 @@ SHIP_LOG="$PROJECT_DIR/.claude/hooks/ship-log.mjs"
 log_ready() {
   case "$CMD" in *"gh pr create"*) ;; *) return 0 ;; esac
   [ -f "$SHIP_LOG" ] && command -v node >/dev/null || return 0
-  TODO=$(SHIP_LOG_ROOT="$TARGET" node "$SHIP_LOG" ready 2>/dev/null) || [ -z "$TODO" ] || deny "BLOCKED: the ship log is not filled in for this /ship. Do these, then create the PR again:
+  TODO=$(SHIP_LOG_ROOT="$TARGET" node "$SHIP_LOG" ready 2>/dev/null) || [ -z "$TODO" ] || deny "BLOCKED: the ship log is not filled in for this /deliver. Do these, then create the PR again:
 $TODO
 
-A finding's shape is in The ship log section of /ship. Log each one with the verdict
+A finding's shape is in The ship log section of /deliver. Log each one with the verdict
 you already reached; never log a finding you did not settle."
 }
 

@@ -133,7 +133,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 
 | Command | What it does |
 |---------|--------------|
-| `/ship` | Unified delivery pipeline — commit → gate → PR → merge → release. The gate is the one enforcement moment: it checks the diff's file lengths and that new files sit in their kind folder, audits it against the skills installed in the project, mutation-tests the changed lines to prove the tests would catch a break, and runs one `/code-review` round for logic bugs — **fixing what it finds** rather than handing you a list. It runs before the **PR**, not before every commit: its scope is the whole branch, so gating each commit re-mutated every file the branch had ever touched. `--force` skips it. No argument steps through interactively; `/ship pr` runs through PR creation; `/ship release` runs the full pipeline |
+| `/deliver` | Unified delivery pipeline — commit → gate → PR → merge → release. The gate is the one enforcement moment: it checks the diff's file lengths and that new files sit in their kind folder, audits it against the skills installed in the project, mutation-tests the changed lines to prove the tests would catch a break, and runs one `/code-review` round for logic bugs — **fixing what it finds** rather than handing you a list. It runs before the **PR**, not before every commit: its scope is the whole branch, so gating each commit re-mutated every file the branch had ever touched. `--force` skips it. No argument steps through interactively; `/deliver pr` runs through PR creation; `/deliver release` runs the full pipeline |
 | `/discover` | Find the right problem before deciding what to build — diverges first: generates competing framings through blind subagents under forced constraints, stress-tests the winner with a blind critic, and refuses to converge until every open question is answered or deferred, then drafts scope, non-goals, edge cases and success criteria for you to correct. Run before `/plan-feature` |
 | `/plan-feature` | Integration-first feature planning, then building — one agent scans the repo for reusable code, patterns and touch points, grounded clarifying questions follow, the plan is written as type-checked stubs at the real paths, and on your go it fills them in. It reads every `*.registry.yaml` first and must mark each one reuse or skip |
 | `/registry` | Record the project's reusable systems — aiming methods, a state machine, an effect pipeline — as a small `<name>.registry.yaml` next to their code, so `/plan-feature` extends them instead of rebuilding them. You name the system, it drafts the entry for your yes. `/registry eval` lists existing code that does an entry's job outside its folder, and `/registry update` redrafts every entry against today's code |
@@ -143,7 +143,7 @@ Portable slash commands installed to `.claude/commands/`. Some orchestrate paral
 | `/dream` | Clean up the project's auto memory — checks each note against the session transcripts and the repo, finds corrections no note covers yet, proposes adds, deletes, fixes and merges with a quoted proof for each, and changes nothing until you approve. Backs up the memory folder first |
 | `/lockdown` | Per-repo supply-chain hardening — detects the package managers, Dockerfiles, and CI in use, then guides you through and applies install-time, deploy, and pipeline hardening for npm/pnpm, pip/uv, Docker, and GitHub Actions |
 | `/add-rule` | Turn a mistake Claude keeps making into a check on every edit — a text rule with a bad and a good example from real code when a pattern can catch it, or a lesson shown only on the files it names when it needs judgment. Old hits go into a baseline and come back as "fix it if you can" notes; nothing is added to CLAUDE.md |
-| `/skill-report` | Which installed skills earn their place in this repo — every `/ship` skills audit is logged by a hook, and this tallies it: how often each skill applied, how often it caught a violation, and the rule it catches most. Names rules that break often enough to become a script check, and skills that never flag and may be dead weight. Also ranks the rules the edit hook blocks most, by how many branches they hit — a rule Claude keeps writing wrong first is one its skill should state earlier |
+| `/skill-report` | Which installed skills earn their place in this repo — every `/deliver` skills audit is logged by a hook, and this tallies it: how often each skill applied, how often it caught a violation, and the rule it catches most. Names rules that break often enough to become a script check, and skills that never flag and may be dead weight. Also ranks the rules the edit hook blocks most, by how many branches they hit — a rule Claude keeps writing wrong first is one its skill should state earlier |
 
 ## How It Works
 
@@ -221,13 +221,13 @@ commands/      Slash commands installed to .claude/commands/
 agents/        Subagent definitions — commands declare which they need via requires-agents
 scripts/       validate-skills.mjs — checks skill length caps and reference integrity
                gauntlet.sh — the Stop-hook verification gates, embedded by the CLI
-               ship-gate.sh — /ship's file-length, folder-structure and mutation checks, behind an exit code
+               ship-gate.sh — /deliver's file-length, folder-structure and mutation checks, behind an exit code
                ship-gate-hook.sh — refuses gh pr create/merge without a ship-gate receipt
                version-check.sh — SessionStart nudge when a newer catalog is published
-               skill-flags-record.sh — logs each /ship skills audit and /code-review; skill-report.mjs tallies them
+               skill-flags-record.sh — logs each /deliver skills audit and /code-review; skill-report.mjs tallies them
                edit-check.sh — PostToolUse check on each edited file: line-limit.sh, lint-ratchet.mjs, .edit-rules.json
                bash-check.sh — PostToolUse check on files a shell command changed: runs edit-check.sh on each
-               diary-check.mjs — run at the end of /ship; says when the diaries hold enough for /add-rule
+               diary-check.mjs — run at the end of /deliver; says when the diaries hold enough for /add-rule
                registry.mjs — the *.registry.yaml checks for /plan-feature and /registry
                line-limit.sh — the 200-line ratchet, shared by the edit check, the ship gate and preflight
                gauntlet-selftest.sh — behavioural tests for the hooks (runs in preflight)

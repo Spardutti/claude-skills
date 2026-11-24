@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
-echo "the /ship mark"
+echo "the /deliver mark"
 newrepo sg-mark
 mkdir -p .claude/hooks
 cp "$SG" "$SGH" "$HERE/ship-mark.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" .claude/hooks/
@@ -12,18 +12,18 @@ git checkout -qb feat/m; echo "const a=1" > a.ts; git add -A; git commit -qm wor
 printf '#!/bin/sh\necho "${GH_BRANCH:-}"\n' > bin/gh; chmod +x bin/gh
 
 bash .claude/hooks/ship-gate.sh >/dev/null 2>&1
-hook "a passed gate without /ship cannot open the PR" deny "gh pr create --fill"
+hook "a passed gate without /deliver cannot open the PR" deny "gh pr create --fill"
 out=$(echo '{"tool_name":"Bash","tool_input":{"command":"gh pr create --fill"}}' | bash "$H")
 N=$((N+1))
-case "$out" in *"Load the /ship command"*) PASS=$((PASS+1)); echo "  ok   the block says to load /ship" ;;
-  *) FAIL=$((FAIL+1)); printf '  FAIL the block says to load /ship\n       got %s\n' "$out" ;; esac
+case "$out" in *"Load the /deliver command"*) PASS=$((PASS+1)); echo "  ok   the block says to load /deliver" ;;
+  *) FAIL=$((FAIL+1)); printf '  FAIL the block says to load /deliver\n       got %s\n' "$out" ;; esac
 bash "$MARK" begin
-hook "after /ship starts, the PR opens" allow "gh pr create --fill"
-GH_BRANCH=feat/m hook "merging a /ship branch's PR is allowed" allow "gh pr merge 4 --squash"
+hook "after /deliver starts, the PR opens" allow "gh pr create --fill"
+GH_BRANCH=feat/m hook "merging a /deliver branch's PR is allowed" allow "gh pr merge 4 --squash"
 
 git checkout -qb feat/other
-hook "a new branch needs /ship again" deny "gh pr create --fill"
-GH_BRANCH=feat/other hook "merging a PR whose branch never saw /ship is blocked" deny "gh pr merge 5 --squash"
+hook "a new branch needs /deliver again" deny "gh pr create --fill"
+GH_BRANCH=feat/other hook "merging a PR whose branch never saw /deliver is blocked" deny "gh pr merge 5 --squash"
 GH_BRANCH="" hook "a merge whose branch gh cannot name is left to the receipt" allow "gh pr merge 5 --squash"
 
 WT="$TMP/sg-mark-tree"

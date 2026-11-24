@@ -21,14 +21,14 @@ import { homedir } from "node:os";
 //   gate-config.sh            sourced by ship-gate.sh — shared helpers
 //   ship-gate-projects.sh     sourced by ship-gate.sh — project detection, reuse
 //   ship-gate-hook.sh         PreToolUse on Bash — no commit without a receipt
-//   ship-mark.sh              written by /ship — no PR on a branch /ship never ran on
-//   ship-prep.sh              run by /ship — prechecks, scope and skills in one call
+//   ship-mark.sh              written by /deliver — no PR on a branch /deliver never ran on
+//   ship-prep.sh              run by /deliver — prechecks, scope and skills in one call
 //   version-check.sh          SessionStart — a line when a newer catalog exists
 //   skill-flags-record.sh     SubagentStop — logs each skills-audit verdict
 //   skill-report.mjs          read by /skill-report — tallies that log
-//   diary-check.mjs           run by /ship — says when /add-rule has repeats to look at
+//   diary-check.mjs           run by /deliver — says when /add-rule has repeats to look at
 //   correction-scan.mjs       run by /dream — finds corrections in the chats
-//   ship-log.mjs              the /ship log, when GAUNTLET_SHIP_LOG=1 — every gate run
+//   ship-log.mjs              the /deliver log, when GAUNTLET_SHIP_LOG=1 — every gate run
 //                             and finding, one file per ship, in one folder
 //   edit-check.sh             PostToolUse — line-limit.sh, lint-ratchet.mjs and
 //                             text-rules.mjs on each edited file
@@ -179,7 +179,7 @@ export async function setupHook(targetDir = process.cwd()) {
   console.log(`  Hook installed: .claude/hooks/${AUTO_MARK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${APPLICATION_GATE_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${GAUNTLET_FILENAME}`);
-  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /ship)`);
+  console.log(`  Installed: .claude/hooks/${SHIP_GATE_FILENAME} (used by /deliver)`);
   console.log(`  Hook installed: .claude/hooks/${SHIP_GATE_HOOK_FILENAME}`);
   console.log(`  Hook installed: .claude/hooks/${SKILL_FLAGS_FILENAME}`);
   console.log("  Hook installed: .claude/hooks/edit-check.sh (baselines: .line-limit-baseline, .lint-baseline)");

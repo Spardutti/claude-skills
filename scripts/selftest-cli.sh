@@ -64,7 +64,7 @@ cli_case "an empty project is told to run without --sync" \
 # read the catalog, install both, pull in the agents the command declares,
 # rewrite the manifest.
 cat > "$CP/.claude/.claude-skills.json" <<'J'
-{ "catalogVersion": "0.0.0", "skills": ["sql"], "commands": ["ship.md"], "agents": [] }
+{ "catalogVersion": "0.0.0", "skills": ["sql"], "commands": ["deliver.md"], "agents": [] }
 J
 OUT=$(cli_run "$CP" --sync)
 cli_case "a manifest syncs to the catalog version" "Synced to catalog v" "$OUT"
@@ -77,9 +77,9 @@ have_file() {  # have_file <label> <path>
 
 have_file "the named skill is installed"    "$CP/.claude/skills/sql/SKILL.md"
 have_file "its reference files come too"    "$CP/.claude/skills/sql/INDEXING.md"
-have_file "the named command is installed"  "$CP/.claude/commands/ship.md"
-# ship.md declares gauntlet-skills in requires-agents; installing the command
-# has to bring it, or /ship launches an agent that is not there.
+have_file "the named command is installed"  "$CP/.claude/commands/deliver.md"
+# deliver.md declares gauntlet-skills in requires-agents; installing the command
+# has to bring it, or /deliver launches an agent that is not there.
 have_file "the agents it requires arrive"   "$CP/.claude/agents/gauntlet-skills.md"
 
 # A project that declined the hooks must not get them from a sync.

@@ -16,7 +16,7 @@ const SETTINGS = [
   ["GAUNTLET_NO_MUTATE", "a regex of files checked for length but not mutated"],
   ["GAUNTLET_SLOW", "warn when a run takes this many seconds", "30"],
   ["GAUNTLET_REQUIRE_TESTS", "1 blocks when a runner matched 0 test files", "1"],
-  ["GAUNTLET_SHIP_LOG", "1 keeps a log of every /ship", "1"],
+  ["GAUNTLET_SHIP_LOG", "1 keeps a log of every /deliver", "1"],
   ["GAUNTLET_OFF", "1 turns every hook off in this project", "1"],
 ];
 

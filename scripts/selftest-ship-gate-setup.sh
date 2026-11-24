@@ -80,4 +80,4 @@ printf "GAUNTLET_MUTATE='echo clean'\n" > .claude/gauntlet.conf
 git checkout -qb feat/old; echo "const a=1" > a.ts; git add -A; git commit -qm w
 bash .claude/hooks/ship-gate.sh >/dev/null 2>&1; bash .claude/hooks/ship-mark.sh begin
 touch -d "13 hours ago" "$(ls -t /tmp/claude-ship-* | head -1)"
-hook "a /ship mark from yesterday no longer opens a PR" deny "gh pr create --fill"
+hook "a /deliver mark from yesterday no longer opens a PR" deny "gh pr create --fill"

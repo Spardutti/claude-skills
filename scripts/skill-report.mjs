@@ -33,7 +33,7 @@ function topRule(rules) {
 }
 
 function render({ skills, models, unreadable }) {
-  if (!skills.size) return "No skill audits recorded yet. Run /ship to record some.";
+  if (!skills.size) return "No skill audits recorded yet. Run /deliver to record some.";
   const rows = [...skills].sort((a, b) => b[1].flagged - a[1].flagged || a[0].localeCompare(b[0]));
   const width = Math.max(5, ...rows.map(([name]) => name.length));
   const out = [`${"skill".padEnd(width)}  audits  flagged  top rule broken`];

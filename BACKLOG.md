@@ -174,7 +174,7 @@ official `anthropics/skills` repo has none of this kind (docs skills only).
     `/test-review`, `/refactor` are candidates to convert (gain auto-invocation + bundling,
     keep `/` UX). Gate with tight `description` + optional `paths:`.
   - **Auto-OFF skill (`disable-model-invocation: true`)** for side-effecting/timing-sensitive
-    → **`/ship`** (never let Claude decide to ship); its description also leaves context until
+    → **`/deliver`** (never let Claude decide to ship); its description also leaves context until
     invoked, so ~zero idle cost. `/plan-feature` is a judgment call.
   - **Keep a real subagent** only where context isolation is the goal — e.g. `/test-review`'s
     sharded-worktree fan-out. Wire via a skill with `context: fork` + `agent:`, or an agent
@@ -238,6 +238,6 @@ TypeScript plugins that can hook tool calls, add slash commands, and draw button
 - **Rebuild `skill-gate.sh` as a mod:** dropped. Inlining the skill text on block needs no
   mod, the bash hook can print it. Handing it over before the edit skips the block, but
   loses the ack step that makes Claude apply the skill. One saved call is not worth that.
-- **Buttons or mod commands for `/ship`:** dropped. Typing the command is just as fast, and
+- **Buttons or mod commands for `/deliver`:** dropped. Typing the command is just as fast, and
   a mod command cannot think, so it can only show script output, not replace a command.
 - **Revisit** only with a new idea that needs something a hook cannot do.

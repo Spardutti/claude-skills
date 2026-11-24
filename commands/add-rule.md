@@ -19,7 +19,7 @@ in the claude-skills repo itself.
 ## Step 0 — No argument: find what keeps coming back
 
 Three diaries record findings: `.claude/review-findings.jsonl` (every `/code-review` run as a
-subagent), `.claude/skill-flags.jsonl` (every `/ship` skills audit) and
+subagent), `.claude/skill-flags.jsonl` (every `/deliver` skills audit) and
 `.claude/gate-findings.jsonl` (every ship gate FAIL: test gaps, surviving mutants, misplaced files).
 Read them through the script, which drops clean audits and trunk re-runs, then reset the count:
 
@@ -28,7 +28,7 @@ node .claude/hooks/diary-check.mjs --entries
 node .claude/hooks/diary-check.mjs --mark
 ```
 
-(`scripts/diary-check.mjs` in the claude-skills repo.) Mark whatever you find, so `/ship` does
+(`scripts/diary-check.mjs` in the claude-skills repo.) Mark whatever you find, so `/deliver` does
 not offer these entries again.
 
 Group the findings by the mistake behind them, not by wording. A surviving mutant

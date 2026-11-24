@@ -110,7 +110,7 @@ or start new work.
 ```markdown
 <!-- BAD — the new session ships before the user knows what it is -->
 ## Next step
-Commit the `tools/pressure*` files and ship the branch with `/ship`.
+Commit the `tools/pressure*` files and ship the branch with `/deliver`.
 ```
 
 ```markdown

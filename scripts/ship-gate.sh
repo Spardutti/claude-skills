@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# ship-gate.sh — the deterministic half of /ship's quality gate.
+# ship-gate.sh — the deterministic half of /deliver's quality gate.
 #
 # File length and mutation are not judgement calls, so they do not live in prose
 # where a model can decide they are not worth it. They live here, behind an exit
-# code. /ship runs this and obeys the result; the skills audit stays in the
+# code. /deliver runs this and obeys the result; the skills audit stays in the
 # command, because that one genuinely needs a model.
 #
 #   bash .claude/hooks/ship-gate.sh [base-ref]

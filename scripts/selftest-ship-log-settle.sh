@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
-echo "the /ship log: survivors fixed but never logged"
+echo "the /deliver log: survivors fixed but never logged"
 newrepo sg_settle
 mkdir -p src "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
 printf '{"devDependencies":{"@stryker-mutator/core":"8"}}\n' > package.json

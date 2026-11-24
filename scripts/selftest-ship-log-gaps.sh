@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
-echo "the test-gap score from /ship logs"
+echo "the test-gap score from /deliver logs"
 GD="$TMP/gaps-logs"; rm -rf "$GD"; mkdir -p "$GD/open"
 gl() {  # gl <file> <started> <gate runs json>
   printf '{"v":1,"app":"a","branch":"b","started":"%s","gate":%s,"findings":[]}' "$2" "$3" > "$GD/$1"

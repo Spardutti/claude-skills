@@ -3,6 +3,9 @@ import { join } from "node:path";
 
 export const MANIFEST_FILE = ".claude-skills.json";
 
+// The old name stays listed, so the orphan prune still deletes its file.
+const RENAMED_COMMANDS = { "ship.md": "deliver.md" };
+
 function manifestPath(targetDir) {
   return join(targetDir, ".claude", MANIFEST_FILE);
 }
@@ -14,7 +17,7 @@ export async function readManifest(targetDir = process.cwd()) {
     return {
       catalogVersion: data.catalogVersion ?? null,
       skills: data.skills ?? [],
-      commands: data.commands ?? [],
+      commands: withRenames(data.commands ?? []),
       agents: data.agents ?? [],
       custom: data.custom ?? [],
       known: data.known ?? null,
@@ -22,6 +25,10 @@ export async function readManifest(targetDir = process.cwd()) {
   } catch {
     return null; // no manifest — a pre-manifest project or a fresh install
   }
+}
+
+function withRenames(commands) {
+  return [...new Set([...commands, ...commands.map((c) => RENAMED_COMMANDS[c]).filter(Boolean)])];
 }
 
 // Record exactly what the CLI has installed. This is the CLI's source of truth —

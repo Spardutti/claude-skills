@@ -163,7 +163,7 @@ gate_diary() {
     >> "$diary/gate-findings.jsonl"
 }
 
-# Every run goes to the /ship log when it is on; a broken log never changes the verdict.
+# Every run goes to the /deliver log when it is on; a broken log never changes the verdict.
 ship_log() {  # ship_log <report> <exit code>
   [ "$GAUNTLET_SHIP_LOG" = 1 ] && command -v node >/dev/null || return 0
   SHIP_LOG_TEST_RE="$TEST_RE" SHIP_LOG_SOURCE_EXT="$GAUNTLET_SOURCE_EXT" node "$HERE/ship-log.mjs" gate "$1" "$2" "$SECONDS" "$BASE" >/dev/null 2>&1 || true

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
-# Cases for logging /ship skills-audit verdicts and the /skill-report tally.
+# Cases for logging /deliver skills-audit verdicts and the /skill-report tally.
 # Sourced by gauntlet-selftest.sh; shares its $HERE, $TMP, $N, $PASS, $FAIL.
 
 echo "skills-audit verdicts are logged and tallied"
@@ -76,7 +76,7 @@ sf "the report counts applied audits only, most flagged first" $ok "$REPORT"
 
 rm -f "$FLAGLOG"
 REPORT=$(node .claude/hooks/skill-report.mjs 2>&1)
-ok=0; [ "$REPORT" = "No skill audits recorded yet. Run /ship to record some." ] && ok=1
+ok=0; [ "$REPORT" = "No skill audits recorded yet. Run /deliver to record some." ] && ok=1
 sf "no log yet says so instead of failing" $ok "$REPORT"
 
 REVLOG=.claude/review-findings.jsonl
@@ -113,7 +113,7 @@ sf "a finished review ends the review step by itself" $ok "$(cat "$SFLOG" 2>&1 |
 git checkout -qb feat/no-ship 2>/dev/null
 stop general-purpose "$R1"
 ok=0; [ ! -e "$HOME/.claude/ship-logs/open/sg_flags__feat-no-ship.json" ] && ok=1
-sf "a review outside /ship opens no log" $ok "$(ls "$HOME/.claude/ship-logs/open" 2>&1)"
+sf "a review outside /deliver opens no log" $ok "$(ls "$HOME/.claude/ship-logs/open" 2>&1)"
 rm -rf "$HOME/.claude/gauntlet.conf" "$HOME/.claude/ship-logs"
 
 SESSIONS="$HOME/.claude/projects/$(printf '%s' "$PWD" | sed 's/[^a-zA-Z0-9]/-/g')"; mkdir -p "$SESSIONS"

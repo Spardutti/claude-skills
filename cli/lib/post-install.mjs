@@ -88,14 +88,14 @@ export async function runPostInstall({ CWD, selectedSkills, selectedCommands }) 
   }
 
   // --- What the installed commands need that this project does not have ---
-  // /ship's mutation check is per project, so a monorepo needs a tool per project.
-  if (selectedCommands.some((c) => c.fileName === "ship.md")) {
+  // /deliver's mutation check is per project, so a monorepo needs a tool per project.
+  if (selectedCommands.some((c) => c.fileName === "deliver.md")) {
     const needs = await reportToolNeeds(CWD);
     console.log();
     if (needs.length === 0) {
-      console.log(`  ${chalk.dim("/ship's mutation check has a tool in every project here.")}`);
+      console.log(`  ${chalk.dim("/deliver's mutation check has a tool in every project here.")}`);
     } else {
-      console.log(`  ${chalk.yellow("!")} ${chalk.bold("/ship needs a mutation tool per project")} ${chalk.dim("— without one it reports UNPROVEN, and never blocks.")}`);
+      console.log(`  ${chalk.yellow("!")} ${chalk.bold("/deliver needs a mutation tool per project")} ${chalk.dim("— without one it reports UNPROVEN, and never blocks.")}`);
       if (!selectedSkills.some((s) => s.dirName === "testing-best-practices")) {
         console.log(`    ${chalk.dim("Setting these up has traps — install the testing-best-practices skill for MUTATION-TESTING.md.")}`);
       }

@@ -109,7 +109,7 @@ export function planRegistry(root) {
   return marks?.size ? Object.fromEntries(marks) : null;
 }
 
-// Most blocks come while the code is written, before /ship, so the count starts at the branch's birth.
+// Most blocks come while the code is written, before /deliver, so the count starts at the branch's birth.
 export function branchStart(branch) {
   const first = git(["reflog", "show", "--date=unix", "--format=%gd", `refs/heads/${branch}`]).split("\n").filter(Boolean).at(-1);
   const seconds = first?.match(/\{(\d+)\}/)?.[1];

@@ -85,7 +85,7 @@ function closeOpened(c, app) {
   for (const f of existsSync(open) ? readdirSync(open).filter((n) => n.startsWith(`${app}__`)) : []) {
     const path = join(open, f), record = JSON.parse(readFileSync(path, "utf8"));
     const pr = prOf(record.branch), empty = !record.gate.length && !record.findings.length;
-    // A /ship that only merged fills nothing, so once its PR closes there is nothing to keep.
+    // A /deliver that only merged fills nothing, so once its PR closes there is nothing to keep.
     if (empty && pr?.closedAt >= record.started) { rmSync(path); continue; }
     if (empty) continue;
     const opened = pr && pr.createdAt >= record.started;
@@ -172,7 +172,7 @@ function run(mode, args) {
     if (todo.length) console.log(todo.map((t) => `  - ${t}`).join("\n"));
     return todo.length ? 1 : 0;
   }
-  // A gate run or a review outside /ship is not a ship; only /ship's start opens one.
+  // A gate run or a review outside /deliver is not a ship; only /deliver's start opens one.
   if ((mode === "gate" || mode === "step") && !existsSync(path)) return 0;
   if (mode === "gate") addGateRun(record, args);
   else if (mode === "finding") addFinding(record, args[0]);

@@ -1,6 +1,6 @@
 ---
-name: ship
-description: "Suggest it to the user once a feature or fix is built and reviewed; start it only when the user asks to ship. Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `ship pr` runs through PR creation; `ship release` runs the full pipeline through the GitHub release."
+name: deliver
+description: "Suggest it to the user once a feature or fix is built and reviewed; start it only when the user asks to ship. Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `deliver pr` runs through PR creation; `deliver release` runs the full pipeline through the GitHub release."
 category: Workflow
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task, Skill
 requires-agents: [gauntlet-skills]
@@ -9,25 +9,25 @@ argument-hint: "[pr | release] [--force to skip the gate]"
 
 # Ship — Commit → PR → Merge → Release
 
-`/ship` is a four-stage git delivery pipeline. It detects where your work currently is, runs from there, and either stops at a target stage or asks you at each boundary.
+`/deliver` is a four-stage git delivery pipeline. It detects where your work currently is, runs from there, and either stops at a target stage or asks you at each boundary.
 
 Stages, in order: **commit → pr → merge → release**, with a **gate** in front of all of them.
 
-## How /ship Decides What to Do
+## How /deliver Decides What to Do
 
 **Start** — auto-detected from git state (Step 0).
 **Stop** — set by `$ARGUMENTS`:
 
 | Invocation | Behavior |
 |---|---|
-| `/ship` | Interactive — run the start stage, then ask "continue to `<next>`?" at every boundary. Stop when you decline. |
-| `/ship pr` | Run through the **pr** stage, then stop. |
-| `/ship release` | Run the full pipeline through the **release** stage. |
-| `/ship commit` / `/ship merge` | Run through that stage, then stop. |
+| `/deliver` | Interactive — run the start stage, then ask "continue to `<next>`?" at every boundary. Stop when you decline. |
+| `/deliver pr` | Run through the **pr** stage, then stop. |
+| `/deliver release` | Run the full pipeline through the **release** stage. |
+| `/deliver commit` / `/deliver merge` | Run through that stage, then stop. |
 
 Rules that always hold:
 - **Never re-do a satisfied stage** — already committed? start at pr.
-- **Never skip a required stage** — `/ship release` with uncommitted work runs commit → pr → merge → release first.
+- **Never skip a required stage** — `/deliver release` with uncommitted work runs commit → pr → merge → release first.
 - A merge into the **main** branch always asks for confirmation, even when a target is set.
 - The **gate** (Step 0.5) runs once per invocation, immediately before the **pr** stage — not before commit — unless `--force`. A run that only commits never pays for it. A release gets no skills audit and no bug review: a `chore/release-*` PR gets only the script, and the dev → main PR gets no gate at all.
 
@@ -39,7 +39,7 @@ Rules that always hold:
 bash .claude/hooks/ship-prep.sh start      # in a worktree: CLAUDE_PROJECT_DIR=<worktree> bash …
 ```
 
-It fetches, prints the facts below, and sets the `/ship` mark (the PR hook opens and merges no
+It fetches, prints the facts below, and sets the `/deliver` mark (the PR hook opens and merges no
 PR on a branch without it). Each command you run costs time to approve, so **read these facts
 from its output; never look them up again**:
 
@@ -61,8 +61,8 @@ This order is exhaustive and the conditions do not overlap once evaluated top-do
 
 ### Reconcile with the target
 
-- If `$ARGUMENTS` names a target **earlier** than the detected start, the target is already satisfied. Do not say a bare "nothing to do" — show the existing artifact: e.g. `/ship pr` when a PR exists → "A PR already exists for this branch: `<URL>`." Then stop.
-- If `$ARGUMENTS` names a target **later** than the start, state the plan and get **one** confirmation: *"You have uncommitted changes — `/ship release` will run commit → pr → merge → release. Proceed?"* Then run each stage to the target without further prompts — except a merge into main, which always confirms.
+- If `$ARGUMENTS` names a target **earlier** than the detected start, the target is already satisfied. Do not say a bare "nothing to do" — show the existing artifact: e.g. `/deliver pr` when a PR exists → "A PR already exists for this branch: `<URL>`." Then stop.
+- If `$ARGUMENTS` names a target **later** than the start, state the plan and get **one** confirmation: *"You have uncommitted changes — `/deliver release` will run commit → pr → merge → release. Proceed?"* Then run each stage to the target without further prompts — except a merge into main, which always confirms.
 - If `$ARGUMENTS` is empty, run the start stage, then **ask before advancing** to each next stage.
 
 Each stage below re-verifies its own precondition and aborts if Step 0 routed it wrong.
@@ -330,7 +330,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
 
 **The version bump reaches main only through dev.** A bump committed on a `release/*` branch lands in main and never in dev, and every release then needed a third PR to back-merge it. So steps 1-3 run before the release PR, on a branch that merges into dev:
 
-- **`/ship release` from a feature branch** → run steps 1-3 on that branch before its **pr** stage and commit them as `chore(release): <version>`. The feature PR carries the bump into dev.
+- **`/deliver release` from a feature branch** → run steps 1-3 on that branch before its **pr** stage and commit them as `chore(release): <version>`. The feature PR carries the bump into dev.
 - **Everything already merged, on dev** → `git checkout -b chore/release-<version>`, run steps 1-3, commit, then pr → merge into dev as usual.
 
 1. **Version** — `bash .claude/hooks/ship-prep.sh release` prints the last tag, the commits since it and
@@ -341,7 +341,7 @@ Precondition: a dev branch exists and is ahead of main; `gh` is authenticated. I
    - **Always confirm the version with the user.**
 2. If the project has a version file (`package.json`, `pyproject.toml`, `Cargo.toml`, …), update it — and its lockfile (`package-lock.json`, `uv.lock`, …) — to the new version.
 3. **Changelog** — for humans, not a commit log. Group commits since the last tag under Breaking Changes, Added, Changed, Fixed, Removed — only the groups that apply. One line per change, written as what a person can now do or what works now, with the PR number. No field names, file names, or commands in a bullet. Skip merge, version-bump, and internal-only noise. Steps someone must run after deploy go in an **After deploy** checklist at the end. No theme paragraph, no essay.
-4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull`, then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist). No gate and no /ship mark: every change on dev passed the gate in its own PR, and the PR hook lets a dev → main PR through.
+4. **Release PR** — straight from dev, no release branch: `git checkout <dev> && git pull`, then `gh pr create --base <main> --head <dev> --title 'release: <version>' --body-file <file>` (changelog + a checklist). No gate and no /deliver mark: every change on dev passed the gate in its own PR, and the PR hook lets a dev → main PR through.
 5. **Merge to main** — confirm with the user first (always). When CI is green, merge with **`bash .claude/hooks/ship-prep.sh land <number> merge`** — a real merge commit, **not** `--squash`: squashing dev→main would collapse the feature commits and destroy the conventional-commit history that future version and changelog detection depends on. **Never `--delete-branch`** here: the head branch is dev.
 6. **Tag + GitHub release**:
 
@@ -358,7 +358,7 @@ gh release create <version> --title '<version>' --notes-file <file>
 
 ## Last, wherever the run stops — repeats worth a rule
 
-At the end of every `/ship` run — after the last stage it reached, or the prompt the user
+At the end of every `/deliver` run — after the last stage it reached, or the prompt the user
 declined — run:
 
 ```bash
@@ -388,16 +388,16 @@ run from the main folder, it logs to the main folder's branch and splits the shi
   you disagree with an audit point, with the reason in `"note"`), `unconfirmed` (no test can
   show it) or `skipped` (sorted out before testing, with `"note":"<kind> — <reason>"`).
 - `pr <number>` right after the PR is created, or `end "<why>"` when the run stops before one.
-  A log left open is closed at its PR by the next `/ship` in this repo.
+  A log left open is closed at its PR by the next `/deliver` in this repo.
 - The PR hook refuses `gh pr create` until `step review end` and every review finding are
   logged, and names what is missing.
 
 ## Flow Examples
 
-- **`/ship` on a dirty feature branch** → commits, asks "create a PR?" → "merge it?" → "cut a release?". Decline at any point to stop.
-- **`/ship pr`** → commits if needed, pushes, creates the PR, stops. If a PR already exists, reports its URL and stops.
-- **`/ship release` with everything already merged** → `chore/release-<version>` with the bump → PR into dev → merge → release PR dev → main → merge → tag.
-- **`/ship release` on a dirty feature branch** → one upfront confirmation, then commit → version bump on the same branch → pr → merge into dev → release PR dev → main → merge → tag. Two PRs, no back-merge.
+- **`/deliver` on a dirty feature branch** → commits, asks "create a PR?" → "merge it?" → "cut a release?". Decline at any point to stop.
+- **`/deliver pr`** → commits if needed, pushes, creates the PR, stops. If a PR already exists, reports its URL and stops.
+- **`/deliver release` with everything already merged** → `chore/release-<version>` with the bump → PR into dev → merge → release PR dev → main → merge → tag.
+- **`/deliver release` on a dirty feature branch** → one upfront confirmation, then commit → version bump on the same branch → pr → merge into dev → release PR dev → main → merge → tag. Two PRs, no back-merge.
 
 ## Rules
 
@@ -417,7 +417,7 @@ run from the main folder, it logs to the main folder's branch and splits the shi
 - NEVER change code for a review finding before a test shows the bug; a finding no test can show is listed, not fixed.
 - ALWAYS sort review findings before testing: decided, old code, cost, out of scope and tooling are listed as skipped, never tested. Not sure it fits → test it.
 - ALWAYS log every finding once, with its verdict, the moment you settle it, and close the log with `pr` or `end`. The calls do nothing when the log is off.
-- ALWAYS run `diary-check.mjs` at the end of every run, `--mark` before asking, and hand a picked repeat to `/add-rule`; NEVER write a rule in `/ship`.
+- ALWAYS run `diary-check.mjs` at the end of every run, `--mark` before asking, and hand a picked repeat to `/add-rule`; NEVER write a rule in `/deliver`.
 - ALWAYS use conventional commits, imperative mood, atomic per logical unit.
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.
 - ALWAYS confirm the release version, and confirm before any merge into `main`.

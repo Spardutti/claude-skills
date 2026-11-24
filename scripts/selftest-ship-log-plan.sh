@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 [ -n "${SELFTEST_SANDBOX:-}" ] || { echo "$(basename "$0"): run it through scripts/gauntlet-selftest.sh, never on its own" >&2; exit 1; }
 
-echo "the /ship log: registry marks and edit-rule blocks"
+echo "the /deliver log: registry marks and edit-rule blocks"
 newrepo sg_plan
 mkdir -p "$HOME/.claude"; echo 'GAUNTLET_SHIP_LOG=1' > "$HOME/.claude/gauntlet.conf"
 git checkout -qb feat/p
@@ -19,7 +19,7 @@ node "$SL" pr 78 >/dev/null
 PLANLOG="$SLOGS/sg_plan_${DAY}_pr78.json"
 sl_is "the plan's registry marks are kept after PLAN.md is deleted" "$PLANLOG" \
   'JSON.stringify(r.registry) === JSON.stringify({ aiming: "reuse", queue: "skip" })'
-sl_is "only this branch's rule blocks since it was created are kept, from before /ship too" "$PLANLOG" \
+sl_is "only this branch's rule blocks since it was created are kept, from before /deliver too" "$PLANLOG" \
   'r.rules.map((b) => b.file).join() === "written.sh,a.sh" && r.rules[0].rules[0] === "no-file-header"'
 
 git checkout -qb feat/oldplan; printf '# Plan\n\n## Build order\n' > PLAN.md; bash "$HERE/ship-mark.sh" begin; rm PLAN.md; node "$SL" pr 80 >/dev/null

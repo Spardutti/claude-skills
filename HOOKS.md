@@ -32,7 +32,7 @@ Two guard the **back** — nothing finishes or ships until the code passes:
 - `gauntlet.sh` — a `Stop` hook running the fast gates on your changed files
 - `ship-gate-hook.sh` — a `PreToolUse` gate on `Bash` that refuses `gh pr create`,
   `gh pr merge`, and a `git push` from a protected branch without a receipt from
-  `ship-gate.sh`. It also refuses a PR on a branch where `/ship` never started
+  `ship-gate.sh`. It also refuses a PR on a branch where `/deliver` never started
 
 Two check each edit as it lands — see [The Edit Check](#the-edit-check):
 
@@ -139,7 +139,7 @@ timeout (600s by default) is cancelled and its **output discarded**, so the turn
 ends as if the hook never ran. A stalled gate is a silent pass, not a block.
 
 Only fast gates live here (target: under ~30s). Mutation testing and the skills
-audit belong to `/ship`'s gate, not to every turn.
+audit belong to `/deliver`'s gate, not to every turn.
 
 At install time the CLI reports what it found, so a silent no-op is never a
 surprise:
@@ -161,7 +161,7 @@ It runs a skip ladder first, cheapest check first, and quits at the first "no":
 3. this exact diff already passed — the hash of a green run is cached per session and repo
 4. no gates detected for this repo
 
-Rule 3 is what makes repeated `/ship` runs free: the gates run once per distinct diff.
+Rule 3 is what makes repeated `/deliver` runs free: the gates run once per distinct diff.
 
 To confirm it is alive when everything is green — green prints nothing, by design:
 
@@ -268,14 +268,14 @@ GAUNTLET_CODE_EXT='ts|tsx|py'        # what counts as a change worth checking
 GAUNTLET_DEBUG=1                     # print the outcome to stderr every run
 GAUNTLET_REQUIRE_TESTS=1             # block when the runner matched 0 test files
 
-# /ship's gate reads its own keys from the same file
+# /deliver's gate reads its own keys from the same file
 GAUNTLET_MAX_LINES=200               # per-file limit; 0 turns the check off
 GAUNTLET_BASE='staging'              # trunk to measure from; else develop, dev, main
 GAUNTLET_SOURCE_EXT='ts|tsx|py'      # what counts as SOURCE — not the same question
 GAUNTLET_MUTATE='bash mutate.sh'     # replace per-project mutation detection
 GAUNTLET_IGNORE_FILES='*.gen.ts'     # globs that are never gated — see below
 GAUNTLET_NO_MUTATE='\.(tsx|jsx)$'    # gated and length-checked, but never mutated
-GAUNTLET_SHIP_LOG=1                  # log every /ship — see The Ship Log
+GAUNTLET_SHIP_LOG=1                  # log every /deliver — see The Ship Log
 GAUNTLET_SHIP_LOG_DIR=~/ship-logs    # where; default ~/.claude/ship-logs
 ```
 
@@ -329,7 +329,7 @@ switched on later (ESLint installed, a skill added) only notes until
 `node .claude/hooks/lint-ratchet.mjs --baseline-new` records its old hits.
 
 **Three diaries** feed `/add-rule`: `.claude/review-findings.jsonl` (every
-`/code-review` subagent), `.claude/skill-flags.jsonl` (every `/ship` skills audit)
+`/code-review` subagent), `.claude/skill-flags.jsonl` (every `/deliver` skills audit)
 and `.claude/gate-findings.jsonl` (every ship gate FAIL). Each block is also logged
 to `.claude/edit-blocks.jsonl`; `/skill-report` tallies which rules block most.
 
@@ -370,7 +370,7 @@ or Jest config, `tsconfig*.json`, `package.json`, a lockfile or `patches/` chang
 runs `stryker run --dryRunOnly`. A failing test run is a FAIL; one that cannot start is
 UNPROVEN. A version bump alone, and a project the gate already mutates, skip it.
 
-**A PR needs `/ship`, not just the gate.** `/ship` runs `ship-mark.sh begin` when it
+**A PR needs `/deliver`, not just the gate.** `/deliver` runs `ship-mark.sh begin` when it
 starts, and the hook opens or merges no PR on a branch without a mark from the last 12 hours. A gate run
 by hand skips the skills audit and the code review, and Claude did exactly that
 when it remembered the steps. The gate's pass is reused, so only those two cost time.
@@ -392,7 +392,7 @@ a project's own `.claude/gauntlet.conf` can set it back to `""`. Every project w
 folder, `~/.claude/ship-logs/`, so ships from different repos can be compared.
 
 One file per ship, named `<app>_<date>_pr<number>.json` (or `_<branch>.json` when the run
-stopped before a PR). Until then it sits in `open/`; a ship left open when the next `/ship`
+stopped before a PR). Until then it sits in `open/`; a ship left open when the next `/deliver`
 starts is saved as abandoned. It holds:
 
 - **Every gate run**, PASS, FAIL, UNPROVEN, FORCED or INTERRUPTED (cancelled before its verdict): its time, the files it mutated, the files
@@ -404,8 +404,8 @@ starts is saved as abandoned. It holds:
 - **Every finding**, from any check: who found it, whether a test confirmed or refuted it or it was skipped untested, and
   whether it was fixed.
 
-The gate writes its own runs, but only while a `/ship` is open (`ship-mark.sh begin` opens it), so a gate run by hand or on a
-release leaves no log. `/ship` adds the rest. A log that cannot be written never
+The gate writes its own runs, but only while a `/deliver` is open (`ship-mark.sh begin` opens it), so a gate run by hand or on a
+release leaves no log. `/deliver` adds the rest. A log that cannot be written never
 changes the gate's verdict. Compare every ship:
 
 ```bash

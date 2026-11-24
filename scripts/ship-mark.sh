@@ -8,11 +8,11 @@ BRANCH=${2:-$(git branch --show-current 2>/dev/null)}
 [ -n "$BRANCH" ] || exit 1
 MARK="/tmp/claude-ship-$(printf '%s %s' "$COMMON" "$BRANCH" | cksum | cut -d' ' -f1)"
 
-# A mark lasts 12 hours, so a branch reused later (dev, for a release) needs /ship again.
+# A mark lasts 12 hours, so a branch reused later (dev, for a release) needs /deliver again.
 case "${1:-}" in
   begin)
     touch "$MARK"
-    # The log opens here, not in ship.md: agents skipped that step. A failed log never fails the mark.
+    # The log opens here, not in deliver.md: agents skipped that step. A failed log never fails the mark.
     [ -z "$NO_LOG" ] && command -v node >/dev/null && node "$HERE/ship-log.mjs" start >/dev/null 2>&1
     true ;;
   check) [ -n "$(find "$MARK" -mmin -720 2>/dev/null)" ] ;;

@@ -7,7 +7,7 @@ function records(dir) {
     try {
       const r = JSON.parse(readFileSync(f, "utf8"));
       const log = r?.v === 1 && Array.isArray(r.gate) && Array.isArray(r.findings);
-      // A /ship that only merged opens a log and never fills it.
+      // A /deliver that only merged opens a log and never fills it.
       return log && (r.gate.length || r.findings.length) ? [r] : [];
     } catch { return []; }
   });

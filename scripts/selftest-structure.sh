@@ -33,7 +33,7 @@ for fn in $(grep -o '^const [A-Z_]*_FILENAME = "[^"]*"' "$SH" | grep -v 'LEGACY_
 done
 
 # ------------------------------------------- a declared agent that nothing invokes
-# ship.md declared gauntlet-skills, described the skills audit as one of "the three
+# deliver.md declared gauntlet-skills, described the skills audit as one of "the three
 # things nothing else does", and never contained a step that ran it. It shipped
 # that way for months: the agent existed, the CLI installed it, and no command
 # ever called it. Four forms went out on useActionState in a repo whose React
