@@ -28,6 +28,66 @@ export const WEAK_ASSERTS = [
   },
 ].map((r) => ({ ...r, applies: (f) => new RegExp(r.files).test(f) }));
 
+const JS_CODE = /\.[cm]?[jt]sx?$/;
+// A feature's public index stays under this; a barrel over a whole layer does not.
+const BARREL_MODULES = 8;
+const FROM = /^[ \t]*(?:import|export)(?!\s+type\b)[^'";]*?from\s*['"]([^'"]+)['"]/gm;
+const INDEXES = ["index.ts", "index.tsx", "index.js", "index.mjs", "index.jsx"];
+
+const specs = (text) => [...text.matchAll(FROM)].map((m) => ({ spec: m[1], index: m.index }));
+
+function nearestTsconfig(root, rel) {
+  for (let dir = dirname(resolve(root, rel)); dir.startsWith(root); dir = dirname(dir)) {
+    if (existsSync(resolve(dir, "tsconfig.json"))) return resolve(dir, "tsconfig.json");
+    if (dir === root) break;
+  }
+  return null;
+}
+
+// tsconfig is JSONC: drop comments and trailing commas, and give up on anything stranger.
+function aliases(file) {
+  try {
+    const raw = readFileSync(file, "utf8")
+      .replace(/("(?:\\.|[^"\\])*")|\/\/.*$|\/\*[\s\S]*?\*\//gm, (m, str) => str ?? "")
+      .replace(/,(\s*[}\]])/g, "$1");
+    const { baseUrl = ".", paths = {} } = JSON.parse(raw).compilerOptions ?? {};
+    return Object.entries(paths).map(([from, [to = ""]]) => [from.replace(/\*$/, ""), resolve(dirname(file), baseUrl, to.replace(/\*$/, ""))]);
+  } catch {
+    return [];
+  }
+}
+
+function targetDir(root, rel, spec) {
+  const bare = spec.replace(/\/index(\.[cm]?[jt]sx?)?$/, "");
+  if (bare.startsWith(".")) return resolve(root, dirname(rel), bare);
+  const tsconfig = nearestTsconfig(root, rel);
+  const hit = tsconfig && aliases(tsconfig).find(([from]) => bare.startsWith(from));
+  return hit ? resolve(hit[1], bare.slice(hit[0].length)) : null;
+}
+
+const isBarrel = (dir) => {
+  const index = INDEXES.map((f) => resolve(dir, f)).find(existsSync);
+  if (!index || basename(dir) === "schema") return false;
+  return new Set(specs(readFileSync(index, "utf8")).map((s) => s.spec).filter((s) => s.startsWith("./"))).size >= BARREL_MODULES;
+};
+
+function barrelLines(root, rel, content) {
+  const own = dirname(resolve(root, rel));
+  return specs(content).flatMap(({ spec, index }) => {
+    const dir = targetDir(root, rel, spec);
+    if (!dir || own === dir || own.startsWith(`${dir}/`) || !isBarrel(dir)) return [];
+    return [content.slice(0, index).split("\n").length];
+  });
+}
+
+// Drizzle's schema/index.ts is required by the library, so it is never counted.
+export const BARREL_IMPORT = {
+  id: "barrel-import",
+  message: `import the file you use, not a folder index that pulls in ${BARREL_MODULES}+ files: every test importing it reruns when any of them changes`,
+  applies: (f) => JS_CODE.test(f),
+  find: barrelLines,
+};
+
 const NEEDS = [
   [/\border_?by\b|\.sort\(|\bsorted\(|\bORDER BY\b/i, "two rows tied on the sort key, so a dropped tiebreak fails"],
   [/\.limit\(|\bLIMIT\b|\.take\(|\[:\s*\w+\]|\.slice\(0,/, "more rows than the limit, so a dropped limit fails"],

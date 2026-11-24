@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { brokenRules, loadEditRules, projectFiles, textFindings } from "./text-rules.mjs";
 import { forget, mergeBaseline, readBaseline, writeBaseline } from "./ratchet-baseline.mjs";
 import { pickLinter } from "./lint-runners.mjs";
-import { WEAK_ASSERTS, checklist } from "./test-checks.mjs";
+import { BARREL_IMPORT, WEAK_ASSERTS, checklist } from "./test-checks.mjs";
 
 const ROOT = realpathSync(process.cwd());
 const BASELINE = resolve(ROOT, ".lint-baseline");
@@ -129,7 +129,7 @@ function selftest() {
 
 function main(mode, arg) {
   ({ text: TEXT, lessons: LESSONS } = loadEditRules(ROOT));
-  if (hasSkill("testing-best-practices")) TEXT = [...WEAK_ASSERTS, ...TEXT];
+  if (hasSkill("testing-best-practices")) TEXT = [...WEAK_ASSERTS, BARREL_IMPORT, ...TEXT];
   if (mode === "--baseline") return baseline(arg, false);
   if (mode === "--baseline-new") return baseline(undefined, true);
   if (mode === "--file") return checkFile(arg ?? "");

@@ -298,6 +298,7 @@ Fix the limit the numbers show. Removing a lock does nothing while the CPUs are 
 - Always switch off cloud SDK credential probes in test setup.
 - Always time one empty test before a mutation run, and cut what every start pays: pytest's cache plugin, bytecode off in a test image, WhiteNoise's static scan.
 - Never import the route tree, the app root or a barrel of every feature from a shared test helper; `related` then reruns the whole suite.
+- Never import a folder index that pulls in 8+ files from app code; import the file you use. The edit hook blocks new ones.
 - Always set `jit=off` on a Postgres test database.
 - Always run test and mutation workers on half the cores at `nice -n 19`, inside the container when tests run in Docker.
 - Never hard-code a worker count in a runner script or config; the gate passes one.

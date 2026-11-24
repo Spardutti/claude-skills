@@ -5,7 +5,7 @@
 - Why structured keys matter
 - The naive approach (and why it breaks)
 - @lukemorales/query-key-factory basics
-- The merge pattern: per-domain factories, one root
+- The domain pattern: one factory per domain, imported directly
 - Invalidation strategies
 - `_def` vs `_ctx`
 - TypeScript inference
@@ -90,14 +90,13 @@ todos.list({ status: 'a' }).queryKey; // ['todos', 'list', { filters: { status: 
 Because each leaf returns both `queryKey` and `queryFn`, hooks become a
 one-liner: `useQuery(todos.detail(id))`.
 
-## The Merge Pattern
+## The Domain Pattern
 
 **Anti-pattern:** one 1000-line `createQueryKeys('app', { ... })` covering
 every domain. It blocks parallel work, balloons diffs, and tanks IDE
 performance.
 
-**Pattern:** one factory per domain, each in its own file, composed with
-`mergeQueryKeys`.
+**Pattern:** one factory per domain, each in its own file, imported directly.
 
 ```ts
 // src/features/users/queries/users.ts
@@ -151,31 +150,21 @@ export const productsKeys = createQueryKeys('products', {
 });
 ```
 
-```ts
-// src/queries.ts — app level, the one file that reaches into every feature
-import { mergeQueryKeys } from '@lukemorales/query-key-factory';
-// Not via the feature's index.ts: it re-exports components, which import this file.
-import { usersKeys } from '~/features/users/queries/users';
-import { todosKeys } from '~/features/todos/queries/todos';
-import { productsKeys } from '~/features/products/queries/products';
+Import the domain file you use, never a root that merges every factory:
 
+```ts
+// BAD: src/queries.ts merges every domain, so each importer loads every factory
+// and every api file behind its queryFn — a change to any of them reruns every test.
 export const queries = mergeQueryKeys(usersKeys, todosKeys, productsKeys);
-```
+useQuery(usersKeys.detail(userId));
 
-Consumption is uniform across the app:
-
-```ts
-import { useQuery } from '@tanstack/react-query';
-import { queries } from '~/queries';
-
-useQuery(queries.users.detail(userId));
-useQuery(queries.todos.list({ status: 'active' }));
-useQuery(queries.products.all);
+// GOOD: only the users domain is loaded
+import { usersKeys } from '~/features/users/queries/users';
+useQuery(usersKeys.detail(userId));
 ```
 
 Each domain file stays small (target under 150 lines). Removing a feature is
-one folder deletion plus one line in `src/queries.ts`. Autocomplete narrows per domain:
-`queries.users.` shows only user leaves.
+one folder deletion. Autocomplete narrows per domain: `usersKeys.` shows only user leaves.
 
 ## Invalidation Strategies
 
@@ -187,18 +176,18 @@ const qc = useQueryClient();
 
 // Surgical — exactly one query
 qc.invalidateQueries({
-  queryKey: queries.todos.detail(id).queryKey,
+  queryKey: todosKeys.detail(id).queryKey,
   exact: true,
 });
 
 // Fuzzy by leaf — every list(filters) variation
-qc.invalidateQueries({ queryKey: queries.todos.list._def });
+qc.invalidateQueries({ queryKey: todosKeys.list._def });
 
 // Whole domain — every todo query
-qc.invalidateQueries({ queryKey: queries.todos._def });
+qc.invalidateQueries({ queryKey: todosKeys._def });
 
 // Direct cache write after a mutation returns the fresh value
-qc.setQueryData(queries.todos.detail(todo.id).queryKey, todo);
+qc.setQueryData(todosKeys.detail(todo.id).queryKey, todo);
 ```
 
 Common post-mutation pattern: `setQueryData` for the detail you just touched,
@@ -220,7 +209,7 @@ usersKeys.detail(id)._ctx.posts.queryKey;
 
 // Hook for the nested sub-query
 function useUserPosts(id: string) {
-  return useQuery(queries.users.detail(id)._ctx.posts);
+  return useQuery(usersKeys.detail(id)._ctx.posts);
 }
 
 // Invalidate every posts query across all users
@@ -244,13 +233,13 @@ export type UsersKeys = inferQueryKeys<typeof usersKeys>;
 
 // data is typed as the queryFn return value automatically
 function useUser(id: string) {
-  const { data } = useQuery(queries.users.detail(id));
+  const { data } = useQuery(usersKeys.detail(id));
   return data; // inferred as User | undefined
 }
 ```
 
 If you need a key's literal type (for a `setQueryData` helper, say), pull it
-from the leaf: `type DetailKey = ReturnType<typeof queries.todos.detail>['queryKey']`.
+from the leaf: `type DetailKey = ReturnType<typeof todosKeys.detail>['queryKey']`.
 
 ## Alternative — v5 `queryOptions`
 
@@ -275,8 +264,8 @@ Pick `@lukemorales/query-key-factory` for hierarchical fuzzy invalidation (`_def
 
 1. **Prefer a typed key source** — either this factory or v5's built-in `queryOptions(...)` helper. Never inline ad-hoc `queryKey` arrays scattered across components.
 2. **Split factories by domain, one file each.** Target under 150 lines per domain.
-3. **Compose with `mergeQueryKeys`.** Never write a single god factory.
-4. **Export one `queries` root** from `src/queries.ts` and import it everywhere. Each domain factory lives in its feature's `queries/` folder.
+3. **Never write a single god factory.**
+4. **Import the domain's key file directly**, never a `queries` root built with `mergeQueryKeys`. Each domain factory lives in its feature's `queries/` folder.
 5. **Use `_def` for fuzzy invalidation**, full `.queryKey` with `exact: true` for surgical.
 6. **Co-locate `queryFn` with the key** inside the factory leaf — hooks become one-liners.
 7. **Use `contextQueries` for parent-owned sub-data**, sibling leaves for flat relationships.

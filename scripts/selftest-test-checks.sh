@@ -47,6 +47,25 @@ tc_is "a new 'assert x is not None' in pytest blocks the write" 2 "$(edit tests/
 printf 'def test_finds():\n    assert search(s, "a") == []\n' > "$TC/tests/clientes/test_search.py"
 tc_is "an exact assertion passes" 0 "$(edit tests/clientes/test_search.py)"
 
+mkdir -p "$TC/lib/api" "$TC/db/schema" "$TC/features/cart"
+printf '{\n  // JSONC, with a glob that looks like a comment end\n  "compilerOptions": { "paths": { "@/*": ["./*"], }, },\n  "include": ["**/*.ts"]\n}\n' > "$TC/tsconfig.json"
+for d in lib/api db/schema; do for m in a b c d e f g h; do echo "export const $m = 1" > "$TC/$d/$m.ts"; printf 'import { %s } from "./%s"\n' "$m" "$m" >> "$TC/$d/index.ts"; done; done
+printf 'export * from "./cart"\nexport * from "./total"\n' > "$TC/features/cart/index.ts"
+echo 'import { api } from "@/lib/api"' > "$TC/src/old.ts"
+sed -i 's/ barrel-import//' "$TC/.lint-baseline"
+(cd "$TC" && node scripts/lint-ratchet.mjs --baseline-new >/dev/null 2>&1)
+tc_is "on upgrade, an old barrel import is debt, not a block" 0 "$(edit src/old.ts)"
+printf 'import x from "y"\nimport { api } from "@/lib/api"\n' > "$TC/src/new.ts"
+tc_is "a new import of an 8-file index blocks the write" 2 "$(edit src/new.ts)"
+tc_is "the block names the line" "  src/new.ts:2  import the file you use, not a folder index that pulls in 8+ files: every test importing it reruns when any of them changes" \
+  "$( (cd "$TC" && node scripts/lint-ratchet.mjs --file src/new.ts 2>&1) | grep '^  src/new.ts')"
+echo 'import { api } from "../lib/api/index"' > "$TC/src/new.ts"
+tc_is "a relative path to the same index blocks too" 2 "$(edit src/new.ts)"
+printf 'import type { Api } from "@/lib/api"\nimport { a } from "@/lib/api/a"\nimport { users } from "@/db/schema"\nimport { cart } from "@/features/cart"\n' > "$TC/src/new.ts"
+tc_is "a type import, a direct file, drizzle's schema and a small feature index pass" 0 "$(edit src/new.ts)"
+echo 'import { b } from "./index"' > "$TC/lib/api/a.ts"
+tc_is "a file inside the barrel's own folder passes" 0 "$(edit lib/api/a.ts)"
+
 rm -rf "$TC/skills/testing-best-practices"
 tc_is "without the testing skill there is no checklist" "" "$(tests_lines tests/clientes/test_search.py)"
 

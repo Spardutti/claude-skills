@@ -19,7 +19,7 @@ export function textFindings(rules, root, rel) {
   const path = resolve(root, rel);
   if (own.length === 0 || !existsSync(path)) return [];
   const content = readFileSync(path, "utf8");
-  return own.flatMap((r) => matchLines(r, content).map((line) => ({ rel, rule: r.id, line, message: r.message })));
+  return own.flatMap((r) => (r.find ? r.find(root, rel, content) : matchLines(r, content)).map((line) => ({ rel, rule: r.id, line, message: r.message })));
 }
 
 export function projectFiles(root) {
@@ -39,7 +39,7 @@ function walk(root, dir) {
 
 export function brokenRules(rules) {
   const broken = [];
-  for (const r of rules) {
+  for (const r of rules.filter((rule) => !rule.find)) {
     if (/\s/.test(r.id ?? "")) broken.push(`${r.id}: its id has whitespace, which .lint-baseline cannot store`);
     if (matchLines(r, r.bad ?? "").length === 0) broken.push(`${r.id}: its bad example is not caught`);
     if (matchLines(r, r.good ?? "").length > 0) broken.push(`${r.id}: its good example is flagged`);
