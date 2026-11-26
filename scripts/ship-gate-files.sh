@@ -19,7 +19,7 @@ changed_tests() {  # changed_tests <family>
 files_context() {  # files_context <owner> <owned files>
   fam=$(family_of "$1/.")
   { printf '%s\n' "$PROJECT_DIR" "$1" "$(git rev-parse "$BASE" 2>/dev/null)"
-    cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh"
+    cat "$HERE/ship-gate.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE"/stryker-batch-*.mjs
     printf '%s\n' "$CHANGED" | grep -E "$SETUP_RE" | while IFS= read -r f; do
       [ -n "$f" ] || continue
       case "$(family_of "$f")" in "$fam"|any) printf '%s\n' "$f"; [ -f "$f" ] && cat "$f" ;; esac
