@@ -45,6 +45,7 @@ const GATE_CONFIG_FILENAME = "gate-config.sh";
 const SHIP_GATE_PROJECTS_FILENAME = "ship-gate-projects.sh";
 const SHIP_GATE_STRUCTURE_FILENAME = "ship-gate-structure.sh";
 const SHIP_GATE_FILES_FILENAME = "ship-gate-files.sh";
+const SHIP_GATE_MUTMUT_FILENAME = "ship-gate-mutmut.sh";
 const SHIP_GATE_HOOK_FILENAME = "ship-gate-hook.sh";
 const VERSION_CHECK_FILENAME = "version-check.sh";
 const SKILL_FLAGS_FILENAME = "skill-flags-record.sh";
@@ -143,6 +144,7 @@ export async function setupHook(targetDir = process.cwd()) {
     SHIP_GATE_PROJECTS_FILENAME,
     SHIP_GATE_STRUCTURE_FILENAME,
     SHIP_GATE_FILES_FILENAME,
+    SHIP_GATE_MUTMUT_FILENAME,
     SHIP_GATE_HOOK_FILENAME,
     VERSION_CHECK_FILENAME,
     SKILL_FLAGS_FILENAME,

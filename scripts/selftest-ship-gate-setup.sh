@@ -74,7 +74,7 @@ rm -rf apps/other
 
 newrepo sg-mark-age
 mkdir -p .claude/hooks
-cp "$SG" "$SGH" "$HERE/ship-mark.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" .claude/hooks/
+cp "$SG" "$SGH" "$HERE/ship-mark.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" .claude/hooks/
 chmod +x .claude/hooks/*.sh; H=".claude/hooks/ship-gate-hook.sh"
 printf "GAUNTLET_MUTATE='echo clean'\n" > .claude/gauntlet.conf
 git checkout -qb feat/old; echo "const a=1" > a.ts; git add -A; git commit -qm w

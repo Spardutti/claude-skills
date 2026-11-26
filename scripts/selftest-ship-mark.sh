@@ -4,7 +4,7 @@
 echo "the /deliver mark"
 newrepo sg-mark
 mkdir -p .claude/hooks
-cp "$SG" "$SGH" "$HERE/ship-mark.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" .claude/hooks/
+cp "$SG" "$SGH" "$HERE/ship-mark.sh" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" .claude/hooks/
 chmod +x .claude/hooks/*.sh
 H=".claude/hooks/ship-gate-hook.sh"; MARK=".claude/hooks/ship-mark.sh"
 printf "GAUNTLET_MUTATE='echo clean'\n" > .claude/gauntlet.conf

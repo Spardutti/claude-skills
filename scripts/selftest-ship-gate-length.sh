@@ -5,7 +5,7 @@ echo "ship-gate length check and the baseline"
 newrepo sg_length
 mkdir -p .claude/hooks src
 cp "$SG" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" \
-   "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" .claude/hooks/
+   "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" .claude/hooks/
 printf 'GAUNTLET_MUTATE="echo clean"\n' > .claude/gauntlet.conf
 echo '{}' > package.json
 awk 'BEGIN { for (i=0;i<300;i++) print "export const x" i " = 1" }' > src/old.ts

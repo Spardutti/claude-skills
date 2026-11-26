@@ -47,7 +47,7 @@
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-. "$HERE/gate-config.sh" && . "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" && . "$HERE/ship-gate-files.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
+. "$HERE/gate-config.sh" && . "$HERE/ship-gate-projects.sh" && . "$HERE/ship-gate-structure.sh" && . "$HERE/ship-gate-files.sh" && . "$HERE/ship-gate-mutmut.sh" || { echo "ship-gate: cannot read its helpers in $HERE"; exit 1; }
 
 MODE=""
 case "${1:-}" in
@@ -310,56 +310,7 @@ for owner in $OWNERS; do
 
   # Module scope still returns a changed file's old survivors; the baseline accepts
   # them. Names index within a function, so only editing that function re-charges them.
-  if [ "$TOOL" = mutmut ]; then
-    BL="$base.mutmut-baseline"
-    # A glob that matches no mutant aborts the run, so nothing in scope was tested.
-    if [ -n "$SCOPE_RE" ] && grep -qs "nothing matches" "$MLOG"; then
-      echo "  $label mutmut — UNPROVEN: no mutant in the changed module(s): $(printf '%s ' $MODS)"
-      [ "$STATUS" = 0 ] && STATUS=2; rm -f "$MLOG"; continue
-    fi
-    NOWF=$(mktemp)
-    printf '%s\n' "$OUT" \
-      | sed -n 's/^[[:space:]]*\([^[:space:]]*\): survived$/\1/p' | sort -u > "$NOWF"
-
-    # When the tests need a service the run cannot reach — a database, a queue
-    # — mutmut still generates every mutant and records it "not checked". No
-    # survivors come out, so the gate printed "nothing survived" and, with no
-    # baseline yet, wrote an EMPTY one and told the user to commit it. That
-    # repo's Python gate could never fail again.
-    #
-    # Counting kills cannot catch it: `mutmut results` SKIPS killed mutants
-    # unless --all (mutmut/__main__.py results()), so a perfect suite and a
-    # suite that ran nothing both print nothing. The status string is what
-    # separates them — "not checked" is exit code None in status_by_exit_code,
-    # meaning the mutant was never executed at all.
-    NOTCHECKED=$(printf '%s\n' "$OUT" | grep -c ': not checked$')
-    if [ "$NOTCHECKED" -gt 0 ]; then
-      mutmut_unchecked "$label" "$base" "$NOTCHECKED" "$MLOG"
-      [ "$STATUS" = 0 ] && STATUS=2
-      rm -f "$NOWF" "$MLOG"
-      continue
-    fi
-
-    [ "$MODE" != baseline ] && baseline_first "$BL" "$NOWF" "$MODS" "$label" && [ "$STATUS" = 0 ] && STATUS=2
-    if [ "$MODE" = baseline ]; then
-      baseline_write "$BL" "$NOWF" "$SCOPE_RE" "$MODS"
-      NOTE="  $label mutmut — baseline set: $(wc -l < "$BL") survivor(s) accepted. Commit $BL."
-      SURVIVED=""
-    elif [ -f "$BL" ]; then
-      # -Fxv against an empty baseline reports every survivor, which is right:
-      # an empty baseline means nothing has been accepted.
-      SURVIVED=$(grep -Fxv -f "$BL" "$NOWF" | head -20)
-      FIXED=$(grep -E "^(${SCOPE_RE:-.*})\.x" "$BL" | grep -Fxvc -f "$NOWF")
-    else
-      cp "$NOWF" "$BL"
-      NOTE="  $label mutmut — no baseline, so nothing could be compared. Recorded
-      $(wc -l < "$BL") existing survivor(s) in $BL — commit it, then run the
-      gate again. From here only NEW survivors fail; --baseline accepts more."
-      SURVIVED=""
-      [ "$STATUS" = 0 ] && STATUS=2
-    fi
-    rm -f "$NOWF" "$MLOG"
-  fi
+  [ "$TOOL" = mutmut ] && { mutmut_judge || continue; }
 
   if [ -n "$SURVIVED" ]; then
     echo "  $label $TOOL (${T}s) — these lines can break and no test notices:"

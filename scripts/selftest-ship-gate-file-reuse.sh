@@ -89,7 +89,7 @@ mutated "and keeps no file from it" 0 "src/a.ts:2-4,src/b.ts:2-7"
 b 8
 mutated "a clean run before the gate changes" 0 "src/b.ts:2-8"
 mkdir -p "$TMP/gate3"
-cp "$SG" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$TMP/gate3/"
+cp "$SG" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" "$TMP/gate3/"
 echo "# a newer gate" >> "$TMP/gate3/ship-gate-files.sh"
 SG_REAL=$SG; SG="$TMP/gate3/ship-gate.sh"
 mutated "a changed gate keeps no file" 0 "src/a.ts:2-4,src/b.ts:2-8"

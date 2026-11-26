@@ -78,7 +78,7 @@ ran_in "--baseline after a change asks mutmut, not a JS app that passed" "api" -
 
 # A verdict from an older gate is a verdict from whatever bugs it had.
 mkdir -p "$TMP/gate2"
-cp "$SG" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$TMP/gate2/"
+cp "$SG" "$HERE/gate-config.sh" "$HERE/line-limit.sh" "$HERE/ship-gate-projects.sh" "$HERE/ship-gate-structure.sh" "$HERE/ship-gate-files.sh" "$HERE/ship-gate-mutmut.sh" "$TMP/gate2/"
 echo "# a newer gate" >> "$TMP/gate2/ship-gate.sh"
 SG_REAL=$SG; SG="$TMP/gate2/ship-gate.sh"
 ran_in "a changed gate trusts no verdict an older one recorded" "admin api web"
