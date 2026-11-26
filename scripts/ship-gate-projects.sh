@@ -28,6 +28,14 @@ py_mutmut() {
 # Node that lives only in Docker leaves no Stryker on the host. An executable
 # .stryker-run runs it there instead, taking the arguments stryker would.
 stryker_bin() { if [ -x "$1.stryker-run" ]; then echo ./.stryker-run; else echo npx --no-install stryker; fi; }
+# Stock Vitest reloads every test file once per mutant; the batch runner loads it once.
+# Local only: Docker behind .stryker-run cannot see this host path.
+stryker_batch() {  # stryker_batch <base>: the extra Stryker arguments, or nothing
+  [ ! -x "$1.stryker-run" ] && [ -f "$HERE/stryker-batch-runner.mjs" ] || return 0
+  grep -qsE "testRunner[\"']?[[:space:]]*:[[:space:]]*[\"']vitest[\"']" "$1"stryker.conf* || return 0
+  d=$(cd "${1:-.}" && node -p "require('path').dirname(require.resolve('@stryker-mutator/vitest-runner/package.json'))" 2>/dev/null)
+  [ -f "$d/dist/src/vitest-test-runner.js" ] && printf " --testRunner vitest-batch --appendPlugins '%s'" "$HERE/stryker-batch-runner.mjs"
+}
 stryker_elsewhere() {  # stryker_elsewhere <tool> <base>: after a failed run, say where Stryker could run
   [ "$1" = stryker ] && [ ! -x "$2.stryker-run" ] || return 0
   d=$(cd "${2:-.}" && pwd)

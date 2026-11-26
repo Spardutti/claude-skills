@@ -239,7 +239,7 @@ for owner in $OWNERS; do
     # 8 of them on one commit, all long since killed. --mutate already scopes
     # the run to the changed hunks, so incremental buys nothing here and costs
     # a cache that goes stale exactly the way mutmut's did.
-    CMD="${RUN}$(stryker_bin "$base") run --concurrency $(gate_workers) --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
+    CMD="${RUN}$(stryker_bin "$base") run --concurrency $(gate_workers)$(stryker_batch "$base") --mutate '${FLAGS#,}'"; stryker_page_tests "$base" "$label"
   elif [ -z "$PY" ] && [ -f "$base"package.json ]; then
     MISSING="$MISSING  $label needs Stryker:
       npm --prefix ${owner} i -D @stryker-mutator/core @stryker-mutator/vitest-runner

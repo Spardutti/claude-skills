@@ -67,6 +67,7 @@ stub() { printf '#!/bin/sh\necho "%s" >> %s\n' "$2" "$LOG" > "bin/$1"; chmod +x 
 . "$HERE/selftest-gauntlet-hook.sh"      # the Stop hook: skips, detection, runners
 . "$HERE/selftest-gauntlet-delta.sh"     # the Stop hook re-tests only code changed since green
 . "$HERE/selftest-ship-gate-stryker.sh"  # the JS half of the ship gate
+. "$HERE/selftest-ship-gate-stryker-batch.sh"  # when Stryker gets the batch runner
 . "$HERE/selftest-ship-gate-glob.sh"     # a [id] route is judged on its changed lines only
 . "$HERE/selftest-ship-gate-stryker-zero.sh"  # survivors from a run that tested nothing
 . "$HERE/selftest-ship-gate-page-tests.sh"  # page tests passed off as proof for logic

@@ -34,6 +34,7 @@ import { homedir } from "node:os";
 //                             text-rules.mjs on each edited file
 //   bash-check.sh             PostToolUse on Bash — edit-check.sh on files a command changed
 //   registry.mjs              run by /plan-feature and /registry — the *.registry.yaml checks
+//   stryker-batch-*.mjs       handed to Stryker by ship-gate.sh — one test load per batch of mutants
 
 const GATE_FILENAME = "skill-gate.sh";
 const AUTO_MARK_FILENAME = "skill-gate-automark.sh";
@@ -63,6 +64,8 @@ const SHIP_LOG_REPORT_FILENAME = "ship-log-report.mjs";
 const SHIP_MARK_FILENAME = "ship-mark.sh";
 const SHIP_PREP_FILENAME = "ship-prep.sh";
 const REGISTRY_FILENAMES = ["registry.mjs", "registry-lib.mjs"];
+const STRYKER_BATCH_RUNNER_FILENAME = "stryker-batch-runner.mjs";
+const STRYKER_BATCH_WORKER_FILENAME = "stryker-batch-worker.mjs";
 const LEGACY_EVAL_FILENAME = "skill-forced-eval-hook.sh";
 const LEGACY_AUDIT_RUNNER_FILENAME = "skill-audit-runner.sh";
 
@@ -159,6 +162,8 @@ export async function setupHook(targetDir = process.cwd()) {
     SHIP_MARK_FILENAME,
     SHIP_PREP_FILENAME,
     ...REGISTRY_FILENAMES,
+    STRYKER_BATCH_RUNNER_FILENAME,
+    STRYKER_BATCH_WORKER_FILENAME,
   ]) {
     const dest = join(hooksDir, name);
     await writeFile(dest, await readHookSource(name), { mode: 0o755 });
