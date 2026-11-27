@@ -190,8 +190,8 @@ qc.invalidateQueries({ queryKey: todosKeys._def });
 qc.setQueryData(todosKeys.detail(todo.id).queryKey, todo);
 ```
 
-Common post-mutation pattern: `setQueryData` for the detail you just touched,
-plus `invalidateQueries` on the related list `_def`.
+After a mutation, write the response into the detail and list leaves with
+`setQueryData`. Invalidate a `_def` only for lists the response can't fill.
 
 ## `_def` vs `_ctx`
 
@@ -271,4 +271,4 @@ Pick `@lukemorales/query-key-factory` for hierarchical fuzzy invalidation (`_def
 7. **Use `contextQueries` for parent-owned sub-data**, sibling leaves for flat relationships.
 8. **Keep keys serializable** — primitives and plain objects only, no Dates, Maps, or class instances.
 9. **Pass parameters through the leaf signature**, not via closure — keeps keys deterministic.
-10. **After a mutation**, prefer `setQueryData` on the detail leaf plus `invalidateQueries` on the list `_def`.
+10. **After a mutation**, `setQueryData` the response into the detail and list leaves; invalidate a list `_def` only when the response can't fill it.

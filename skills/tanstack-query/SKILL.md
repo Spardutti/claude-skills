@@ -185,9 +185,8 @@ qc.invalidateQueries({ queryKey: ['todos', id], exact: true }); // only this one
 | Parallel reads, variable count | `useQueries({ queries: [...] })` |
 | Paginated/cursor lists | `useInfiniteQuery` with `initialPageParam` |
 | Write data | `useMutation` |
-| Refresh after a write — server is source of truth | `queryClient.invalidateQueries` |
-| Refresh after a write — mutation returns fresh entity | `queryClient.setQueryData` (skip the refetch) |
-| Common pattern after a write | `setQueryData(detail)` + `invalidateQueries(list._def)` |
+| Sync after a write — create, update or delete | `setQueryData` from the response on every cache that shows it (no refetch) |
+| Sync a cache the response can't fill (server-sorted pages, counts) | `queryClient.invalidateQueries` on that cache only |
 | Evict on logout | `queryClient.removeQueries` (or `queryClient.clear()`) |
 | Disable until args ready | `enabled: false` on `useQuery` (never on `useSuspenseQuery`) |
 | Stable spinner across page changes | `placeholderData: keepPreviousData` |
@@ -201,7 +200,7 @@ qc.invalidateQueries({ queryKey: ['todos', id], exact: true }); // only this one
 3. **Query keys are serializable arrays, broad to narrow:** `['todos', 'list', { filters }]`, `['todos', 'detail', id]`. Stringify dates; never put functions, `Map`/`Set`, or class instances in a key.
 4. **`queryFn` throws on non-OK responses.** Resolved promise = success in the cache. Always thread `signal` for cancellation.
 5. **No side effects in `useQuery`.** `onSuccess`/`onError` are gone — put effects in `useEffect` or in the relevant `useMutation`.
-6. **Default to pessimistic mutations.** Wait for the server, then `setQueryData` or `invalidateQueries`. Reach for optimistic only when latency hurts UX — and then all five steps: `cancelQueries` → snapshot → `setQueryData` → `onError` rollback → `onSettled` invalidate. See MUTATIONS.md.
+6. **Default to pessimistic mutations.** Wait for the server, then write its response with `setQueryData` — create appends, update replaces, delete removes; invalidate only what the response can't fill. Reach for optimistic only when latency hurts UX — and then all five steps: `cancelQueries` → snapshot → `setQueryData` → `onError` rollback → `onSuccess` writes the server's answer. See MUTATIONS.md.
 7. **One factory per domain, imported directly.** No 1000-line monolith, and no `mergeQueryKeys` root that every file imports. See QUERY-KEYS.md.
 8. **`enabled: false` is not idle.** Gate UI on the precondition itself, not on `isPending`. Never combine `enabled` with `useSuspenseQuery`.
 9. **SSR:** create a fresh `QueryClient` per request on the server, and on the client create it inside `useState(() => new QueryClient())` — never at module scope.
@@ -212,5 +211,5 @@ qc.invalidateQueries({ queryKey: ['todos', id], exact: true }); // only this one
 For deeper guidance, load the file matching what you're working on:
 
 - **QUERY-KEYS.md** — read before your first `useQuery` in a repo — it may already have a key factory you must extend — and when designing query keys, building a `@lukemorales/query-key-factory` factory, or invalidating cache by prefix. Covers the domain pattern (one `createQueryKeys` file per domain, imported directly), the `_def` / `_ctx` / `contextQueries` shapes, fuzzy vs exact invalidation targets, and `inferQueryKeys` for type extraction.
-- **MUTATIONS.md** — read when writing `useMutation`, doing optimistic updates, or invalidating after a write. Covers the `mutate` vs `mutateAsync` choice, the `onMutate → mutationFn → onSuccess/onError → onSettled` lifecycle, **pessimistic vs optimistic — pick the default**, the canonical `cancelQueries → snapshot → setQueryData → rollback → invalidate` template, the full `refetchType` table (including `'none'` for broad invalidations), call-site vs hook-level callbacks, and concurrent-mutation `scope`.
+- **MUTATIONS.md** — read when writing `useMutation`, doing optimistic updates, or syncing the cache after a write. Covers the `mutate` vs `mutateAsync` choice, the `onMutate → mutationFn → onSuccess/onError → onSettled` lifecycle, **pessimistic vs optimistic — pick the default**, create/update/delete cache writes from the response, when to invalidate instead, the canonical `cancelQueries → snapshot → setQueryData → rollback → write server answer` template, the full `refetchType` table (including `'none'` for broad invalidations), call-site vs hook-level callbacks, and concurrent-mutation `scope`.
 - **QUERIES.md** — read when reading data, tuning options, handling errors, or integrating devtools. Covers `select` for derived state and re-render stability, error handling (`throwOnError`, retry, retryDelay, error boundaries), full `useInfiniteQuery` example + key-change reset gotcha, `useSuspenseQuery` and `useQueries` examples, stale closures in `queryFn`, network/focus options (`networkMode`, dev-mode `refetchOnWindowFocus`, `gcTime: 0`), and Devtools setup.

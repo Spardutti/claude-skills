@@ -8,7 +8,7 @@
 - Pessimistic vs optimistic — pick the default
 - The optimistic update template
 - Invalidation strategies & `refetchType`
-- `setQueryData` vs `invalidateQueries`
+- When to invalidate instead
 - Call-site callbacks vs hook-level callbacks
 - Mutation keys and concurrent mutations
 - Server action / RSC interop
@@ -87,34 +87,53 @@ Order of callbacks for a single `mutate()` call:
 What each callback is for:
 
 - **`onMutate`** — optimistic write + snapshot for rollback. Return the snapshot as context.
-- **`onError`** — roll back using `context`. Don't refetch here; `onSettled` will.
-- **`onSuccess`** — react to confirmed success (toast, navigate, write fresh server data into cache).
-- **`onSettled`** — runs on both branches. **Invalidate here**, so the cache resyncs whether the mutation succeeded or failed.
+- **`onError`** — roll back using `context`. Don't refetch here.
+- **`onSuccess`** — **write the server response into the cache**, then UI reactions (toast, navigate).
+- **`onSettled`** — runs on both branches. Only for work that must happen either way.
 
 ## Pessimistic vs Optimistic — Pick the Default
 
-**Default to pessimistic.** Wait for the server, then sync the cache. Optimistic is only worth its complexity (rollback bookkeeping, race conditions) when perceived latency actually hurts UX — toggles, likes, list reordering, anything that should feel instant.
+**Default to pessimistic.** Wait for the server, then write its response into every cache that shows the changed data. The response already is the fresh state, so no refetch. Optimistic is only worth its complexity (rollback bookkeeping, race conditions) when perceived latency actually hurts UX — toggles, likes, list reordering, anything that should feel instant.
 
 ```ts
-// PESSIMISTIC, flavor (a): use the server response to write the cache directly.
-// No refetch needed for the entity you just mutated.
+// BAD: refetches data the response already holds — an extra round-trip and a flicker
 useMutation({
-  mutationFn: api.updateTodo,
-  onSuccess: (updated) => {
-    queryClient.setQueryData(['todos', 'detail', updated.id], updated);
-    queryClient.invalidateQueries({ queryKey: ['todos', 'list'] });
+  mutationFn: api.createTodo,
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
+});
+
+// GOOD: create — add the server's row to the list
+useMutation({
+  mutationFn: api.createTodo,
+  onSuccess: (created) => {
+    // returning undefined leaves a list that was never fetched unloaded
+    queryClient.setQueryData<Todo[]>(['todos', 'list'], (old) => old && [...old, created]);
+    queryClient.setQueryData(['todos', 'detail', created.id], created);
   },
 });
 
-// PESSIMISTIC, flavor (b): invalidate and let queries refetch.
-// Use when you don't trust the response shape, or the mutation affects many entities.
+// GOOD: update — replace the row everywhere it shows
 useMutation({
   mutationFn: api.updateTodo,
-  onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
+  onSuccess: (updated) => {
+    queryClient.setQueryData<Todo[]>(['todos', 'list'], (old) =>
+      old?.map((t) => (t.id === updated.id ? updated : t)),
+    );
+    queryClient.setQueryData(['todos', 'detail', updated.id], updated);
+  },
+});
+
+// GOOD: delete — drop the row and its detail
+useMutation({
+  mutationFn: (id: string) => api.deleteTodo(id),
+  onSuccess: (_res, id) => {
+    queryClient.setQueryData<Todo[]>(['todos', 'list'], (old) => old?.filter((t) => t.id !== id));
+    queryClient.removeQueries({ queryKey: ['todos', 'detail', id], exact: true });
+  },
 });
 ```
 
-Most mutations should look like one of the two above. Reach for the optimistic template below only when the wait would feel wrong to the user.
+Most mutations should look like one of these. Invalidate only the caches the response cannot fill — see "When to Invalidate Instead". Reach for the optimistic template below only when the wait would feel wrong to the user.
 
 ## The Optimistic Update Template
 
@@ -148,9 +167,10 @@ const updateTodo = useMutation({
     }
   },
 
-  onSettled: () => {
-    // Re-sync with server regardless of outcome
-    queryClient.invalidateQueries({ queryKey: ['todos'] });
+  onSuccess: (saved) => {
+    queryClient.setQueryData<Todo[]>(['todos'], (old) =>
+      old?.map((t) => (t.id === saved.id ? saved : t)),
+    );
   },
 });
 ```
@@ -160,7 +180,7 @@ Why each step matters:
 - **`cancelQueries`** — an in-flight refetch will land *after* your optimistic write and clobber it. This is the only way to prevent the race.
 - **`getQueryData` snapshot** — without it, `onError` has nothing to roll back to.
 - **`setQueryData` updater fn `(old) => ...`** — never a static value; the cache may have moved since render.
-- **`invalidateQueries` in `onSettled`** — both branches resync: server may add derived fields on success; on error the optimistic write must be discarded.
+- **`onSuccess` writes the server's answer over the guess** — it carries what the guess lacked (ids, timestamps, derived fields). On error the rollback already restored the cache, so nothing refetches.
 
 ## Invalidation Strategies & `refetchType`
 
@@ -200,24 +220,22 @@ queryClient.invalidateQueries({ queryKey: ['todos'], refetchType: 'none' });
 
 Trap: `invalidateQueries({ queryKey: ['todos'] })` is fuzzy by default. If you mean only the literal `['todos']` key, pass `exact: true`.
 
-## `setQueryData` vs `invalidateQueries`
+## When to Invalidate Instead
+
+Invalidate only a cache you cannot compute from the response:
+
+- **Server-sorted or server-filtered lists, and pages.** The new or edited row may belong on another page or outside the filter.
+- **Counts and aggregates** the response doesn't carry (totals, unread badges).
+- **Server side effects** — the write changed other records (a cascade, a recalculated parent).
+- **No usable response** — an empty body, or a shape different from the cache.
 
 ```ts
-// BAD: invalidate after mutation when the response already has fresh data —
-// causes an unnecessary network round-trip
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['todos', 'detail', id] });
-},
-
-// GOOD: write the server response directly, skip the refetch
-onSuccess: (updatedTodo) => {
-  queryClient.setQueryData(['todos', 'detail', updatedTodo.id], updatedTodo);
-  // …and still invalidate the *list* queries since their shape may differ
-  queryClient.invalidateQueries({ queryKey: ['todos', 'list'] });
+// GOOD: write what the response gives, mark stale only what it can't fill
+onSuccess: (created) => {
+  queryClient.setQueryData(['todos', 'detail', created.id], created);
+  queryClient.invalidateQueries({ queryKey: ['todos', 'search'], refetchType: 'none' });
 },
 ```
-
-Rule of thumb: `setQueryData` for the exact entity you mutated (you have the response). `invalidateQueries` for everything related you don't have fresh data for (lists, counts, search results).
 
 ## Call-site Callbacks vs Hook-level Callbacks
 
@@ -227,7 +245,7 @@ Rule of thumb: `setQueryData` for the exact entity you mutated (you have the res
 // Hook-level: ALWAYS runs, even if the component unmounts before the mutation settles
 const updateTodo = useMutation({
   mutationFn: api.updateTodo,
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
+  onSuccess: (updated) => queryClient.setQueryData(['todos', 'detail', updated.id], updated),
 });
 
 // Call-site: tied to the calling component's lifecycle — DROPPED if it unmounts
@@ -285,8 +303,8 @@ Mutations sharing a `scope.id` queue and run sequentially. Use one scope per log
 1. **Default to pessimistic.** Reach for the optimistic template only when waiting feels wrong to the user.
 2. Always `await cancelQueries` at the start of `onMutate` — otherwise an in-flight refetch will clobber your optimistic write.
 3. Always snapshot in `onMutate` and roll back in `onError`. Optimistic updates without rollback leave the cache permanently wrong.
-4. Invalidate in `onSettled`, not `onSuccess` — `onSettled` runs on both branches so the cache resyncs after errors too.
-5. Use `setQueryData` for the entity you just mutated (you have fresh server data); `invalidateQueries` for related lists/counts.
+4. **Write the server response into the cache in `onSuccess`** — create appends, update replaces, delete removes. Never refetch data the response already holds.
+5. Invalidate only what the response can't fill: server-sorted or filtered lists, pages, counts, server side effects.
 6. Pass `setQueryData` an updater function `(old) => ...`, not a static value — the cache may have moved since render.
 7. `invalidateQueries` is fuzzy by default. Pass `exact: true` when you want only the literal key.
 8. **Use `refetchType: 'none'`** for broad post-mutation invalidations — avoids network storms for queries the user can't currently see.
