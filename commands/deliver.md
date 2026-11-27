@@ -1,6 +1,6 @@
 ---
 name: deliver
-description: "Suggest it to the user once a feature or fix is built and reviewed; start it only when the user asks to ship. Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument to step through interactively; `deliver pr` runs through PR creation; `deliver release` runs the full pipeline through the GitHub release."
+description: "Suggest it to the user once a feature or fix is built and reviewed; start it only when the user asks to ship. Unified git delivery pipeline — gate → commit → PR → merge → release. A quality gate runs first and fixes what it finds; run with no argument (or `deliver pr`) to run through PR creation and stop; `deliver release` runs the full pipeline through the GitHub release."
 category: Workflow
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task, Skill
 requires-agents: [gauntlet-skills]
@@ -9,7 +9,7 @@ argument-hint: "[pr | release] [--force to skip the gate]"
 
 # Ship — Commit → PR → Merge → Release
 
-`/deliver` is a four-stage git delivery pipeline. It detects where your work currently is, runs from there, and either stops at a target stage or asks you at each boundary.
+`/deliver` is a four-stage git delivery pipeline. It detects where your work currently is, runs from there, and stops at the target stage — the **pr** stage unless you name another.
 
 Stages, in order: **commit → pr → merge → release**, with a **gate** in front of all of them.
 
@@ -20,8 +20,7 @@ Stages, in order: **commit → pr → merge → release**, with a **gate** in fr
 
 | Invocation | Behavior |
 |---|---|
-| `/deliver` | Interactive — run the start stage, then ask "continue to `<next>`?" at every boundary. Stop when you decline. |
-| `/deliver pr` | Run through the **pr** stage, then stop. |
+| `/deliver` / `/deliver pr` | Run through the **pr** stage, then stop. |
 | `/deliver release` | Run the full pipeline through the **release** stage. |
 | `/deliver commit` / `/deliver merge` | Run through that stage, then stop. |
 
@@ -63,7 +62,7 @@ This order is exhaustive and the conditions do not overlap once evaluated top-do
 
 - If `$ARGUMENTS` names a target **earlier** than the detected start, the target is already satisfied. Do not say a bare "nothing to do" — show the existing artifact: e.g. `/deliver pr` when a PR exists → "A PR already exists for this branch: `<URL>`." Then stop.
 - If `$ARGUMENTS` names a target **later** than the start, state the plan and get **one** confirmation: *"You have uncommitted changes — `/deliver release` will run commit → pr → merge → release. Proceed?"* Then run each stage to the target without further prompts — except a merge into main, which always confirms.
-- If `$ARGUMENTS` is empty, run the start stage, then **ask before advancing** to each next stage.
+- If `$ARGUMENTS` is empty, the target is **pr**.
 
 Each stage below re-verifies its own precondition and aborts if Step 0 routed it wrong.
 
@@ -394,8 +393,7 @@ run from the main folder, it logs to the main folder's branch and splits the shi
 
 ## Flow Examples
 
-- **`/deliver` on a dirty feature branch** → commits, asks "create a PR?" → "merge it?" → "cut a release?". Decline at any point to stop.
-- **`/deliver pr`** → commits if needed, pushes, creates the PR, stops. If a PR already exists, reports its URL and stops.
+- **`/deliver` or `/deliver pr`** → commits if needed, pushes, creates the PR, stops. If a PR already exists, reports its URL and stops.
 - **`/deliver release` with everything already merged** → `chore/release-<version>` with the bump → PR into dev → merge → release PR dev → main → merge → tag.
 - **`/deliver release` on a dirty feature branch** → one upfront confirmation, then commit → version bump on the same branch → pr → merge into dev → release PR dev → main → merge → tag. Two PRs, no back-merge.
 
@@ -422,6 +420,6 @@ run from the main folder, it logs to the main folder's branch and splits the shi
 - ALWAYS detect main/dev branches and the PR base automatically; apply 0.x semver rules for pre-1.0 projects.
 - ALWAYS confirm the release version, and confirm before any merge into `main`.
 - ALWAYS run stages in order — skip satisfied stages, never skip required ones; each stage re-verifies its precondition.
-- With no `$ARGUMENTS`, ask before advancing to each next stage; with a target set, confirm once upfront then run through (a merge into `main` still asks).
+- With no `$ARGUMENTS`, run through the pr stage without asking; with a later target, confirm once upfront then run through (a merge into `main` still asks).
 - If a target is already satisfied, report the existing artifact (branch, PR URL, tag) — never a bare "nothing to do".
 - Verify `gh auth status` before the pr, merge, and release stages; if it fails, explain setup and stop.
