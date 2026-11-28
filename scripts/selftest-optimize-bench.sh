@@ -17,6 +17,7 @@ awk '/^## Step 1/{s=1} s&&/^```bash$/{b=1;next} b&&/^```$/{exit} b' "$HERE/../co
 cat > "$OB/work/.mutmut-run" <<'M'
 #!/bin/sh
 echo "$*" >> ../ran.log
+[ -e ../slow ] && sleep 5
 [ "$1" = results ] && cat ../results.fixture
 exit 0
 M
@@ -43,4 +44,11 @@ echo "baseline" > "$OB/out/round2.prediction"
 out=$(cd "$OB/work" && bash ../out/bench.sh round2 2>&1); rc=$?
 ob_check "an empty invariant is refused and not logged" \
   "$([ "$rc" = 4 ] && [ "$(grep -c . "$OB/out/rounds.log")" = 1 ] && echo 1)" "exit $rc: $out"
+
+printf 'base1\t1s\t2 items\tabc\tbaseline\n' >> "$OB/out/rounds.log"
+printf '    app.a.x_f__mutmut_1: killed\n' > "$OB/results.fixture"; touch "$OB/slow"
+echo "10-20% faster: one pool" > "$OB/out/round3.prediction"
+out=$(cd "$OB/work" && bash ../out/bench.sh round3 2>&1); rc=$?
+ob_check "a round past twice base1's time is killed, exits 5 and logs timeout" \
+  "$([ "$rc" = 5 ] && tail -1 "$OB/out/rounds.log" | grep -qE '^round3	[23]s	timeout	' && echo 1)" "exit $rc: $out"
 chmod -R u+w "$OB"

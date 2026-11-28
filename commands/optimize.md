@@ -41,9 +41,15 @@ invariant() {
   ./.mutmut-run results --all true | grep -E '^ +app\.' | sort
 }
 
+B=$(awk -F'\t' '$1=="base1"{print $2+0}' "$OUT/rounds.log" 2>/dev/null)
+export -f job; export OUT ROUND
 SECONDS=0
-job
+if [ -n "$B" ]; then timeout $((2*B)) bash -c job; else job; fi
+RC=$?
 T=$SECONDS
+if [ "$RC" = 124 ]; then
+  printf '%s\t%ss\ttimeout\t-\t%s\n' "$ROUND" "$T" "$(cat "$P")" | tee -a "$OUT/rounds.log"; exit 5
+fi
 invariant > "$OUT/$ROUND.results"
 N=$(grep -c . "$OUT/$ROUND.results")
 [ "$N" -gt 0 ] || { echo "empty invariant: $ROUND not recorded" >&2; exit 4; }
@@ -53,6 +59,7 @@ printf '%s\t%ss\t%s items\t%s\t%s\n' "$ROUND" "$T" "$N" "$H" "$(cat "$P")" | tee
 
 - **No prediction file, no run.** It exits 3 before timing anything, and locks the file read-only once the round starts.
 - **An empty invariant is refused,** with exit 4 and nothing logged.
+- **A round past twice `base1`'s time is killed,** logged as `timeout`, and exits 5. It counts as a failed round: revert it.
 - **`rounds.log` is the record.** One line per run: round, seconds, item count, invariant hash, prediction. The report copies it; nothing is written from memory.
 
 - **Check it is worth it first.** Time the real job once, as it runs for real. If it takes under a minute, the target saves seconds per run: say so and stop, unless the user asks to go on. One run spent an hour taking an 11-second job to 10.
@@ -60,11 +67,13 @@ printf '%s\t%ss\t%s items\t%s\t%s\n' "$ROUND" "$T" "$N" "$H" "$(cat "$P")" | tee
 - **Fix the input.** A benchmark over "whatever changed" measures a different job each round.
 - **Clear what the real job would not have.** A leftover cache (`mutants/`, `.pytest_cache`, a warm build) turns a run into a replay that tests nothing.
 - Record `sha256sum bench.sh` once the baseline is set. Check it before every round; a changed benchmark ends the run.
-- Run it **twice** before touching anything, as rounds `base1` and `base2`, each with a prediction file that says `baseline`. If the two times differ by more than 10%, the benchmark is noise: find why (another job running, a cold cache, a container starting) before any round.
+- Once the user has confirmed the invariant (Step 2), run it **twice** before touching anything, as rounds `base1` and `base2`, each with a prediction file that says `baseline`. If the two times differ by more than 10%, the benchmark is noise: find why (another job running, a cold cache, a container starting) before any round.
 
 ## Step 2 — The invariant
 
 Name the result the job produces that must be **identical** after every change: each mutant's status, tests passed, rows exported. Record it as counts **and** a hash of the full list.
+
+**Get the user's yes first.** Show them the `invariant` command and a sample of what it prints, and wait for their answer before `base1` runs. Once the baseline is recorded, it can no longer change.
 
 **Reject an empty invariant.** `bench.sh` refuses one with exit 4 — never work around that. A hash of nothing (`e3b0c442…` is SHA-256 of empty input) matches every future run, so it would wave any change through.
 
@@ -135,6 +144,7 @@ If the cause is a **pattern**, not a one-off, write it as one rule the way a ski
 - NEVER write a prediction whose range includes no change.
 - NEVER profile beside a benchmark run.
 - NEVER read into or change another project.
+- ALWAYS get the user's yes on the invariant before `base1` runs.
 - ALWAYS run `/test-review speed` first when the job runs tests, and stop on a break.
 - ALWAYS run a round through `bench.sh <round>`, never the job by hand.
 - ALWAYS profile after a wrong prediction, before the next round.
